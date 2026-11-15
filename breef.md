@@ -136,3 +136,5 @@ Gli stati che vedi in `git shared status`:
 - Linux e Windows. Serve git 2.34 o più recente.
 - Al massimo 32 peer per file shared; path fino a 4096 caratteri. Nessun limite al numero di file shared per repo.
 - L'estensione va installata su ogni macchina che deve pubblicare o applicare versioni. Chi non ce l'ha usa comunque la repo normalmente.
+
+test shared dell'utente
