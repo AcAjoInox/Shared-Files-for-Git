@@ -19,24 +19,35 @@ int proc_read(Proc_t *p, int delim, Str_t *rec)
     return got;
 }
 
+void proc_close_in(Proc_t *p)
+{
+    if (p->in != NULL) {
+        (void)fclose(p->in);
+        p->in = NULL;
+    }
+}
+
+eGsErr_t proc_collect(Proc_t *p, Str_t *out, int *exit_code)
+{
+    char chunk[4096];
+    size_t n;
+
+    str_reset(out);
+    while ((n = fread(chunk, 1U, sizeof chunk, p->out)) > 0U) {
+        str_addn(out, chunk, n);
+    }
+    return proc_finish(p, exit_code);
+}
+
 eGsErr_t proc_capture(const char *const argv[], unsigned flags, Str_t *out,
                       int *exit_code)
 {
     Proc_t p;
-    char chunk[4096];
-    size_t n;
     eGsErr_t err;
 
     err = proc_start(&p, argv, flags);
-    if (err != GS_OK) {
-        goto exit;
+    if (err == GS_OK) {
+        err = proc_collect(&p, out, exit_code);
     }
-    str_reset(out);
-    while ((n = fread(chunk, 1U, sizeof chunk, p.out)) > 0U) {
-        str_addn(out, chunk, n);
-    }
-    err = proc_finish(&p, exit_code);
-
-exit:
     return err;
 }

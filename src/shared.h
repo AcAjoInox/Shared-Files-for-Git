@@ -1,41 +1,74 @@
 /*
- * shared.h - modello: i file shared dichiarati in .gitshared (§6.3).
+ * shared.h - modello: la repo corrente e i suoi file shared (§6.3).
  *
- * Nella v0 (M0) solo lettura di .gitshared. Seguiranno l'unione con le
- * sezioni locali di .git/config e la derivazione dello stato (D-054, D-065).
+ * Una voce unisce due fonti: la sezione [shared "<nome>"] di .gitshared
+ * (versionata: nome, id, path) e la sezione [shared "<id>"] di .git/config
+ * (locale: branch attivi, operazione in attesa; D-068).
  */
 #ifndef GS_SHARED_H
 #define GS_SHARED_H
 
 #include <stddef.h>
 
+#include "bounds.h"
 #include "err.h"
+#include "git.h"
 #include "str.h"
 
+/* Operazione in attesa di commit (REQ-F-023). */
+typedef enum {
+    SHARED_PENDING_NONE = 0,
+    SHARED_PENDING_SET,
+    SHARED_PENDING_LINK,
+    SHARED_PENDING_UNLINK
+} ePending_t;
+
 typedef struct {
-    Str_t name; /* nome breve: nome della sezione in .gitshared */
-    Str_t id;   /* 32 cifre esadecimali minuscole (D-006) */
-    Str_t path; /* relativo alla radice della repo, separatore '/' */
+    Str_t name;     /* nome della sezione in .gitshared */
+    Str_t path;     /* da .gitshared: relativo alla radice, separatore '/' */
+    Str_t branches; /* branch attivi (o default), ognuno chiuso da '\0' */
+    char id[GS_ID_HEX_LEN + 1U]; /* "" se in .gitshared non e' valido */
+    unsigned in_gitshared : 1U; /* sezione in .gitshared (working tree) */
+    unsigned in_config : 1U;    /* sezione [shared "<id>"] in .git/config */
+    unsigned valid : 1U;        /* id e path ben formati */
+    unsigned pending : 2U;      /* ePending_t */
 } SharedEntry_t;
 
 typedef struct {
+    Str_t top;    /* radice del working tree */
+    Str_t prefix; /* cartella corrente relativa a top: "" oppure "dir/" */
+    Str_t branch; /* branch corrente senza "refs/heads/"; "" se HEAD staccata */
     SharedEntry_t *v;
     size_t n;
     size_t cap;
-} SharedList_t;
+} Repo_t;
 
-#define SHARED_LIST_INIT { NULL, 0U, 0U }
-
-void shared_list_free(SharedList_t *l);
+#define REPO_INIT { STR_INIT, STR_INIT, STR_INIT, NULL, 0U, 0U }
 
 /*
- * Legge <top>/.gitshared, nell'ordine del file. Un file assente da' una
- * lista vuota. GS_ERR_FORMAT se il file non e' un config di git valido
- * (git ha gia' scritto su stderr la riga sbagliata).
+ * Apre la repo della cartella corrente e carica i file shared.
+ * GS_ERR_NOT_REPO fuori da un working tree; GS_ERR_FORMAT se .gitshared
+ * non e' un config valido (git ha gia' indicato la riga sbagliata).
  */
-eGsErr_t shared_load(const char *top, SharedList_t *l);
+eGsErr_t repo_open(Repo_t *r);
+void repo_close(Repo_t *r);
 
-/* 1 se la voce ha un ID ben formato e un path relativo, 0 altrimenti. */
-int shared_entry_valid(const SharedEntry_t *e);
+/* Nuova voce vuota in fondo. Invalida i puntatori alle voci precedenti. */
+SharedEntry_t *repo_add(Repo_t *r);
+SharedEntry_t *repo_find_path(Repo_t *r, const char *path);
+SharedEntry_t *repo_find_name(Repo_t *r, const char *name);
+
+/* 1 se branch e' tra i branch attivi della voce (nomi esatti nella v0). */
+int shared_is_active(const SharedEntry_t *e, const char *branch);
+
+/* Nuovo ID casuale: UUID v4 in 32 cifre esadecimali minuscole (D-006). */
+eGsErr_t shared_new_id(char id[GS_ID_HEX_LEN + 1U]);
+
+/*
+ * Completa o scarta le operazioni in attesa (REQ-F-023): completa quelle
+ * gia' committate (la sezione e' in HEAD:.gitshared), scarta quelle la cui
+ * sezione non c'e' piu' nemmeno nel working tree. Nella v0: solo `set`.
+ */
+eGsErr_t repo_complete_pending(Repo_t *r, GitBatch_t *b);
 
 #endif /* GS_SHARED_H */

@@ -87,9 +87,52 @@ expect_no_out() {
 	esac
 }
 
-# make_repo <nome>: repo git vuota in $TRASH/<nome>
+# make_repo <nome>: repo git vuota in $TRASH/<nome>, branch iniziale main
 make_repo() {
-	git init -q "$TRASH/$1"
+	git init -q -b main "$TRASH/$1"
+}
+
+# expect_eq <descrizione> <ottenuto> <atteso>
+expect_eq() {
+	if [ "$2" = "$3" ]; then
+		ok "$1"
+	else
+		not_ok "$1" "ottenuto: '$2'" "atteso:   '$3'"
+	fi
+}
+
+# expect_ok <descrizione> <comando...>: il comando termina con 0
+expect_ok() {
+	desc=$1
+	shift
+	if "$@" >/dev/null 2>&1; then
+		ok "$desc"
+	else
+		not_ok "$desc" "comando fallito: $*"
+	fi
+}
+
+# expect_fail <descrizione> <comando...>: il comando termina con errore
+expect_fail() {
+	desc=$1
+	shift
+	if "$@" >/dev/null 2>&1; then
+		not_ok "$desc" "comando riuscito: $*"
+	else
+		ok "$desc"
+	fi
+}
+
+# put <file> <contenuto>: scrive il file e lo committa
+put() {
+	printf '%s\n' "$2" >"$1"
+	git add -- "$1"
+	git commit -q -m "$1: $2"
+}
+
+# shared_id <nome>: id della voce <nome> in .gitshared (repo corrente)
+shared_id() {
+	git config -f .gitshared "shared.$1.id"
 }
 
 # done_testing: piano TAP; codice di uscita 1 se un test e' fallito

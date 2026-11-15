@@ -1,7 +1,10 @@
 /*
  * cmd_status.c - "git shared status" (REQ-F-012).
  *
- * M0: elenca le voci di .gitshared. Lo stato non e' ancora ricavato.
+ * Processi git nel caso comune (file allineato), su qualunque numero di
+ * file: tre in parallelo (radice, branch, config locale), poi .gitshared
+ * e un solo cat-file per tutte le domande. La storia di un file si legge
+ * solo quando H e T differiscono.
  */
 #include <stdio.h>
 
@@ -10,24 +13,48 @@
 #include "git.h"
 #include "msg.h"
 #include "shared.h"
+#include "state.h"
 
-static void print_entry(const SharedEntry_t *e)
+static const eMsgId_t state_msg[] = {
+    [STATE_ALIGNED] = MSG_STATE_ALIGNED,
+    [STATE_TO_APPLY] = MSG_STATE_TO_APPLY,
+    [STATE_TO_PUBLISH] = MSG_STATE_TO_PUBLISH,
+    [STATE_DIVERGED] = MSG_STATE_DIVERGED,
+    [STATE_PENDING] = MSG_STATE_PENDING,
+    [STATE_UNLINKED] = MSG_STATE_UNLINKED,
+    [STATE_INCONSISTENT] = MSG_STATE_INCONSISTENT,
+};
+
+static void print_entry(const SharedEntry_t *e, eState_t st, int suspended)
 {
-    printf("%s\n", str_cstr(&e->name));
-    printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_PATH), str_cstr(&e->path));
-    printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_ID), str_cstr(&e->id));
-    printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_STATE),
-           msg(MSG_STATE_UNKNOWN));
+    if (e->in_gitshared) {
+        printf("%s\n", str_cstr(&e->name));
+        printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_PATH), str_cstr(&e->path));
+    } else {
+        printf("%s\n", msg(MSG_STATUS_UNDECLARED));
+    }
+    printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_ID), e->id);
+    printf("    %-6s ", msg(MSG_STATUS_FIELD_STATE));
+    if (suspended != 0) {
+        printf(msg(MSG_STATUS_SUSPENDED), msg(state_msg[st]));
+    } else {
+        fputs(msg(state_msg[st]), stdout);
+    }
+    putchar('\n');
 }
 
 int cmd_status(int argc, char **argv)
 {
-    Str_t top = STR_INIT;
-    SharedList_t list = SHARED_LIST_INIT;
+    Repo_t repo = REPO_INIT;
+    GitBatch_t batch;
+    const SharedEntry_t *e;
+    eState_t st;
     size_t i;
     size_t shown = 0U;
-    eGsErr_t err;
+    int batch_open = 0;
+    int suspended;
     int rc = GS_EXIT_FATAL;
+    eGsErr_t err;
 
     (void)argv;
     if (argc > 1) {
@@ -36,41 +63,54 @@ int cmd_status(int argc, char **argv)
         rc = GS_EXIT_USAGE;
         goto exit;
     }
-
-    err = git_toplevel(&top);
-    if (err == GS_ERR_NOT_REPO) {
-        msg_fatal(MSG_ERR_NOT_REPO);
-        goto exit;
-    }
+    err = repo_open(&repo);
     if (err != GS_OK) {
-        msg_fatal(MSG_ERR_PROC, "git");
+        msg_fatal((err == GS_ERR_NOT_REPO)  ? MSG_ERR_NOT_REPO
+                  : (err == GS_ERR_FORMAT) ? MSG_ERR_READ_GITSHARED
+                                           : MSG_ERR_PROC,
+                  "git");
         goto exit;
     }
-
-    err = shared_load(str_cstr(&top), &list);
-    if (err != GS_OK) {
-        msg_fatal(MSG_ERR_READ_GITSHARED);
+    if (git_batch_open(&batch) != GS_OK) {
+        msg_fatal(MSG_ERR_PROC, "git cat-file");
         goto exit;
     }
+    batch_open = 1;
+    rc = GS_EXIT_OK;
+    if (repo_complete_pending(&repo, &batch) != GS_OK) {
+        msg_error(MSG_ERR_PENDING);
+        rc = GS_EXIT_ERROR; /* si mostra comunque lo stato */
+    }
 
-    for (i = 0U; i < list.n; i++) {
-        if (shared_entry_valid(&list.v[i]) != 0) {
+    for (i = 0U; i < repo.n; i++) {
+        e = &repo.v[i];
+        if (e->in_gitshared && !e->valid) {
+            msg_warning(MSG_WARN_BAD_ENTRY, str_cstr(&e->name));
+        } else if (e->in_gitshared || e->in_config) {
+            if (state_derive(&repo, e, &batch, &st) != GS_OK) {
+                msg_fatal(MSG_ERR_PROC, "git");
+                rc = GS_EXIT_FATAL;
+                goto exit;
+            }
+            suspended = state_is_derived(st) &&
+                        !shared_is_active(e, str_cstr(&repo.branch));
             if (shown > 0U) {
                 putchar('\n');
             }
-            print_entry(&list.v[i]);
+            print_entry(e, st, suspended);
             shown++;
         } else {
-            msg_warning(MSG_WARN_BAD_ENTRY, str_cstr(&list.v[i].name));
+            /* attesa appena scartata: niente da mostrare */
         }
     }
     if (shown == 0U) {
         puts(msg(MSG_STATUS_NONE));
     }
-    rc = GS_EXIT_OK;
 
 exit:
-    shared_list_free(&list);
-    str_free(&top);
+    if (batch_open != 0) {
+        git_batch_close(&batch);
+    }
+    repo_close(&repo);
     return rc;
 }

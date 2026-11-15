@@ -10,7 +10,7 @@
 #include "cmd.h"
 #include "err.h"
 #include "msg.h"
-#include "proc.h"
+#include "sys.h"
 
 typedef int (*cmd_fn_t)(int argc, char **argv);
 
@@ -22,6 +22,7 @@ typedef struct {
 
 static const CmdDef_t commands[] = {
     { "help", cmd_help, MSG_USAGE_HELP },
+    { "set", cmd_set, MSG_USAGE_SET },
     { "status", cmd_status, MSG_USAGE_STATUS },
 };
 
@@ -47,7 +48,7 @@ int main(int argc, char **argv)
     const CmdDef_t *cmd;
     int rc = GS_EXIT_USAGE;
 
-    proc_utf8_args(&argc, &argv);
+    sys_init(&argc, &argv);
 
     if ((argc < 2) || (strcmp(argv[1], "-h") == 0)) {
         fputs(msg(MSG_USAGE_MAIN), stdout);

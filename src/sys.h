@@ -1,0 +1,32 @@
+/*
+ * sys.h - servizi del sistema operativo che non riguardano i processi.
+ *
+ * Con proc, unico modulo con codice diverso per piattaforma (§6.2):
+ * sys_win.c e sys_posix.c. Tutti i path sono in UTF-8.
+ */
+#ifndef GS_SYS_H
+#define GS_SYS_H
+
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+
+#include "err.h"
+
+/*
+ * Da chiamare per prima in main. Windows: argomenti convertiti in UTF-8.
+ * POSIX: SIGPIPE ignorato, cosi' scrivere a un figlio gia' terminato da'
+ * un errore invece di terminare il programma.
+ */
+void sys_init(int *argc, char ***argv);
+
+/* n byte dal generatore casuale del sistema operativo. */
+eGsErr_t sys_random(uint8_t *buf, size_t n);
+
+FILE *sys_fopen(const char *path, const char *mode);
+int sys_remove(const char *path);
+
+/* 1 se il path esiste ed e' una cartella. */
+int sys_is_dir(const char *path);
+
+#endif /* GS_SYS_H */

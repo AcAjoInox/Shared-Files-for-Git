@@ -7,7 +7,6 @@
  */
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-#include <shellapi.h>
 
 #include <fcntl.h>
 #include <io.h>
@@ -16,34 +15,7 @@
 
 #include "mem.h"
 #include "proc.h"
-
-/* UTF-8 -> UTF-16, allocata con xmalloc. */
-static wchar_t *utf8_to_wide(const char *s)
-{
-    int n = MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
-    wchar_t *w = xmalloc((size_t)((n > 0) ? n : 1) * sizeof *w);
-
-    if (n <= 0) {
-        w[0] = L'\0';
-    } else {
-        (void)MultiByteToWideChar(CP_UTF8, 0, s, -1, w, n);
-    }
-    return w;
-}
-
-/* UTF-16 -> UTF-8, allocata con xmalloc. */
-static char *wide_to_utf8(const wchar_t *w)
-{
-    int n = WideCharToMultiByte(CP_UTF8, 0, w, -1, NULL, 0, NULL, NULL);
-    char *s = xmalloc((size_t)((n > 0) ? n : 1));
-
-    if (n <= 0) {
-        s[0] = '\0';
-    } else {
-        (void)WideCharToMultiByte(CP_UTF8, 0, w, -1, s, n, NULL, NULL);
-    }
-    return s;
-}
+#include "sys_win.h"
 
 /*
  * Aggiunge un argomento alla riga di comando con le regole di
@@ -100,7 +72,7 @@ static wchar_t *find_in_path(const char *name)
     if (strchr(name, '.') == NULL) {
         str_add(&file, ".exe");
     }
-    wfile = utf8_to_wide(str_cstr(&file));
+    wfile = win_utf8_to_wide(str_cstr(&file));
     n = SearchPathW(_wgetenv(L"PATH"), wfile, NULL, 0, NULL, NULL);
     if (n > 0U) {
         found = xmalloc((size_t)n * sizeof *found);
@@ -114,22 +86,6 @@ static wchar_t *find_in_path(const char *name)
     return found;
 }
 
-/* Copia ereditabile di un handle standard; NUL se non e' valido. */
-static HANDLE inheritable(HANDLE h)
-{
-    HANDLE dup = INVALID_HANDLE_VALUE;
-    SECURITY_ATTRIBUTES sa = { sizeof sa, NULL, TRUE };
-
-    if ((h == NULL) || (h == INVALID_HANDLE_VALUE) ||
-        !DuplicateHandle(GetCurrentProcess(), h, GetCurrentProcess(), &dup, 0,
-                         TRUE, DUPLICATE_SAME_ACCESS)) {
-        dup = CreateFileW(L"NUL", GENERIC_READ | GENERIC_WRITE,
-                          FILE_SHARE_READ | FILE_SHARE_WRITE, &sa,
-                          OPEN_EXISTING, 0, NULL);
-    }
-    return dup;
-}
-
 static HANDLE open_null(void)
 {
     SECURITY_ATTRIBUTES sa = { sizeof sa, NULL, TRUE };
@@ -139,27 +95,66 @@ static HANDLE open_null(void)
                        0, NULL);
 }
 
+/* Copia ereditabile di un handle standard; NUL se non e' valido. */
+static HANDLE inheritable(HANDLE h)
+{
+    HANDLE dup = INVALID_HANDLE_VALUE;
+
+    if ((h == NULL) || (h == INVALID_HANDLE_VALUE) ||
+        !DuplicateHandle(GetCurrentProcess(), h, GetCurrentProcess(), &dup, 0,
+                         TRUE, DUPLICATE_SAME_ACCESS)) {
+        dup = open_null();
+    }
+    return dup;
+}
+
+/* HANDLE -> FILE *. Se riesce, l'handle passa al FILE e *h diventa NULL. */
+static FILE *wrap_handle(HANDLE *h, int oflag, const char *mode)
+{
+    FILE *f = NULL;
+    int fd = _open_osfhandle((intptr_t)*h, oflag | _O_BINARY);
+
+    if (fd >= 0) {
+        *h = NULL;
+        f = _fdopen(fd, mode);
+        if (f == NULL) {
+            (void)_close(fd);
+        }
+    }
+    return f;
+}
+
+static void close_handle(HANDLE *h)
+{
+    if ((*h != NULL) && (*h != INVALID_HANDLE_VALUE)) {
+        (void)CloseHandle(*h);
+    }
+    *h = NULL;
+}
+
 eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags)
 {
     SECURITY_ATTRIBUTES sa = { sizeof sa, NULL, TRUE };
     STARTUPINFOW si;
     PROCESS_INFORMATION pi;
-    HANDLE rd = NULL;
-    HANDLE wr = NULL;
-    HANDLE in = INVALID_HANDLE_VALUE;
-    HANDLE errh = INVALID_HANDLE_VALUE;
+    HANDLE out_rd = NULL;
+    HANDLE out_wr = NULL;
+    HANDLE in_rd = NULL;
+    HANDLE in_wr = NULL;
+    HANDLE errh = NULL;
+    HANDLE child = NULL;
     Str_t cmd = STR_INIT;
     wchar_t *wcmd = NULL;
     wchar_t *wapp = NULL;
     size_t i;
-    int fd;
     eGsErr_t err = GS_ERR_PROC;
 
+    p->in = NULL;
     p->out = NULL;
     p->handle = 0;
 
     if (strpbrk(argv[0], "/\\") != NULL) {
-        wapp = utf8_to_wide(argv[0]);
+        wapp = win_utf8_to_wide(argv[0]);
     } else {
         wapp = find_in_path(argv[0]);
     }
@@ -172,13 +167,22 @@ eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags)
         }
         append_arg(&cmd, argv[i]);
     }
-    wcmd = utf8_to_wide(str_cstr(&cmd));
+    wcmd = win_utf8_to_wide(str_cstr(&cmd));
 
-    if (!CreatePipe(&rd, &wr, &sa, 0)) {
+    /* Le estremita' del padre non sono ereditabili: un figlio avviato dopo
+     * non le riceve, e chiudere le nostre basta a dare la fine dei dati. */
+    if (!CreatePipe(&out_rd, &out_wr, &sa, 0)) {
         goto exit;
     }
-    (void)SetHandleInformation(rd, HANDLE_FLAG_INHERIT, 0); /* resta nostro */
-    in = open_null();
+    (void)SetHandleInformation(out_rd, HANDLE_FLAG_INHERIT, 0);
+    if ((flags & PROC_STDIN_PIPE) != 0U) {
+        if (!CreatePipe(&in_rd, &in_wr, &sa, 0)) {
+            goto exit;
+        }
+        (void)SetHandleInformation(in_wr, HANDLE_FLAG_INHERIT, 0);
+    } else {
+        in_rd = open_null();
+    }
     errh = ((flags & PROC_STDERR_NULL) != 0U)
                ? open_null()
                : inheritable(GetStdHandle(STD_ERROR_HANDLE));
@@ -186,47 +190,45 @@ eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags)
     memset(&si, 0, sizeof si);
     si.cb = sizeof si;
     si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdInput = in;
-    si.hStdOutput = wr;
+    si.hStdInput = in_rd;
+    si.hStdOutput = out_wr;
     si.hStdError = errh;
     if (!CreateProcessW(wapp, wcmd, NULL, NULL, TRUE, 0, NULL, NULL, &si,
                         &pi)) {
         goto exit;
     }
     (void)CloseHandle(pi.hThread);
+    child = pi.hProcess;
 
-    fd = _open_osfhandle((intptr_t)rd, _O_RDONLY | _O_BINARY);
-    if (fd < 0) {
-        (void)TerminateProcess(pi.hProcess, 1U);
-        (void)CloseHandle(pi.hProcess);
-        goto exit;
-    }
-    rd = NULL; /* ora appartiene a fd */
-    p->out = _fdopen(fd, "rb");
+    p->out = wrap_handle(&out_rd, _O_RDONLY, "rb");
     if (p->out == NULL) {
-        (void)_close(fd);
-        (void)TerminateProcess(pi.hProcess, 1U);
-        (void)CloseHandle(pi.hProcess);
         goto exit;
     }
-    p->handle = (intptr_t)pi.hProcess;
+    if (in_wr != NULL) {
+        p->in = wrap_handle(&in_wr, _O_WRONLY, "wb");
+        if (p->in == NULL) {
+            goto exit;
+        }
+    }
+    p->handle = (intptr_t)child;
+    child = NULL;
     err = GS_OK;
 
 exit:
-    /* Gli handle passati al figlio non servono piu' al padre: chiudere wr
-     * e' cio' che fa arrivare la fine dell'output quando il figlio esce. */
-    if (wr != NULL) {
-        (void)CloseHandle(wr);
+    if (child != NULL) { /* avviato ma non collegato: lo si ferma */
+        (void)TerminateProcess(child, 1U);
+        (void)CloseHandle(child);
+        if (p->out != NULL) {
+            (void)fclose(p->out);
+            p->out = NULL;
+        }
     }
-    if (rd != NULL) {
-        (void)CloseHandle(rd);
-    }
-    if (in != INVALID_HANDLE_VALUE) {
-        (void)CloseHandle(in);
-    }
-    if (errh != INVALID_HANDLE_VALUE) {
-        (void)CloseHandle(errh);
-    }
+    /* Le estremita' del figlio non servono piu' al padre. */
+    close_handle(&out_wr);
+    close_handle(&in_rd);
+    close_handle(&errh);
+    close_handle(&out_rd);
+    close_handle(&in_wr);
     free(wcmd);
     free(wapp);
     str_free(&cmd);
@@ -239,6 +241,7 @@ eGsErr_t proc_finish(Proc_t *p, int *exit_code)
     DWORD code = 0U;
     eGsErr_t err = GS_ERR_PROC;
 
+    proc_close_in(p);
     (void)fclose(p->out);
     p->out = NULL;
     if (WaitForSingleObject(h, INFINITE) != WAIT_OBJECT_0) {
@@ -253,27 +256,4 @@ eGsErr_t proc_finish(Proc_t *p, int *exit_code)
 exit:
     (void)CloseHandle(h);
     return err;
-}
-
-void proc_utf8_args(int *argc, char ***argv)
-{
-    int n = 0;
-    int i;
-    wchar_t **wargv = CommandLineToArgvW(GetCommandLineW(), &n);
-    char **args;
-
-    if (wargv == NULL) {
-        goto exit; /* si tengono gli argomenti originali */
-    }
-    args = xmalloc(((size_t)n + 1U) * sizeof *args);
-    for (i = 0; i < n; i++) {
-        args[i] = wide_to_utf8(wargv[i]);
-    }
-    args[n] = NULL;
-    (void)LocalFree(wargv);
-    *argc = n;
-    *argv = args;
-
-exit:
-    return;
 }

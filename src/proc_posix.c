@@ -11,17 +11,43 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+/* Il descrittore si chiude da solo all'exec: i figli avviati dopo non
+ * ricevono le estremita' del padre. */
+static void set_cloexec(int fd)
+{
+    int fl = fcntl(fd, F_GETFD);
+
+    if (fl >= 0) {
+        (void)fcntl(fd, F_SETFD, fl | FD_CLOEXEC);
+    }
+}
+
+static void close_fd(int *fd)
+{
+    if (*fd >= 0) {
+        (void)close(*fd);
+    }
+    *fd = -1;
+}
+
 /* Nel figlio, dopo fork: collega i descrittori e lancia il programma. */
 static _Noreturn void child_exec(const char *const argv[], unsigned flags,
-                                 int fd_out)
+                                 int fd_in, int fd_out)
 {
     int null_fd = open("/dev/null", O_RDWR);
 
-    if (null_fd >= 0) {
+    if (fd_in >= 0) {
+        (void)dup2(fd_in, STDIN_FILENO);
+        (void)close(fd_in);
+    } else if (null_fd >= 0) {
         (void)dup2(null_fd, STDIN_FILENO);
-        if ((flags & PROC_STDERR_NULL) != 0U) {
-            (void)dup2(null_fd, STDERR_FILENO);
-        }
+    } else {
+        /* senza /dev/null il figlio eredita lo stdin */
+    }
+    if (((flags & PROC_STDERR_NULL) != 0U) && (null_fd >= 0)) {
+        (void)dup2(null_fd, STDERR_FILENO);
+    }
+    if (null_fd >= 0) {
         (void)close(null_fd);
     }
     (void)dup2(fd_out, STDOUT_FILENO);
@@ -38,36 +64,63 @@ static _Noreturn void child_exec(const char *const argv[], unsigned flags,
 
 eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags)
 {
-    int fds[2];
-    pid_t pid;
+    int out_fd[2] = { -1, -1 };
+    int in_fd[2] = { -1, -1 };
+    pid_t pid = -1;
     eGsErr_t err = GS_ERR_PROC;
 
+    p->in = NULL;
     p->out = NULL;
     p->handle = 0;
-    if (pipe(fds) != 0) {
+    if (pipe(out_fd) != 0) {
         goto exit;
+    }
+    if (((flags & PROC_STDIN_PIPE) != 0U) && (pipe(in_fd) != 0)) {
+        goto exit;
+    }
+    set_cloexec(out_fd[0]);
+    if (in_fd[1] >= 0) {
+        set_cloexec(in_fd[1]);
     }
     pid = fork();
     if (pid < 0) {
-        (void)close(fds[0]);
-        (void)close(fds[1]);
         goto exit;
     }
     if (pid == 0) {
-        (void)close(fds[0]);
-        child_exec(argv, flags, fds[1]);
+        close_fd(&out_fd[0]);
+        close_fd(&in_fd[1]);
+        child_exec(argv, flags, in_fd[0], out_fd[1]);
     }
-    (void)close(fds[1]);
-    p->out = fdopen(fds[0], "r");
+    close_fd(&out_fd[1]);
+    close_fd(&in_fd[0]);
+
+    p->out = fdopen(out_fd[0], "r");
     if (p->out == NULL) {
-        (void)close(fds[0]);
-        (void)waitpid(pid, NULL, 0);
         goto exit;
+    }
+    out_fd[0] = -1; /* ora appartiene a p->out */
+    if (in_fd[1] >= 0) {
+        p->in = fdopen(in_fd[1], "w");
+        if (p->in == NULL) {
+            goto exit;
+        }
+        in_fd[1] = -1;
     }
     p->handle = (intptr_t)pid;
     err = GS_OK;
 
 exit:
+    close_fd(&out_fd[0]);
+    close_fd(&out_fd[1]);
+    close_fd(&in_fd[0]);
+    close_fd(&in_fd[1]);
+    if ((err != GS_OK) && (pid > 0)) { /* avviato ma non collegato */
+        if (p->out != NULL) {
+            (void)fclose(p->out);
+            p->out = NULL;
+        }
+        (void)waitpid(pid, NULL, 0);
+    }
     return err;
 }
 
@@ -76,6 +129,7 @@ eGsErr_t proc_finish(Proc_t *p, int *exit_code)
     int status = 0;
     eGsErr_t err = GS_ERR_PROC;
 
+    proc_close_in(p);
     (void)fclose(p->out);
     p->out = NULL;
     if (waitpid((pid_t)p->handle, &status, 0) < 0) {
@@ -93,10 +147,4 @@ eGsErr_t proc_finish(Proc_t *p, int *exit_code)
 
 exit:
     return err;
-}
-
-void proc_utf8_args(int *argc, char ***argv)
-{
-    (void)argc;
-    (void)argv;
 }

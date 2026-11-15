@@ -9,6 +9,7 @@
 #define GS_CMD_H
 
 int cmd_help(int argc, char **argv);
+int cmd_set(int argc, char **argv);
 int cmd_status(int argc, char **argv);
 
 #endif /* GS_CMD_H */

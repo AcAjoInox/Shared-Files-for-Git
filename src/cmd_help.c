@@ -19,6 +19,7 @@ static const char manual[] =
     "    git-shared - keep the same file aligned across repositories\n"
     "\n"
     "SYNOPSIS\n"
+    "    git shared set [-c | -m <message>] [--] <path>\n"
     "    git shared status\n"
     "    git shared help [<command>]\n"
     "\n"
@@ -28,8 +29,18 @@ static const char manual[] =
     "    repository when a new version exists and applies it on request.\n"
     "\n"
     "COMMANDS\n"
+    "    set [-c | -m <message>] [--] <path>\n"
+    "        Declare a tracked file of this repository as shared. The\n"
+    "        file is added to .gitshared, which is staged: the declaration\n"
+    "        takes effect when .gitshared is committed. -c commits right\n"
+    "        away with a standard message, -m <message> with <message>.\n"
+    "        Nothing is committed by default.\n"
+    "\n"
     "    status\n"
-    "        List the shared files declared in .gitshared.\n"
+    "        Show each shared file with its state: aligned, new version to\n"
+    "        apply, to publish, diverged, pending commit, unlinked,\n"
+    "        inconsistent. On a branch where the file is not active the\n"
+    "        state is shown as suspended.\n"
     "\n"
     "    help [<command>]\n"
     "        Show this manual, or the usage of a command.\n"
@@ -48,6 +59,7 @@ static const struct {
     eMsgId_t usage;
 } topics[] = {
     { "help", MSG_USAGE_HELP },
+    { "set", MSG_USAGE_SET },
     { "status", MSG_USAGE_STATUS },
 };
 

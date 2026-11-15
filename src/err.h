@@ -11,7 +11,8 @@ typedef enum {
     GS_ERR_NOT_REPO, /* fuori da una repo git o dal suo working tree */
     GS_ERR_PROC,     /* impossibile lanciare un processo */
     GS_ERR_GIT,      /* un comando git e' terminato con errore */
-    GS_ERR_FORMAT    /* dati in un formato inatteso */
+    GS_ERR_FORMAT,   /* dati in un formato inatteso */
+    GS_ERR_SYS       /* errore del sistema operativo (file, numeri casuali) */
 } eGsErr_t;
 
 /* Codici di uscita del programma, come git (REQ-NF-008). */
