@@ -1,3 +1,3 @@
-build/msg.o: src/msg.c src/msg.h src/str.h
+build/msg.o: src/msg.c src/msg.h utils/str.h
 src/msg.h:
-src/str.h:
+utils/str.h:

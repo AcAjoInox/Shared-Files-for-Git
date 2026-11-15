@@ -1,7 +1,7 @@
-build/proc_win.o: src/proc_win.c src/mem.h src/proc.h src/err.h src/str.h \
- src/sys_win.h
-src/mem.h:
-src/proc.h:
-src/err.h:
-src/str.h:
-src/sys_win.h:
+build/proc_win.o: utils/proc_win.c utils/mem.h utils/proc.h utils/err.h \
+ utils/str.h utils/sys_win.h
+utils/mem.h:
+utils/proc.h:
+utils/err.h:
+utils/str.h:
+utils/sys_win.h:

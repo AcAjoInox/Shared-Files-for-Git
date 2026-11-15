@@ -8,11 +8,13 @@
 # PREFIX di default: ~/bin su Linux, %USERPROFILE%\bin su Windows.
 # Su Windows serve MinGW-w64 GCC. make funziona da Git Bash, PowerShell e cmd.
 
-CC      := gcc
-CFLAGS  := -std=c11 -Wall -Wextra -Wpedantic -Wshadow -Wstrict-prototypes \
-           -O2 -g
-SRC_DIR := src
-BUILD   := build
+CC       := gcc
+CFLAGS   := -std=c11 -Wall -Wextra -Wpedantic -Wshadow -Wstrict-prototypes \
+            -O2 -g
+# src/: il core. utils/: moduli di base, senza dipendenze da src/ (§6.2).
+SRC_DIRS := src utils
+BUILD    := build
+CPPFLAGS += $(addprefix -I,$(SRC_DIRS))
 
 ifeq ($(OS),Windows_NT)
 EXE      := .exe
@@ -48,17 +50,20 @@ RMDIR = rm -rf "$1"
 endif
 
 # Codice per piattaforma: i file *_win.c e *_posix.c (§6.2).
-SRC      := $(filter-out %_win.c %_posix.c,$(wildcard $(SRC_DIR)/*.c)) \
-            $(wildcard $(SRC_DIR)/*_$(PLAT).c)
-OBJ      := $(patsubst $(SRC_DIR)/%.c,$(BUILD)/%.o,$(SRC))
+ALL_C    := $(foreach d,$(SRC_DIRS),$(wildcard $(d)/*.c))
+SRC      := $(filter-out %_win.c %_posix.c,$(ALL_C)) \
+            $(filter %_$(PLAT).c,$(ALL_C))
+# Oggetti tutti in build/: i nomi dei file sono unici tra le cartelle.
+OBJ      := $(addprefix $(BUILD)/,$(notdir $(SRC:.c=.o)))
 BIN      := $(BUILD)/git-shared$(EXE)
+vpath %.c $(SRC_DIRS)
 
 all: $(BIN)
 
 $(BIN): $(OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
-$(BUILD)/%.o: $(SRC_DIR)/%.c | $(BUILD)
+$(BUILD)/%.o: %.c | $(BUILD)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -MMD -MP -c -o $@ $<
 
 $(BUILD):

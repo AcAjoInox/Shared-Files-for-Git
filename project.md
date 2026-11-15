@@ -300,6 +300,8 @@ Un **unico eseguibile** `git-shared` (`git-shared.exe` su Windows) con una tabel
 #### Moduli
 Ogni livello usa solo quelli sotto. Solo `proc` e `sys` contengono codice diverso per piattaforma: i file `*_win.c` e `*_posix.c`, scelti dal Makefile.
 
+I moduli di base non legati a git shared (`proc`, `sys`, `str`, `mem`, `err`) stanno in `utils/`, il core in `src/`. `utils/` non include nulla da `src/`: si potrebbe riusare in un altro progetto così com'è.
+
 | Livello | Modulo | Compito |
 |---|---|---|
 | Ingresso | `main` | Opzioni globali, tabella dei sottocomandi, codici di uscita |
@@ -322,18 +324,21 @@ Ogni livello usa solo quelli sotto. Solo `proc` e `sys` contengono codice divers
 git-shared-file/
 ├── project.md, breef.md, reportIdea.md
 ├── Makefile                  build Linux e Windows (MinGW)
-├── src/
+├── src/                      il core
 │   ├── main.c
 │   ├── cmd.h                 prototipi dei sottocomandi
 │   ├── cmd_set.c  cmd_link.c  cmd_status.c  cmd_update.c
 │   ├── cmd_publish.c  cmd_hook.c  cmd_help.c
 │   ├── shared.c/.h  state.c/.h  chain.c/.h  peers.c/.h  hooks.c/.h
 │   ├── git.c/.h
+│   ├── path.c/.h
+│   ├── bounds.h
+│   └── msg.c/.h
+├── utils/                    moduli di base, senza dipendenze da src/
 │   ├── proc.c/.h  proc_win.c  proc_posix.c
 │   ├── sys.h  sys_win.c/.h  sys_posix.c
-│   ├── path.c/.h
-│   ├── str.c/.h  mem.c/.h  bounds.h  err.h
-│   └── msg.c/.h
+│   ├── str.c/.h  mem.c/.h
+│   └── err.h
 ├── doc/                      sorgente del manuale (A-06)
 ├── test/
 │   ├── lib.sh                funzioni comuni: repo di prova, asserzioni

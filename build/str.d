@@ -1,3 +1,3 @@
-build/str.o: src/str.c src/str.h src/mem.h
-src/str.h:
-src/mem.h:
+build/str.o: utils/str.c utils/str.h utils/mem.h
+utils/str.h:
+utils/mem.h:

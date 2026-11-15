@@ -1,7 +1,8 @@
-build/main.o: src/main.c src/cmd.h src/err.h src/msg.h src/str.h \
- src/sys.h
+build/main.o: src/main.c src/cmd.h utils/err.h src/msg.h utils/str.h \
+ utils/sys.h utils/err.h
 src/cmd.h:
-src/err.h:
+utils/err.h:
 src/msg.h:
-src/str.h:
-src/sys.h:
+utils/str.h:
+utils/sys.h:
+utils/err.h:
