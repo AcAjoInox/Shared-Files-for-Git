@@ -1,0 +1,99 @@
+# lib.sh - funzioni comuni dei test di git shared.
+#
+# Uso, in testa a ogni t*.sh:   . "$(dirname "$0")/lib.sh"
+#
+# Ogni test gira in una cartella temporanea ($TRASH), cancellata alla fine,
+# con l'eseguibile di build/ in testa al PATH e senza la configurazione git
+# dell'utente o del sistema. Output nel formato TAP ("ok N - ...").
+
+TEST_DIR=$(cd "$(dirname "$0")" && pwd)
+BUILD_DIR=$(cd "$TEST_DIR/../build" && pwd) || {
+	echo "Bail out! manca build/: lanciare 'make'"
+	exit 1
+}
+PATH="$BUILD_DIR:$PATH"
+export PATH
+
+TRASH=$(mktemp -d "${TMPDIR:-/tmp}/git-shared-test.XXXXXX")
+trap 'rm -rf "$TRASH"' EXIT
+
+# Ambiente isolato e riproducibile.
+HOME="$TRASH"
+GIT_CONFIG_NOSYSTEM=1
+GIT_AUTHOR_NAME="Test Author"
+GIT_AUTHOR_EMAIL="author@example.com"
+GIT_COMMITTER_NAME="Test Committer"
+GIT_COMMITTER_EMAIL="committer@example.com"
+export HOME GIT_CONFIG_NOSYSTEM GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL \
+	GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
+
+n_test=0
+n_fail=0
+
+ok() {
+	n_test=$((n_test + 1))
+	echo "ok $n_test - $1"
+}
+
+not_ok() {
+	n_test=$((n_test + 1))
+	n_fail=$((n_fail + 1))
+	echo "not ok $n_test - $1"
+	shift
+	for line in "$@"; do
+		echo "#   $line"
+	done
+}
+
+# run <comando...>: esegue e salva codice di uscita, stdout e stderr
+# in $RC, $OUT, $ERR.
+run() {
+	"$@" >"$TRASH/.out" 2>"$TRASH/.err"
+	RC=$?
+	OUT=$(cat "$TRASH/.out")
+	ERR=$(cat "$TRASH/.err")
+}
+
+# expect_rc <descrizione> <codice atteso>
+expect_rc() {
+	if [ "$RC" -eq "$2" ]; then
+		ok "$1"
+	else
+		not_ok "$1" "codice di uscita $RC, atteso $2" "stderr: $ERR"
+	fi
+}
+
+# expect_out <descrizione> <testo>: stdout contiene il testo
+expect_out() {
+	case "$OUT" in
+	*"$2"*) ok "$1" ;;
+	*) not_ok "$1" "stdout non contiene: $2" "stdout: $OUT" ;;
+	esac
+}
+
+# expect_err <descrizione> <testo>: stderr contiene il testo
+expect_err() {
+	case "$ERR" in
+	*"$2"*) ok "$1" ;;
+	*) not_ok "$1" "stderr non contiene: $2" "stderr: $ERR" ;;
+	esac
+}
+
+# expect_no_out <descrizione> <testo>: stdout NON contiene il testo
+expect_no_out() {
+	case "$OUT" in
+	*"$2"*) not_ok "$1" "stdout contiene: $2" ;;
+	*) ok "$1" ;;
+	esac
+}
+
+# make_repo <nome>: repo git vuota in $TRASH/<nome>
+make_repo() {
+	git init -q "$TRASH/$1"
+}
+
+# done_testing: piano TAP; codice di uscita 1 se un test e' fallito
+done_testing() {
+	echo "1..$n_test"
+	[ "$n_fail" -eq 0 ]
+}
