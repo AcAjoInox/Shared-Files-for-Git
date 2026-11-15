@@ -107,7 +107,7 @@ Nessuno degli strumenti di §2.2 offre insieme tutte queste caratteristiche:
 | **`.gitshared`** | File versionato alla radice della repo che dichiara i file shared (nome, ID, path, default dei branch attivi, URL dei peer remoti). Gestito solo dall'estensione (D-050). |
 | **Versione shared** | Commit della catena `refs/shared/<id>`: il suo tree contiene il blob del file sotto un nome fisso, uguale in tutte le repo (D-042). |
 | **H, I, T** | Blob del file shared in HEAD (H), nell'index (I) e nell'ultima versione di `refs/shared/<id>` (T). Lo stato si ricava dal loro confronto e dalla base (D-039, D-041, D-054). |
-| **Base** | Versione shared da cui parte una modifica sul branch corrente. Non è salvata: è la versione del primo blob della catena che si incontra risalendo la storia del file da HEAD (D-041, D-065). |
+| **Base** | Versione shared da cui parte una modifica sul branch corrente. Non è salvata: si ricava dalla posizione nella storia del file delle versioni della catena (D-041, D-065). |
 | **Pubblicare** | Creare una nuova versione shared e inviarla ai peer con `git push` di `refs/shared/<id>` (solo fast-forward, D-040). |
 | **Ricevere** | Ottenere oggetti e ref di una versione da un peer: tramite il push del peer, oppure con `git fetch` durante `update`. Non tocca WT né index. |
 | **Applicare** | Portare una versione ricevuta nel WT e nell'index (`git shared update`). |
@@ -119,7 +119,7 @@ Nessuno degli strumenti di §2.2 offre insieme tutte queste caratteristiche:
 | **WT, IDX, ODB, REF** | Working tree, index, object database, ref. |
 
 ## 5. Requisiti
-> **BASELINE v2.9** (2026-11-15) — derivata dalle decisioni D-001…D-068. v2.9: unico eseguibile (§6.2, D-067); in `.git/config` solo dati per repo (REQ-F-020, D-068). v2.8: base ricavata dalla prima corrispondenza nella storia (REQ-F-012, D-065); allocazione dinamica ammessa (REQ-NF-011, §8.3, D-066). v2.7: `link` su una destinazione già shared con un altro ID (REQ-F-002, D-064). v2.6: il `pre-commit` avvisa e non blocca (REQ-F-006, D-058); effetti di `set`/`link`/`unlink` al commit (REQ-F-023, D-059); seme sostituito dalla catena vera (D-060); `link` riusa la storia esistente (REQ-F-002, D-062); C non esclusivo (REQ-NF-001, D-063). v2.5: pattern e default versionato dei branch attivi (REQ-F-021, REQ-F-022, D-056, D-057). v2.4: branch attivi per file shared (REQ-F-022, D-055). v2.3: stato ricavato prima dalla base, poi dal confronto (REQ-F-012, D-054). v2.1: `.gitshared` al posto di `.gitattributes` (REQ-F-021). v2.2: nuovi limiti statici (REQ-NF-011). v1.1: documentazione utente (REQ-F-018, REQ-F-019). v2.0: revisione architetturale I-015 (trasporto git, stato ricavabile, regola H/I/T, rinomina e cancellazione, pubblicazione configurabile). Ogni modifica successiva passa dal registro decisioni (§9) e incrementa la versione.
+> **BASELINE v2.10** (2026-11-15) — derivata dalle decisioni D-001…D-068. v2.10: base ricavata dalla posizione nella storia (D-065 rev. 1). v2.9: unico eseguibile (§6.2, D-067); in `.git/config` solo dati per repo (REQ-F-020, D-068). v2.8: base ricavata dalla prima corrispondenza nella storia (REQ-F-012, D-065); allocazione dinamica ammessa (REQ-NF-011, §8.3, D-066). v2.7: `link` su una destinazione già shared con un altro ID (REQ-F-002, D-064). v2.6: il `pre-commit` avvisa e non blocca (REQ-F-006, D-058); effetti di `set`/`link`/`unlink` al commit (REQ-F-023, D-059); seme sostituito dalla catena vera (D-060); `link` riusa la storia esistente (REQ-F-002, D-062); C non esclusivo (REQ-NF-001, D-063). v2.5: pattern e default versionato dei branch attivi (REQ-F-021, REQ-F-022, D-056, D-057). v2.4: branch attivi per file shared (REQ-F-022, D-055). v2.3: stato ricavato prima dalla base, poi dal confronto (REQ-F-012, D-054). v2.1: `.gitshared` al posto di `.gitattributes` (REQ-F-021). v2.2: nuovi limiti statici (REQ-NF-011). v1.1: documentazione utente (REQ-F-018, REQ-F-019). v2.0: revisione architetturale I-015 (trasporto git, stato ricavabile, regola H/I/T, rinomina e cancellazione, pubblicazione configurabile). Ogni modifica successiva passa dal registro decisioni (§9) e incrementa la versione.
 > Formato: ogni requisito ha un ID univoco, un testo verificabile e l'origine. La verifica è tracciata in §7.
 
 ### 5.0 Il modello in sintesi
@@ -265,7 +265,9 @@ La v0 è il **core solo locale**: tutto ciò che serve perché due o più repo s
 | **M2 – Due repo** | `link` su destinazione nuova, `publish`, `update` in fast-forward, `status` senza merge | REQ-F-002 (parte), REQ-F-004, REQ-F-005, REQ-F-007, REQ-F-009, REQ-F-010 |
 | **M3 – Hook** | Installazione con marker; `pre-commit` che avvisa; `post-commit` che pubblica e completa le operazioni in attesa | REQ-F-006, REQ-F-016, REQ-F-023 |
 
-> **Stato (2026-11-15): M0 completato.** `make` compila senza warning (`-Wall -Wextra -Wpedantic -Wshadow`), `make test` passa 44 test (§7). `git shared status` impiega in media 66 ms su Windows (due processi git), contro la soglia di 300 ms di REQ-NF-007. Il percorso di `proc_posix.c` non è ancora stato compilato né provato su Linux.
+> **Stato (2026-11-15): M0 e M1 completati.** `make` compila senza warning (`-Wall -Wextra -Wpedantic -Wshadow`), `make test` passa 111 test (§7). Tempi medi su Windows (soglia di REQ-NF-007: 300 ms): `status` con 5 file allineati 81 ms; con un file da pubblicare 93 ms; con un file con 30 commit di storia 118 ms; `set` 157 ms. I file `*_posix.c` non sono ancora stati compilati né provati su Linux.
+>
+> Limiti noti di M1: la regola dei merge di D-065 (basi diverse dai due genitori → *divergente*) non è applicata; la catena si legge seguendo il primo genitore (le versioni di merge arrivano con M2); sul branch nato prima del `set` lo stato è *incoerente* (A-21).
 
 **Fuori dalla v0**, in ordine di probabile arrivo: merge delle divergenze (REQ-F-011); `link` su destinazione esistente e `--adopt` (D-062, D-064); `unlink`, `mv`; comando `branch` e pattern (nella v0 i branch attivi sono solo nomi esatti, copiati dal default di `.gitshared`); `prune`, `relocate`; seme e ri-aggancio dopo un clone; messaggi in italiano, man page e HTML; hook da configurazione (git ≥ 2.54); prove con SHA-256 (il formato degli oid è già previsto).
 
@@ -296,18 +298,20 @@ Un **unico eseguibile** `git-shared` (`git-shared.exe` su Windows) con una tabel
 - Il dispatcher `sh` resta possibile in seguito, senza cambiare nulla per l'utente.
 
 #### Moduli
-Ogni livello usa solo quelli sotto. Solo `proc` contiene codice diverso per piattaforma (`#if defined(_WIN32)`).
+Ogni livello usa solo quelli sotto. Solo `proc` e `sys` contengono codice diverso per piattaforma: i file `*_win.c` e `*_posix.c`, scelti dal Makefile.
 
 | Livello | Modulo | Compito |
 |---|---|---|
 | Ingresso | `main` | Opzioni globali, tabella dei sottocomandi, codici di uscita |
 | Comandi | `cmd_*` | Un file per sottocomando: `set`, `link`, `status`, `update`, `publish`, `hook`, `help` |
-| Modello | `shared` | Elenco dei file shared (`.gitshared` + sezioni locali), derivazione dello stato (D-054, D-065) |
-| | `chain` | Catena `refs/shared/<id>`: lettura di T, creazione di una versione, ascendenza |
-| | `peers` | Membership; push e fetch verso i peer |
-| | `hooks` | Installazione dei blocchi con marker |
-| Accesso a git | `git` | Lancia un comando git, legge l'output riga per riga; funzioni per `config`, `rev-parse`, `update-ref`, `ls-files`, `mktree`, `commit-tree` |
-| Piattaforma | `proc` | Crea un processo **senza shell** e ne legge lo stdout: `proc_win.c` (`CreateProcess`), `proc_posix.c` (`fork` + `exec`) |
+| Modello | `shared` | La repo (`Repo_t`: radice, branch, voci) e i file shared (`.gitshared` + sezioni locali); completamento delle operazioni in attesa (REQ-F-023) |
+| | `state` | Derivazione dello stato e della base (D-054, D-065) |
+| | `chain` | Catena `refs/shared/<id>`: creazione di una versione, blob delle versioni |
+| | `peers` | Membership; push e fetch verso i peer (M2) |
+| | `hooks` | Installazione dei blocchi con marker (M3) |
+| Accesso a git | `git` | Lancia comandi git; oid in binario (`Oid_t`, 33 byte); dialogo con `cat-file --batch-check` (`GitBatch_t`) |
+| Piattaforma | `proc` | Processi **senza shell**, con stdin e stdout in pipe: `proc_win.c` (`CreateProcess`), `proc_posix.c` (`fork` + `exec`) |
+| | `sys` | Argomenti in UTF-8, numeri casuali (`BCryptGenRandom`, `/dev/urandom`), file con path UTF-8 |
 | | `path` | Normalizzazione dei path (A-26) |
 | Base | `str`, `mem` | Stringhe a lunghezza variabile, `xmalloc` (D-066) |
 | | `bounds`, `err` | Limiti (D-034); codici di errore interni e codici di uscita |
@@ -323,9 +327,10 @@ git-shared-file/
 │   ├── cmd.h                 prototipi dei sottocomandi
 │   ├── cmd_set.c  cmd_link.c  cmd_status.c  cmd_update.c
 │   ├── cmd_publish.c  cmd_hook.c  cmd_help.c
-│   ├── shared.c/.h  chain.c/.h  peers.c/.h  hooks.c/.h
+│   ├── shared.c/.h  state.c/.h  chain.c/.h  peers.c/.h  hooks.c/.h
 │   ├── git.c/.h
 │   ├── proc.c/.h  proc_win.c  proc_posix.c
+│   ├── sys.h  sys_win.c/.h  sys_posix.c
 │   ├── path.c/.h
 │   ├── str.c/.h  mem.c/.h  bounds.h  err.h
 │   └── msg.c/.h
@@ -413,6 +418,27 @@ Tutti i file in formato config di git si leggono e scrivono **solo** con `git co
 - Il blocco non contiene `exit`: non cambia l'esito dell'hook che lo ospita, e il `pre-commit` non blocca mai (D-058).
 
 ### 6.4 Flussi principali
+Regola per tutti i flussi: **pochi processi git**, perché su Windows ognuno costa ~30 ms (§6.1). Processi indipendenti si avviano insieme; molte domande sugli oggetti passano da un solo `cat-file --batch-check`.
+
+#### `status`
+1. In parallelo: `rev-parse --show-toplevel --show-prefix`, `symbolic-ref -q HEAD` (branch corrente: funziona anche su un branch senza commit, `rev-parse HEAD` no), `config -z --show-scope --get-regexp ^shared\.` (sezioni locali).
+2. `config -z -f <top>/.gitshared --get-regexp ^shared\.`, mentre gli altri due finiscono.
+3. Un `cat-file --batch-check` per tutte le domande: `HEAD:<path>` (H) e `refs/shared/<id>:content` (T) di ogni file.
+4. Solo se c'è un'operazione in attesa: `config --blob HEAD:.gitshared` e il completamento.
+5. Solo se H ≠ T: blob delle versioni sullo stesso `cat-file` (due domande per versione) e un `git log --raw` sul path del file (D-065), interrotto appena possibile.
+
+Caso comune (tutti i file allineati): **5 processi, qualunque sia il numero di file**.
+
+#### `set`
+1. Come `status`, passi 1–4; poi `ls-files -s --full-name` con pathspec letterali: risolve il path, controlla che sia tracciato, senza conflitti e un file regolare.
+2. ID da 16 byte casuali (UUID v4).
+3. Attesa in `.git/config` **per prima**: se un passo successivo fallisce, il primo comando la scarta da solo (REQ-F-023).
+4. Sezione in `.gitshared` (`git config -f`: id, path, branch); in caso di errore `.gitshared` torna com'era.
+5. `update-index --add -- .gitshared`.
+6. Con `-c`/`-m`: `commit --only -- .gitshared`, poi il completamento.
+
+#### Completamento di un `set` (REQ-F-023)
+Quando la sezione con quell'ID compare in `HEAD:.gitshared`: (1) branch attivi copiati dal default di `.gitshared`, o il branch corrente; (2) prima versione della catena (`mktree` dallo stdin, `commit-tree`, `update-ref` con valore vecchio vuoto: solo se la ref non esiste); (3) rimozione dell'attesa. L'ordine permette di ripetere tutto dopo un'interruzione. Se il file non è ancora in HEAD, l'attesa resta e l'utente riceve un avviso. Se la sezione non è né in HEAD né nel working tree, l'attesa viene scartata.
 ### 6.5 Gestione errori
 
 ## 7. Strategia di verifica
@@ -427,6 +453,8 @@ Tutti i file in formato config di git si leggono e scrivono **solo** con `git co
 |---|---|---|
 | `t0001-usage.sh` | REQ-F-018, REQ-F-019, REQ-NF-008, D-067 | 19 |
 | `t0002-status.sh` | REQ-F-012 (parte), REQ-F-021, REQ-NF-003 e D-067 (path con spazi e non ASCII, senza shell), §6.3 | 25 |
+| `t0003-set.sh` | REQ-F-001, REQ-F-021, REQ-F-022 (sospensione), REQ-F-023 (attesa, completamento, annullamento), D-006, D-007, D-057 | 59 |
+| `t0004-base.sh` | REQ-F-012, D-054, D-065 (revert, `reset`, B-14), con catene di più versioni costruite a mano | 8 |
 
 ## 8. Stile di programmazione
 > Preferenze dell'autore (background embedded, orientamento MISRA). Sezione viva: si aggiunge man mano. Vale per le parti scritte in C (D-063).
@@ -439,6 +467,7 @@ Tutti i file in formato config di git si leggono e scrivono **solo** con `git co
 ### 8.2 Tipi e strutture
 - Tipi a larghezza fissa di `<stdint.h>` (`uint8_t`, `uint32_t`, ...) ovunque la dimensione conti; `size_t` per dimensioni e indici di buffer.
 - `typedef` per tutte le struct, con nome in **PascalCase** seguito da `_t` (es. `typedef struct { ... } SharedEntry_t;`).
+- `typedef` degli enum: prefisso `e`, poi PascalCase e `_t` (es. `eGsErr_t`, `eMsgId_t`). I puntatori a funzione restano in snake_case con `_t` (es. `cmd_fn_t`).
 - Letterali senza segno con suffisso **`U` maiuscolo** (`0U`, `4096U`, `0x1U`). MISRA C:2012 (Rule 7.2) chiede il suffisso; la maiuscola è scelta di stile, coerente con il divieto della `l` minuscola (Rule 7.3).
 - **Bitfield** consentiti per flag e stati **in memoria**. Vietati per mappare formati binari esterni (file, protocolli): layout, ordine dei bit e padding dei bitfield sono definiti dall'implementazione. Tipi ammessi per i bitfield: `unsigned int` / `uint32_t` (o `_Bool`), mai `int` con segno.
 
@@ -501,7 +530,7 @@ Le decisioni sono in ordine di ID, cioè cronologico. Il ragionamento che le leg
 | D-038 | Documentazione utente integrata: `-h` (sintassi rapida, gestita dall'eseguibile) e `--help` / `git help shared` (manuale completo: man page su Linux, HTML su Windows), più `git shared help` come manuale incorporato sempre disponibile. | La documentazione consultabile dal terminale è parte del prodotto; `--help` è intercettato da git e richiede man/HTML installati. | REQ-F-018/019 |
 | D-039 | **Regola H/I/T** per il `pre-commit` (H = blob in HEAD, I = nell'index, T = ultima versione): I = H passa; I = T passa senza pubblicare (è il commit di un update); H = T passa e pubblica; merge shared in corso passa; altrimenti avvisa e non pubblica (rev. 1, D-058: prima bloccava). Solo controlli locali: i peer li verifica il push. | La regola precedente ("blocca se HEAD ≠ ultima versione") bloccava anche il commit di `update`. Interrogare i peer a ogni commit costa troppo, soprattutto su Windows. | I-015 |
 | D-040 | **Trasporto git.** Pubblicare = `git push <peer> refs/shared/<id>:refs/shared/<id>`; `link` e la prima fase di `update` = `git fetch <peer> refs/shared/<id>` in ref temporanee. | Push e fetch trasferiscono anche gli oggetti e applicano da soli la regola fast-forward; `update` può ottenere le versioni divergenti dei peer; meno codice; stesso meccanismo in fase 2. | I-015 |
-| D-041 | **Stato sempre ricavabile.** Nessuno stato shared è salvato: si calcola da H, I, T e dalla catena. La **base** di una modifica si ricava dalla storia del file sul branch corrente (rev. 1, D-065: è la versione del primo blob della catena che si incontra risalendo da HEAD; prima era la versione più recente il cui blob compare ovunque nella storia). Gli hook sono solo comodità. | La ref è per repo ma il file è per branch; gli hook non coprono merge, pull, rebase, cherry-pick. | I-015 |
+| D-041 | **Stato sempre ricavabile.** Nessuno stato shared è salvato: si calcola da H, I, T e dalla catena. La **base** di una modifica si ricava dalla storia del file sul branch corrente (rev. 1, D-065: dalla posizione nella storia delle versioni della catena; prima era la versione più recente il cui blob compare ovunque nella storia). Gli hook sono solo comodità. | La ref è per repo ma il file è per branch; gli hook non coprono merge, pull, rebase, cherry-pick. | I-015 |
 | D-042 | Nel tree della catena il file ha un **nome fisso** uguale per tutti (`content`), indipendente dal path locale. Applicazione con `git update-index --cacheinfo` + `git checkout-index`. | I path differiscono tra repo (D-028); il contenuto non passa mai dai buffer dell'estensione (§8.3). | I-015 |
 | D-043 | `link` funziona anche come **ri-aggancio**: se la repo ha già la sezione in `.gitshared` con quell'ID, ricrea membership, ref e hook senza errore. | Un clone conserva solo `.gitshared`; membership, hook e `refs/shared/*` non passano con `git clone`. | I-015 |
 | D-044 | Pubblicazione automatica **configurabile**: `shared.autoPublish` (default `true`). (Rev. 1: `shared.publishBranch`, con default "tutti i branch", è sostituito dall'elenco dei branch attivi, D-055.) | Un commit su un branch sperimentale non deve per forza raggiungere tutti i peer. | I-015 |
@@ -525,7 +554,7 @@ Le decisioni sono in ordine di ID, cioè cronologico. Il ragionamento che le leg
 | D-062 | **`link` riusa la storia esistente.** Se nella destinazione il file c'è già, `link` non lo tocca e ricava la base come per ogni file shared: blob uguale all'ultima versione → *allineato*; uguale a una versione precedente → *da applicare*; diverso, ma con una versione della catena nella storia del file → *divergente* con base vera. Solo senza base vale D-029. | Il caso d'uso di partenza sono copie fatte a mano: quasi sempre derivano da una versione comune. Riusare ciò che c'è evita il conflitto sull'intero file. Non serve codice nuovo: è la regola di D-054 applicata al collegamento. | reportIdea §4.5 |
 | D-063 | **Il C non è una scelta assoluta.** Il nucleo resta in C11 (D-031), ma parti del sistema possono essere script `.sh` o `.bat`. La ripartizione si decide in architettura (§6), con il vincolo di REQ-NF-002. | Lanciare processi e leggerne l'output è la parte più scomoda in C e la più naturale per uno script. L'estensione non linka git, quindi "git è scritto in C" non è un vincolo. | reportIdea §4.9 |
 | D-064 | **`link` su un file già shared con un altro ID → errore**; `--adopt` adotta l'ID della sorgente. L'adozione è un `unlink` della vecchia identità più un `link` della nuova, in un'unica operazione in attesa confermata dal commit (D-059). Il file non viene toccato: la base si ricava come in D-062; senza base vale D-029. | Il caso d'uso di partenza (copie fatte a mano) porta facilmente a un `set` in più repo: senza regola lo stesso path avrebbe due ID, due catene e push doppi. L'adozione è un atto esplicito perché fa uscire la repo dai peer della vecchia identità. | reportIdea B-19 |
-| D-065 | **Base = prima corrispondenza risalendo la storia** (rev. di D-041). Si risale la storia del file da HEAD; la base è la versione della catena con il primo blob incontrato che corrisponde a una versione (se più versioni hanno quel blob, la più recente: il contenuto della base non cambia). A un commit di merge in cui il file differisce da entrambi i genitori, ogni genitore dà una base: se sono diverse, il file è *divergente*. Nel dubbio lo stato è *divergente*, mai *da pubblicare*. Si calcola solo se H ≠ T, con un solo `git log` sul path chiuso alla prima corrispondenza; è ammessa una cache in `.git/` con chiave (HEAD, T), perché ricalcolabile. | Con la regola precedente ("la versione più recente il cui blob compare ovunque nella storia") un revert pubblicato o un `merge -s ours` facevano risultare *da pubblicare* una modifica da base vecchia, che poi cancellava una versione in tutti i peer. Un falso *divergente* costa un merge, un falso *da pubblicare* perde dati. Il costo non supera quello della regola precedente, che doveva leggere tutta la storia. | reportIdea B-14 |
+| D-065 | **Base dalla posizione nella storia** (rev. di D-041; rev. 1, 2026-11-15). La storia del file sul branch si legge dalla più vecchia alla più recente: a ogni blob che è una versione della catena, la base diventa la versione **più vecchia** con quel blob che non sia più vecchia della base attuale; un blob presente solo in versioni più vecchie della base è una regressione (es. un revert) e la base non cambia. Se la versione più recente che compare nella storia è T, la base è T e ci si ferma subito. A un commit di merge in cui il file differisce da entrambi i genitori, ogni genitore dà una base: se sono diverse, il file è *divergente*. Nel dubbio lo stato è *divergente*, mai *da pubblicare*. Si calcola solo se H ≠ T, con un solo `git log` sul path; è ammessa una cache in `.git/` con chiave (HEAD, T), perché ricalcolabile. *Rev. 1:* la prima stesura ("prima corrispondenza risalendo da HEAD") dava base v1 a un revert da v2 ad A = v1, quindi *da applicare*: riapriva B-01. | Con la regola di D-041 ("la versione più recente il cui blob compare ovunque nella storia") un revert pubblicato o un `merge -s ours` facevano risultare *da pubblicare* una modifica da base vecchia, che poi cancellava una versione in tutti i peer. La regola per posizione tiene insieme i tre casi: revert non pubblicato → *da pubblicare*, `reset --hard` a una versione vecchia → *da applicare*, modifica dopo un revert pubblicato (B-14) → *divergente*. Un falso *divergente* costa un merge, un falso *da pubblicare* perde dati. | reportIdea B-14, B-28 |
 | D-066 | **Allocazione dinamica ammessa** (rev. di D-034 e §8.3). `malloc` si usa dove un limite statico sarebbe artificiale (versioni della catena, elenchi, output dei comandi git). Un'allocazione fallita termina il programma con un messaggio e un codice d'errore, come `xmalloc` di git; la memoria non va liberata prima dell'uscita. L'allocazione resta isolata nel modulo di limiti e stringhe. La soglia di memoria di D-036 comprende l'heap. Gli altri limiti di D-034 si rivedono in architettura. | I comandi girano in locale e durano pochi millisecondi: frammentazione e tempi non deterministici, motivo del divieto MISRA, non contano. I limiti statici costringevano a inventare tetti, come il numero di versioni della catena per D-065. | reportIdea B-14 |
 | D-067 | **Un unico eseguibile** `git-shared` con una tabella interna dei sottocomandi. Le differenze tra piattaforme stanno nel modulo `proc`, che lancia i processi senza shell. | git non trova `.bat`/`.cmd`; è git a lanciare l'estensione, qualunque sia la shell dell'utente; un dispatcher `sh` costerebbe un processo in più a ogni chiamata, hook compresi, e più pezzi da tenere coerenti. Un dispatcher resta aggiungibile senza cambiare l'interfaccia. | A-31 |
 | D-068 | **In `.git/config` solo dati per repo.** La sezione `[shared "<id>"]` contiene peer, branch attivi e operazione in attesa; nome e path stanno solo in `.gitshared` (rev. di D-012). | `.gitshared` è per branch e cambia con checkout e merge: una copia in config divergerebbe (A-21). | A-32 |
