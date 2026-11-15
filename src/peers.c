@@ -36,7 +36,7 @@ eGsErr_t peers_of(const char *repo, const char *id, Str_t *out)
     str_addf(&key, "shared.%s.peer", id);
     args[0] = str_cstr(&dir);
     args[3] = str_cstr(&key);
-    err = git_capture(args, PROC_STDERR_NULL, &lines, &code);
+    err = git_capture(args, PROC_STDERR_NULL | PROC_CLEAN_ENV, &lines, &code);
     if ((err == GS_OK) && (code == 0)) {
         line = lines.buf;
         while ((line != NULL) && (*line != '\0')) {
@@ -178,7 +178,8 @@ void peers_announce(const char *id, const Str_t *peers, const char *self,
          k++, peer = str_znext(peers, peer)) {
         git_dir_arg(&dir, peer);
         args[0] = str_cstr(&dir);
-        jobs[k].started = (git_start(&jobs[k].p, args, PROC_STDERR_NULL) == GS_OK);
+        jobs[k].started = (git_start(&jobs[k].p, args,
+                                     PROC_STDERR_NULL | PROC_CLEAN_ENV) == GS_OK);
     }
     for (k = 0U, peer = str_znext(peers, NULL); peer != NULL;
          k++, peer = str_znext(peers, peer)) {

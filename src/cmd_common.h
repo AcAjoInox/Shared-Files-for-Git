@@ -61,6 +61,23 @@ int cmd_has_local_changes(const Repo_t *r, const char *path);
 /* Commit dedicato dei soli path dati, relativi alla radice (D-007, A-29). */
 eGsErr_t cmd_commit(const Repo_t *r, const char *message, const Str_t *paths);
 
+/*
+ * Dopo un commit lanciato dal comando: completa le attese con un cat-file
+ * nuovo (che veda il nuovo HEAD). Con il post-commit installato
+ * (autoPublish) rilegge anche repo e configurazione, perche' l'hook puo'
+ * aver gia' completato. GS_EXIT_OK o il codice di uscita (messaggio
+ * stampato); se non riesce, repo e cat-file sono chiusi.
+ */
+int cmd_reopen(Repo_t *r, GitBatch_t *b);
+
+/*
+ * Pubblica un file: con create = 1 crea prima la nuova versione (stato
+ * "da pubblicare", la base e' T: D-065), poi invia T a tutti i peer.
+ * GS_EXIT_OK, oppure GS_EXIT_ERROR se la versione non si crea o un peer
+ * la rifiuta (messaggi stampati).
+ */
+int cmd_publish_entry(const SharedEntry_t *e, GitBatch_t *b, int create);
+
 /* Path dell'utente (relativo alla cartella corrente) -> relativo alla
  * radice. 0 se assoluto o fuori dalla repo. */
 int cmd_repo_path(const Repo_t *r, const char *user_path, Str_t *out);

@@ -6,6 +6,7 @@
 #include "proc.h"
 
 #include <fcntl.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/wait.h>
@@ -35,7 +36,13 @@ static _Noreturn void child_exec(const char *const argv[], unsigned flags,
                                  int fd_in, int fd_out)
 {
     int null_fd = open("/dev/null", O_RDWR);
+    size_t i;
 
+    if ((flags & PROC_CLEAN_ENV) != 0U) {
+        for (i = 0U; proc_repo_env[i] != NULL; i++) {
+            (void)unsetenv(proc_repo_env[i]); /* solo nel figlio */
+        }
+    }
     if (fd_in >= 0) {
         (void)dup2(fd_in, STDIN_FILENO);
         (void)close(fd_in);

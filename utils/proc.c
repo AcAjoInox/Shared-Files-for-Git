@@ -3,6 +3,21 @@
  */
 #include "proc.h"
 
+/* Come "git rev-parse --local-env-vars", senza quelle di configurazione. */
+const char *const proc_repo_env[] = {
+    "GIT_DIR",
+    "GIT_WORK_TREE",
+    "GIT_IMPLICIT_WORK_TREE",
+    "GIT_INDEX_FILE",
+    "GIT_OBJECT_DIRECTORY",
+    "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+    "GIT_COMMON_DIR",
+    "GIT_PREFIX",
+    "GIT_SHALLOW_FILE",
+    "GIT_GRAFT_FILE",
+    NULL
+};
+
 int proc_read(Proc_t *p, int delim, Str_t *rec)
 {
     int c;

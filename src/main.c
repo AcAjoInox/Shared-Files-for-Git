@@ -22,6 +22,7 @@ typedef struct {
 
 static const CmdDef_t commands[] = {
     { "help", cmd_help, MSG_USAGE_HELP },
+    { "hook", cmd_hook, MSG_USAGE_HOOK }, /* interno: lo chiamano gli hook */
     { "link", cmd_link, MSG_USAGE_LINK },
     { "publish", cmd_publish, MSG_USAGE_PUBLISH },
     { "set", cmd_set, MSG_USAGE_SET },

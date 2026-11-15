@@ -13,6 +13,7 @@
 
 #include "cmd.h"
 #include "cmd_common.h"
+#include "hooks.h"
 #include "sys.h"
 
 /*
@@ -128,6 +129,7 @@ int cmd_set(int argc, char **argv)
         msg_error(MSG_ERR_STAGE_GITSHARED);
         goto exit;
     }
+    (void)hooks_sync(&repo); /* REQ-F-016: un errore e' solo un avviso */
 
     e = repo_add(&repo);
     str_add(&e->name, name);
@@ -155,17 +157,9 @@ int cmd_set(int argc, char **argv)
         msg_error(MSG_ERR_COMMIT);
         goto exit;
     }
-    /* cat-file e' nato prima del commit: uno nuovo vede di sicuro il nuovo
-     * HEAD. */
-    git_batch_close(&batch);
-    if (git_batch_open(&batch) != GS_OK) {
-        msg_fatal(MSG_ERR_PROC, "git cat-file");
+    /* Il post-commit puo' aver gia' completato: si rilegge tutto. */
+    if (cmd_reopen(&repo, &batch) != GS_EXIT_OK) {
         opened = 0;
-        repo_close(&repo);
-        goto exit;
-    }
-    if (repo_complete_pending(&repo, &batch) != GS_OK) {
-        msg_error(MSG_ERR_PENDING);
         goto exit;
     }
     /* Se il file non e' ancora in HEAD resta in attesa: l'avviso e' gia'

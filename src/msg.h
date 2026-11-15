@@ -18,6 +18,7 @@ typedef enum {
     MSG_USAGE_PUBLISH,
     MSG_USAGE_UPDATE,
     MSG_USAGE_STATUS,
+    MSG_USAGE_HOOK,
 
     MSG_ERR_UNKNOWN_CMD,     /* sottocomando */
     MSG_ERR_UNKNOWN_TOPIC,   /* argomento di help */
@@ -62,6 +63,10 @@ typedef enum {
     MSG_WARN_DISCARDED,      /* id */
     MSG_WARN_PEER_UNREACHABLE, /* file, peer */
     MSG_WARN_SUSPENDED,      /* file */
+    MSG_WARN_HOOK,           /* path dell'hook */
+    MSG_HOOK_DIVERGED,       /* file */
+    MSG_HOOK_NOT_ALIGNED,    /* file, stato, comando */
+    MSG_HOOKS_INSTALLED,     /* "on" | "off" */
 
     MSG_SET_STAGED,          /* path, nome */
     MSG_SET_DONE,            /* path, nome */

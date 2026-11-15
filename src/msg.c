@@ -44,6 +44,13 @@ static const char *const msg_en[] = {
         "    -m <message>      commit right away with <message>\n",
     [MSG_USAGE_STATUS] =
         "usage: git shared status\n",
+    [MSG_USAGE_HOOK] =
+        "usage: git shared hook install\n"
+        "   or: git shared hook <event> [<args>]\n"
+        "\n"
+        "    install    align the hooks with shared.autoPublish; also for a\n"
+        "               repository whose shared files have no hooks yet\n"
+        "    <event>    called by the hooks; not meant to be run by hand\n",
 
     [MSG_ERR_UNKNOWN_CMD] = "unknown subcommand: '%s'",
     [MSG_ERR_UNKNOWN_TOPIC] = "no help for '%s'",
@@ -102,6 +109,12 @@ static const char *const msg_en[] = {
         "discarded pending operation on %s: .gitshared was restored",
     [MSG_WARN_PEER_UNREACHABLE] = "%s: peer %s not reachable",
     [MSG_WARN_SUSPENDED] = "%s: suspended on this branch",
+    [MSG_WARN_HOOK] = "cannot install the hook '%s'",
+    [MSG_HOOK_DIVERGED] =
+        "%s: changed from an old version: it is now diverged and it was "
+        "not published (run 'git shared update')",
+    [MSG_HOOK_NOT_ALIGNED] = "%s: %s (run 'git shared %s')",
+    [MSG_HOOKS_INSTALLED] = "Hooks installed (publish at commit: %s).",
 
     [MSG_SET_STAGED] =
         "'%s' is now shared as '%s'. Commit .gitshared to confirm.",

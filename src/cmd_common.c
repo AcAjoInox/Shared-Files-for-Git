@@ -7,8 +7,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "chain.h"
 #include "mem.h"
 #include "path.h"
+#include "peers.h"
 #include "sys.h"
 
 static const char gitshared_header[] =
@@ -246,6 +248,86 @@ eGsErr_t cmd_commit(const Repo_t *r, const char *message, const Str_t *paths)
     err = git_run(args, 0U, NULL);
     free((void *)args);
     return err;
+}
+
+int cmd_reopen(Repo_t *r, GitBatch_t *b)
+{
+    int rc = GS_EXIT_OK;
+
+    git_batch_close(b);
+    if (r->auto_publish != 0U) {
+        /* c'e' il post-commit: puo' aver gia' completato, si rilegge */
+        repo_close(r);
+        rc = cmd_open(r, b);
+    } else if (git_batch_open(b) != GS_OK) {
+        /* solo un cat-file nuovo, che veda il nuovo HEAD */
+        msg_fatal(MSG_ERR_PROC, "git cat-file");
+        repo_close(r);
+        rc = GS_EXIT_FATAL;
+    } else if (repo_complete_pending(r, b) != GS_OK) {
+        msg_error(MSG_ERR_PENDING);
+    } else {
+        /* completato */
+    }
+    return rc;
+}
+
+/* Nuova versione: blob di HEAD, genitore T, ref condizionata a T. */
+static eGsErr_t new_version(const SharedEntry_t *e, GitBatch_t *b)
+{
+    Str_t name = STR_INIT;
+    Str_t ref = STR_INIT;
+    Oid_t h;
+    Oid_t t;
+    Oid_t v;
+    eGsErr_t err = GS_ERR_GIT;
+
+    str_addf(&name, "HEAD:%s", str_cstr(&e->path));
+    chain_ref(&ref, e->id);
+    if ((git_batch_blob(b, str_cstr(&name), &h) != 0) &&
+        (git_batch_query(b, str_cstr(&ref), &t) == GIT_OBJ_COMMIT)) {
+        err = chain_commit(&h, &t, str_cstr(&e->name), &v);
+        if (err == GS_OK) {
+            /* Condizionata: se nel frattempo un peer ha cambiato T, non
+             * si sovrascrive niente (REQ-NF-005, D-072). */
+            err = git_update_ref(str_cstr(&ref), &v, &t, "git shared: publish");
+        }
+    }
+    str_free(&ref);
+    str_free(&name);
+    return err;
+}
+
+int cmd_publish_entry(const SharedEntry_t *e, GitBatch_t *b, int create)
+{
+    PeerTally_t tally = { 0U, 0U, 0U };
+    const char *label = str_cstr(&e->path);
+    unsigned npeers = (unsigned)str_zcount(&e->peers);
+    int rc = GS_EXIT_OK;
+
+    if (create != 0) {
+        if (new_version(e, b) != GS_OK) {
+            msg_error(MSG_ERR_PUBLISH, label);
+            rc = GS_EXIT_ERROR;
+            goto exit;
+        }
+        printf(msg(MSG_PUB_CREATED), label);
+        putchar('\n');
+    }
+    if (npeers == 0U) {
+        printf(msg(MSG_PUB_NO_PEERS), label);
+        putchar('\n');
+        goto exit;
+    }
+    peers_push(label, e->id, &e->peers, &tally);
+    printf(msg(MSG_PUB_PUSHED), label, tally.ok, npeers);
+    putchar('\n');
+    if (tally.rejected > 0U) {
+        rc = GS_EXIT_ERROR;
+    }
+
+exit:
+    return rc;
 }
 
 int cmd_repo_path(const Repo_t *r, const char *user_path, Str_t *out)

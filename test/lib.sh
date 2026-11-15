@@ -123,11 +123,12 @@ expect_fail() {
 	fi
 }
 
-# put <file> <contenuto>: scrive il file e lo committa
+# put <file> <contenuto>: scrive il file e lo committa. L'output degli
+# hook (avvisi, pubblicazione) e' scartato: lo verifica t0006-hooks.sh.
 put() {
 	printf '%s\n' "$2" >"$1"
 	git add -- "$1"
-	git commit -q -m "$1: $2"
+	git commit -q -m "$1: $2" 2>/dev/null
 }
 
 # shared_id <nome>: id della voce <nome> in .gitshared (repo corrente)

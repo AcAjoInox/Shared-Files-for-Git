@@ -59,6 +59,17 @@ int sys_remove(const char *path)
     return remove(path);
 }
 
+int sys_make_executable(const char *path)
+{
+    struct stat st;
+    int rc = -1;
+
+    if (stat(path, &st) == 0) {
+        rc = chmod(path, st.st_mode | S_IXUSR | S_IXGRP | S_IXOTH);
+    }
+    return rc;
+}
+
 int sys_is_dir(const char *path)
 {
     struct stat st;

@@ -12,6 +12,8 @@
 #include <io.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wchar.h>
+#include <wctype.h>
 
 #include "mem.h"
 #include "proc.h"
@@ -108,6 +110,58 @@ static HANDLE inheritable(HANDLE h)
     return dup;
 }
 
+/* 1 se la voce "NOME=valore" e' una delle proc_repo_env (nomi senza
+ * distinzione di maiuscole, come in Windows). */
+static int is_repo_var(const wchar_t *entry)
+{
+    const char *name;
+    size_t i;
+    size_t k;
+    int match = 0;
+
+    for (i = 0U; (proc_repo_env[i] != NULL) && (match == 0); i++) {
+        name = proc_repo_env[i];
+        k = 0U;
+        while ((name[k] != '\0') &&
+               (towupper(entry[k]) == (wint_t)(unsigned char)name[k])) {
+            k++;
+        }
+        match = (name[k] == '\0') && (entry[k] == L'=');
+    }
+    return match;
+}
+
+/* Copia dell'ambiente senza le proc_repo_env, nel formato di
+ * CreateProcessW: "A=1\0B=2\0\0". */
+static wchar_t *clean_env_block(void)
+{
+    wchar_t *env = GetEnvironmentStringsW();
+    const wchar_t *e;
+    wchar_t *block = NULL;
+    wchar_t *dst;
+    size_t total = 0U;
+    size_t len;
+
+    if (env != NULL) {
+        for (e = env; *e != L'\0'; e += wcslen(e) + 1U) {
+            total += wcslen(e) + 1U;
+        }
+        block = xmalloc((total + 2U) * sizeof *block);
+        dst = block;
+        for (e = env; *e != L'\0'; e += len + 1U) {
+            len = wcslen(e);
+            if (!is_repo_var(e)) {
+                memcpy(dst, e, (len + 1U) * sizeof *e);
+                dst += len + 1U;
+            }
+        }
+        dst[0] = L'\0';
+        dst[1] = L'\0'; /* ambiente vuoto: servono due terminatori */
+        (void)FreeEnvironmentStringsW(env);
+    }
+    return block;
+}
+
 /* HANDLE -> FILE *. Se riesce, l'handle passa al FILE e *h diventa NULL. */
 static FILE *wrap_handle(HANDLE *h, int oflag, const char *mode)
 {
@@ -146,6 +200,7 @@ eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags)
     Str_t cmd = STR_INIT;
     wchar_t *wcmd = NULL;
     wchar_t *wapp = NULL;
+    wchar_t *wenv = NULL;
     size_t i;
     eGsErr_t err = GS_ERR_PROC;
 
@@ -193,8 +248,12 @@ eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags)
     si.hStdInput = in_rd;
     si.hStdOutput = out_wr;
     si.hStdError = errh;
-    if (!CreateProcessW(wapp, wcmd, NULL, NULL, TRUE, 0, NULL, NULL, &si,
-                        &pi)) {
+    if ((flags & PROC_CLEAN_ENV) != 0U) {
+        wenv = clean_env_block();
+    }
+    if (!CreateProcessW(wapp, wcmd, NULL, NULL, TRUE,
+                        (wenv != NULL) ? CREATE_UNICODE_ENVIRONMENT : 0U, wenv,
+                        NULL, &si, &pi)) {
         goto exit;
     }
     (void)CloseHandle(pi.hThread);
@@ -229,6 +288,7 @@ exit:
     close_handle(&errh);
     close_handle(&out_rd);
     close_handle(&in_wr);
+    free(wenv);
     free(wcmd);
     free(wapp);
     str_free(&cmd);

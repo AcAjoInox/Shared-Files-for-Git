@@ -29,4 +29,7 @@ int sys_remove(const char *path);
 /* 1 se il path esiste ed e' una cartella. */
 int sys_is_dir(const char *path);
 
+/* Bit di esecuzione per tutti (POSIX); su Windows non serve: 0 = riuscito. */
+int sys_make_executable(const char *path);
+
 #endif /* GS_SYS_H */

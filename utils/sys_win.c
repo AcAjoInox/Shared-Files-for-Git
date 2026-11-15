@@ -94,6 +94,12 @@ int sys_remove(const char *path)
     return rc;
 }
 
+int sys_make_executable(const char *path)
+{
+    (void)path; /* Git for Windows lancia gli hook con la propria sh */
+    return 0;
+}
+
 int sys_is_dir(const char *path)
 {
     wchar_t *wpath = win_utf8_to_wide(path);

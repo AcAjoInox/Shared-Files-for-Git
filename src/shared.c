@@ -65,6 +65,27 @@ void repo_close(Repo_t *r)
     str_free(&r->prefix);
     str_free(&r->branch);
     str_free(&r->objfmt);
+    r->auto_publish = 0U;
+}
+
+/* Booleano di git config: falso per false/no/off/0 (maiuscole comprese). */
+static int cfg_bool(const char *v)
+{
+    static const char *const falses[] = { "false", "no", "off", "0" };
+    size_t i;
+    size_t k;
+    int is_false = 0;
+
+    for (i = 0U; (i < (sizeof falses / sizeof falses[0])) && (is_false == 0); i++) {
+        k = 0U;
+        while ((falses[i][k] != '\0') &&
+               (((unsigned)(unsigned char)v[k] | 0x20U) ==
+                (unsigned)(unsigned char)falses[i][k])) { /* minuscolo ASCII */
+            k++;
+        }
+        is_false = (falses[i][k] == '\0') && (v[k] == '\0');
+    }
+    return !is_false;
 }
 
 SharedEntry_t *repo_add(Repo_t *r)
@@ -411,7 +432,8 @@ eGsErr_t repo_open(Repo_t *r)
         str_add(&r->branch, out.buf + (sizeof heads - 1U));
     }
 
-    /* Record "scope\0chiave\nvalore\0": contano solo quelli locali. */
+    /* Record "scope\0chiave\nvalore\0": le sezioni per ID contano solo se
+     * locali; shared.autoPublish vale da qualunque livello. */
     run &= ~RUN_CFG;
     err = proc_collect(&p_cfg, &out, &code);
     if (err != GS_OK) {
@@ -427,8 +449,12 @@ eGsErr_t repo_open(Repo_t *r)
         scope = rec;
         rec += strlen(rec) + 1U;
         if (rec < end) {
-            if (strcmp(scope, "local") == 0) {
+            if (strncmp(rec, "shared.autopublish\n", 19U) == 0) {
+                r->auto_publish = cfg_bool(rec + 19) ? 1U : 0U;
+            } else if (strcmp(scope, "local") == 0) {
                 parse_local_rec(r, rec);
+            } else {
+                /* chiavi per ID fuori dal livello locale: ignorate */
             }
             rec += strlen(rec) + 1U;
         }
@@ -457,19 +483,6 @@ static eGsErr_t config_run(const char *a1, const char *a2, const char *a3)
     const char *args[] = { "config", a1, a2, a3, NULL };
 
     return git_run(args, 0U, NULL);
-}
-
-/* "git config <op> shared.<id>.<field> [<value>]". */
-static eGsErr_t config_key(const char *op, const char *id, const char *field,
-                           const char *value)
-{
-    Str_t key = STR_INIT;
-    eGsErr_t err;
-
-    str_addf(&key, "shared.%s.%s", id, field);
-    err = config_run(op, str_cstr(&key), value);
-    str_free(&key);
-    return err;
 }
 
 /* Branch attivi: copia del default (D-057); se manca, il corrente. */
@@ -508,13 +521,34 @@ static eGsErr_t copy_branches(const Repo_t *r, SharedEntry_t *e,
     return err;
 }
 
+/* "git config --unset shared.<id>.<field>": una chiave gia' assente
+ * (codice 5) non e' un errore, cosi' il completamento si puo' ripetere. */
+static eGsErr_t config_unset(const char *id, const char *field)
+{
+    const char *args[] = { "config", "--unset", NULL, NULL };
+    Str_t key = STR_INIT;
+    Str_t out = STR_INIT;
+    int code = 0;
+    eGsErr_t err;
+
+    str_addf(&key, "shared.%s.%s", id, field);
+    args[2] = str_cstr(&key);
+    err = git_capture(args, PROC_STDERR_NULL, &out, &code);
+    if ((err == GS_OK) && (code != 0) && (code != 5)) {
+        err = GS_ERR_GIT;
+    }
+    str_free(&out);
+    str_free(&key);
+    return err;
+}
+
 /* Fine dell'attesa: per ultima, cosi' un'interruzione si puo' ripetere. */
 static eGsErr_t end_pending(SharedEntry_t *e)
 {
-    eGsErr_t err = config_key("--unset", e->id, "pending", NULL);
+    eGsErr_t err = config_unset(e->id, "pending");
 
     if ((err == GS_OK) && (e->pending_src.len > 0U)) {
-        err = config_key("--unset", e->id, "pendingsource", NULL);
+        err = config_unset(e->id, "pendingsource");
     }
     if (err == GS_OK) {
         e->pending = SHARED_PENDING_NONE;
@@ -609,7 +643,15 @@ static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
                           GS_PEER_MAX);
                 err = GS_ERR_USAGE;
             } else {
-                err = config_key("--add", e->id, "peer", p);
+                /* aggiunge senza duplicare, anche se ripetuto */
+                const char *add[] = { "config", "--replace-all", "--fixed-value",
+                                      NULL, p, p, NULL };
+                Str_t key = STR_INIT;
+
+                str_addf(&key, "shared.%s.peer", e->id);
+                add[3] = str_cstr(&key);
+                err = git_run(add, 0U, NULL);
+                str_free(&key);
                 str_addz(&e->peers, p);
             }
         }

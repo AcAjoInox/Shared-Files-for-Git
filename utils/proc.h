@@ -31,6 +31,13 @@ typedef struct {
 
 #define PROC_STDERR_NULL 0x1U /* scarta lo stderr del figlio */
 #define PROC_STDIN_PIPE  0x2U /* il padre scrive lo stdin del figlio */
+/* Toglie dall'ambiente del figlio le variabili che legano git a una repo
+ * (proc_repo_env). Negli hook git le esporta per la repo corrente: un
+ * comando diretto a un'altra repo non deve vederle (A-27, D-071). */
+#define PROC_CLEAN_ENV   0x4U
+
+/* Variabili tolte da PROC_CLEAN_ENV; l'elenco termina con NULL. */
+extern const char *const proc_repo_env[];
 
 /*
  * Avvia argv[0] con gli argomenti argv[1..] (argv termina con NULL).
