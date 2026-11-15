@@ -32,7 +32,7 @@ typedef struct {
  * Se argv[0] contiene un separatore di path e' usato cosi' com'e',
  * altrimenti e' cercato nel PATH.
  */
-gs_err_t proc_start(Proc_t *p, const char *const argv[], unsigned flags);
+eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags);
 
 /*
  * Legge dallo stdout del figlio fino al delimitatore (escluso) o alla
@@ -44,10 +44,10 @@ int proc_read(Proc_t *p, int delim, Str_t *rec);
  * Chiude lo stdout (un figlio che sta ancora scrivendo termina) e attende
  * la fine del processo. exit_code riceve il codice di uscita del figlio.
  */
-gs_err_t proc_finish(Proc_t *p, int *exit_code);
+eGsErr_t proc_finish(Proc_t *p, int *exit_code);
 
 /* Avvia, legge tutto lo stdout in `out` e attende la fine. */
-gs_err_t proc_capture(const char *const argv[], unsigned flags, Str_t *out,
+eGsErr_t proc_capture(const char *const argv[], unsigned flags, Str_t *out,
                       int *exit_code);
 
 /*

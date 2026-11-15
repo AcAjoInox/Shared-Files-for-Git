@@ -19,13 +19,13 @@ int proc_read(Proc_t *p, int delim, Str_t *rec)
     return got;
 }
 
-gs_err_t proc_capture(const char *const argv[], unsigned flags, Str_t *out,
+eGsErr_t proc_capture(const char *const argv[], unsigned flags, Str_t *out,
                       int *exit_code)
 {
     Proc_t p;
     char chunk[4096];
     size_t n;
-    gs_err_t err;
+    eGsErr_t err;
 
     err = proc_start(&p, argv, flags);
     if (err != GS_OK) {

@@ -17,7 +17,7 @@ typedef int (*cmd_fn_t)(int argc, char **argv);
 typedef struct {
     const char *name;
     cmd_fn_t fn;
-    msg_id_t usage;
+    eMsgId_t usage;
 } CmdDef_t;
 
 static const CmdDef_t commands[] = {

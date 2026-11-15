@@ -58,30 +58,30 @@ static const char **make_argv(const char *const args[])
     return argv;
 }
 
-gs_err_t git_start(Proc_t *p, const char *const args[], unsigned flags)
+eGsErr_t git_start(Proc_t *p, const char *const args[], unsigned flags)
 {
     const char **argv = make_argv(args);
-    gs_err_t err = proc_start(p, argv, flags);
+    eGsErr_t err = proc_start(p, argv, flags);
 
     free((void *)argv);
     return err;
 }
 
-gs_err_t git_capture(const char *const args[], unsigned flags, Str_t *out,
+eGsErr_t git_capture(const char *const args[], unsigned flags, Str_t *out,
                      int *exit_code)
 {
     const char **argv = make_argv(args);
-    gs_err_t err = proc_capture(argv, flags, out, exit_code);
+    eGsErr_t err = proc_capture(argv, flags, out, exit_code);
 
     free((void *)argv);
     return err;
 }
 
-gs_err_t git_toplevel(Str_t *top)
+eGsErr_t git_toplevel(Str_t *top)
 {
     static const char *const args[] = { "rev-parse", "--show-toplevel", NULL };
     int code = 0;
-    gs_err_t err;
+    eGsErr_t err;
 
     err = git_capture(args, PROC_STDERR_NULL, top, &code);
     if (err != GS_OK) {

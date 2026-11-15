@@ -14,12 +14,12 @@
 
 /* Come proc_start/proc_capture, con "git" davanti agli argomenti.
  * args termina con NULL. */
-gs_err_t git_start(Proc_t *p, const char *const args[], unsigned flags);
-gs_err_t git_capture(const char *const args[], unsigned flags, Str_t *out,
+eGsErr_t git_start(Proc_t *p, const char *const args[], unsigned flags);
+eGsErr_t git_capture(const char *const args[], unsigned flags, Str_t *out,
                      int *exit_code);
 
 /* Radice del working tree della repo corrente.
  * GS_ERR_NOT_REPO se la directory corrente non e' in un working tree. */
-gs_err_t git_toplevel(Str_t *top);
+eGsErr_t git_toplevel(Str_t *top);
 
 #endif /* GS_GIT_H */

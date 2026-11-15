@@ -27,15 +27,15 @@ typedef enum {
     MSG_STATUS_FIELD_STATE,
     MSG_STATE_UNKNOWN,
     MSG_COUNT
-} msg_id_t;
+} eMsgId_t;
 
 /* Testo del messaggio nella lingua corrente. */
-const char *msg(msg_id_t id);
+const char *msg(eMsgId_t id);
 
 /* Messaggi su stderr con il prefisso di git ("fatal: ", "error: ", ...).
  * Non terminano il programma: l'uscita resta al chiamante (§8.4). */
-void msg_fatal(msg_id_t id, ...);
-void msg_error(msg_id_t id, ...);
-void msg_warning(msg_id_t id, ...);
+void msg_fatal(eMsgId_t id, ...);
+void msg_error(eMsgId_t id, ...);
+void msg_warning(eMsgId_t id, ...);
 
 #endif /* GS_MSG_H */

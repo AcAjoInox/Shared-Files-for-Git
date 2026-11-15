@@ -36,11 +36,11 @@ static _Noreturn void child_exec(const char *const argv[], unsigned flags,
     _exit(127); /* come la shell quando il comando non si trova */
 }
 
-gs_err_t proc_start(Proc_t *p, const char *const argv[], unsigned flags)
+eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags)
 {
     int fds[2];
     pid_t pid;
-    gs_err_t err = GS_ERR_PROC;
+    eGsErr_t err = GS_ERR_PROC;
 
     p->out = NULL;
     p->handle = 0;
@@ -71,10 +71,10 @@ exit:
     return err;
 }
 
-gs_err_t proc_finish(Proc_t *p, int *exit_code)
+eGsErr_t proc_finish(Proc_t *p, int *exit_code)
 {
     int status = 0;
-    gs_err_t err = GS_ERR_PROC;
+    eGsErr_t err = GS_ERR_PROC;
 
     (void)fclose(p->out);
     p->out = NULL;

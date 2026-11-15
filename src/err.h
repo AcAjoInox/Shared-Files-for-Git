@@ -12,7 +12,7 @@ typedef enum {
     GS_ERR_PROC,     /* impossibile lanciare un processo */
     GS_ERR_GIT,      /* un comando git e' terminato con errore */
     GS_ERR_FORMAT    /* dati in un formato inatteso */
-} gs_err_t;
+} eGsErr_t;
 
 /* Codici di uscita del programma, come git (REQ-NF-008). */
 enum {

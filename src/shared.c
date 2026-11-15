@@ -97,7 +97,7 @@ exit:
     return;
 }
 
-gs_err_t shared_load(const char *top, SharedList_t *l)
+eGsErr_t shared_load(const char *top, SharedList_t *l)
 {
     Str_t file = STR_INIT;
     Str_t rec = STR_INIT;
@@ -105,7 +105,7 @@ gs_err_t shared_load(const char *top, SharedList_t *l)
                            "^shared\\.", NULL };
     Proc_t p;
     int code = 0;
-    gs_err_t err;
+    eGsErr_t err;
 
     str_addf(&file, "%s/.gitshared", top);
     args[3] = str_cstr(&file);

@@ -26,7 +26,7 @@ int cmd_status(int argc, char **argv)
     SharedList_t list = SHARED_LIST_INIT;
     size_t i;
     size_t shown = 0U;
-    gs_err_t err;
+    eGsErr_t err;
     int rc = GS_EXIT_FATAL;
 
     (void)argv;

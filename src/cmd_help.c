@@ -45,7 +45,7 @@ static const char manual[] =
 /* Uso di un sottocomando, per "git shared help <command>". */
 static const struct {
     const char *name;
-    msg_id_t usage;
+    eMsgId_t usage;
 } topics[] = {
     { "help", MSG_USAGE_HELP },
     { "status", MSG_USAGE_STATUS },

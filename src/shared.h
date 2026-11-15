@@ -33,7 +33,7 @@ void shared_list_free(SharedList_t *l);
  * lista vuota. GS_ERR_FORMAT se il file non e' un config di git valido
  * (git ha gia' scritto su stderr la riga sbagliata).
  */
-gs_err_t shared_load(const char *top, SharedList_t *l);
+eGsErr_t shared_load(const char *top, SharedList_t *l);
 
 /* 1 se la voce ha un ID ben formato e un path relativo, 0 altrimenti. */
 int shared_entry_valid(const SharedEntry_t *e);

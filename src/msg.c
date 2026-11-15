@@ -37,7 +37,7 @@ static const char *const msg_en[] = {
 _Static_assert(sizeof msg_en / sizeof msg_en[0] == MSG_COUNT,
                "msg_en: one text per message ID");
 
-const char *msg(msg_id_t id)
+const char *msg(eMsgId_t id)
 {
     const char *s = NULL;
 
@@ -49,14 +49,14 @@ const char *msg(msg_id_t id)
     return (s != NULL) ? s : "(missing message)";
 }
 
-static void vreport(const char *prefix, msg_id_t id, va_list ap)
+static void vreport(const char *prefix, eMsgId_t id, va_list ap)
 {
     fputs(prefix, stderr);
     (void)vfprintf(stderr, msg(id), ap);
     fputc('\n', stderr);
 }
 
-void msg_fatal(msg_id_t id, ...)
+void msg_fatal(eMsgId_t id, ...)
 {
     va_list ap;
 
@@ -65,7 +65,7 @@ void msg_fatal(msg_id_t id, ...)
     va_end(ap);
 }
 
-void msg_error(msg_id_t id, ...)
+void msg_error(eMsgId_t id, ...)
 {
     va_list ap;
 
@@ -74,7 +74,7 @@ void msg_error(msg_id_t id, ...)
     va_end(ap);
 }
 
-void msg_warning(msg_id_t id, ...)
+void msg_warning(eMsgId_t id, ...)
 {
     va_list ap;
 
