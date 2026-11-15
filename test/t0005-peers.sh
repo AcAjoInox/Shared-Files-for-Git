@@ -128,7 +128,7 @@ run git shared status
 expect_out "A: da applicare" "new version to apply"
 run git shared update
 expect_rc "update: codice 0" 0
-expect_out "update: applicata" "new version applied"
+expect_out "update: applicata, da committare" "new version applied. Commit it to confirm."
 expect_ok "update: contenuto di B" grep -q "riga aggiunta da B" breef.md
 expect_eq "update: file in staging, nessun commit" \
 	"$(git diff --cached --name-only)" breef.md
@@ -139,6 +139,8 @@ expect_out "A dopo il commit: allineato" "aligned"
 cd "$TRASH/C" || exit 1
 run git shared update -c
 expect_rc "update -c: codice 0" 0
+expect_out "update -c: applicata e committata" "new version applied and committed."
+expect_no_out "update -c: nessun invito a committare" "Commit it to confirm"
 expect_eq "update -c: messaggio standard" "$(git log -1 --format=%s)" "Update docs/breef copy.md"
 run git shared status
 expect_out "update -c: allineato" "aligned"

@@ -77,6 +77,7 @@ typedef enum {
     MSG_SKIP_STATE,          /* file, stato */
     MSG_UPD_RECEIVED,        /* file */
     MSG_UPD_APPLIED,         /* file */
+    MSG_UPD_COMMITTED,       /* file */
     MSG_UPD_UP_TO_DATE,      /* file */
     MSG_UPD_TO_PUBLISH,      /* file */
     MSG_UPD_DIVERGED,        /* file */

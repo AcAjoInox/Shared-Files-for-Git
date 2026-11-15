@@ -135,9 +135,7 @@ static int apply(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         msg_error(MSG_ERR_WRITE_FILE, label);
         goto exit;
     }
-    str_addz(applied, label);
-    printf(msg(MSG_UPD_APPLIED), label);
-    putchar('\n');
+    str_addz(applied, label); /* il messaggio dopo l'eventuale commit */
     ok = 1;
 
 exit:
@@ -155,8 +153,10 @@ int cmd_update(int argc, char **argv)
     unsigned char *sel = NULL;
     Str_t applied = STR_INIT;
     Str_t text = STR_INIT;
+    const char *p;
     eState_t st;
     size_t i;
+    int committed = 0;
     int first;
     int advanced;
     int diverged;
@@ -239,10 +239,16 @@ int cmd_update(int argc, char **argv)
                      (str_zcount(&applied) == 1U) ? applied.buf : "shared files");
             o.message = str_cstr(&text);
         }
-        if (cmd_commit(&repo, o.message, &applied) != GS_OK) {
+        if (cmd_commit(&repo, o.message, &applied) == GS_OK) {
+            committed = 1;
+        } else {
             msg_error(MSG_ERR_COMMIT);
             rc = GS_EXIT_ERROR;
         }
+    }
+    for (p = str_znext(&applied, NULL); p != NULL; p = str_znext(&applied, p)) {
+        printf(msg((committed != 0) ? MSG_UPD_COMMITTED : MSG_UPD_APPLIED), p);
+        putchar('\n');
     }
 
 exit:

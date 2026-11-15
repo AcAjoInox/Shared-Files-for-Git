@@ -121,6 +121,7 @@ static const char *const msg_en[] = {
     [MSG_SKIP_STATE] = "%s: %s, nothing to do",
     [MSG_UPD_RECEIVED] = "%s: new version received",
     [MSG_UPD_APPLIED] = "%s: new version applied. Commit it to confirm.",
+    [MSG_UPD_COMMITTED] = "%s: new version applied and committed.",
     [MSG_UPD_UP_TO_DATE] = "%s: up to date",
     [MSG_UPD_TO_PUBLISH] =
         "%s: local change not published yet: run 'git shared publish'",
