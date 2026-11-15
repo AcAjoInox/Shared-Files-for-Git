@@ -138,3 +138,5 @@ Gli stati che vedi in `git shared status`:
 - L'estensione va installata su ogni macchina che deve pubblicare o applicare versioni. Chi non ce l'ha usa comunque la repo normalmente.
 
 test shared dell'utente
+
+secondo test
