@@ -11,7 +11,10 @@ static const char *const msg_en[] = {
         "usage: git shared <command> [<args>]\n"
         "\n"
         "    set       declare a file of this repository as shared\n"
+        "    link      link a shared file of another repository\n"
         "    status    show the shared files of this repository\n"
+        "    publish   send new versions to the peers\n"
+        "    update    get the new versions and apply them\n"
         "    help      show the manual\n"
         "\n"
         "'git shared <command> -h' shows the options of a command.\n",
@@ -22,6 +25,23 @@ static const char *const msg_en[] = {
         "\n"
         "    -c, --commit      commit .gitshared right away\n"
         "    -m <message>      commit .gitshared right away with <message>\n",
+    [MSG_USAGE_LINK] =
+        "usage: git shared link [-c | -m <message>] [--] <source-file> "
+        "[<destination>]\n"
+        "\n"
+        "    <source-file>     the shared file in the other repository\n"
+        "    <destination>     path in this repository "
+        "(default: as in the source)\n"
+        "    -c, --commit      commit right away\n"
+        "    -m <message>      commit right away with <message>\n",
+    [MSG_USAGE_PUBLISH] =
+        "usage: git shared publish [<path>]\n",
+    [MSG_USAGE_UPDATE] =
+        "usage: git shared update [-f] [-c | -m <message>] [<path>]\n"
+        "\n"
+        "    -f, --force       overwrite local changes\n"
+        "    -c, --commit      commit the applied files right away\n"
+        "    -m <message>      commit right away with <message>\n",
     [MSG_USAGE_STATUS] =
         "usage: git shared status\n",
 
@@ -49,7 +69,28 @@ static const char *const msg_en[] = {
     [MSG_ERR_PENDING] = "cannot complete a pending operation",
     [MSG_ERR_COMMIT] =
         "commit failed: .gitshared is staged, commit it by hand",
-    [MSG_ERR_CHAIN] = "cannot create the version chain of '%s'",
+    [MSG_ERR_CHAIN] = "cannot update the version chain of '%s'",
+    [MSG_ERR_SRC_NOT_REPO] = "'%s' is not inside a git repository",
+    [MSG_ERR_SRC_NOT_SHARED] =
+        "'%s' is not shared in its repository: run 'git shared set' there",
+    [MSG_ERR_SRC_NO_VERSIONS] =
+        "cannot get the versions of '%s' from %s: is it committed there?",
+    [MSG_ERR_SAME_REPO] = "source and destination are the same repository",
+    [MSG_ERR_HASH_MISMATCH] =
+        "the repositories use different hash algorithms (%s, %s)",
+    [MSG_ERR_DEST_PATH] = "invalid destination path: '%s'",
+    [MSG_ERR_DEST_EXISTS] =
+        "'%s' already exists: linking an existing file is not supported yet",
+    [MSG_ERR_ALREADY_LINKED] = "'%s' is already shared here (id %s)",
+    [MSG_ERR_WRITE_FILE] = "cannot write '%s'",
+    [MSG_ERR_NOT_SHARED_PATH] = "'%s' is not a shared file",
+    [MSG_ERR_LOCAL_CHANGES] =
+        "'%s' has local changes: commit or discard them, or use -f",
+    [MSG_ERR_PEER_REJECTED] =
+        "%s: rejected by %s, which has a newer version: "
+        "run 'git shared update'",
+    [MSG_ERR_TOO_MANY_PEERS] = "%s: too many peers (at most %u)",
+    [MSG_ERR_PUBLISH] = "%s: cannot create the new version",
 
     [MSG_WARN_BAD_ENTRY] = "ignoring invalid entry '%s' in .gitshared",
     [MSG_WARN_NOT_IN_HEAD] =
@@ -59,11 +100,32 @@ static const char *const msg_en[] = {
         "(add one with: git config --add shared.%s.branch <branch>)",
     [MSG_WARN_DISCARDED] =
         "discarded pending operation on %s: .gitshared was restored",
+    [MSG_WARN_PEER_UNREACHABLE] = "%s: peer %s not reachable",
+    [MSG_WARN_SUSPENDED] = "%s: suspended on this branch",
 
     [MSG_SET_STAGED] =
         "'%s' is now shared as '%s'. Commit .gitshared to confirm.",
     [MSG_SET_DONE] = "'%s' is now shared as '%s'.",
     [MSG_SET_COMMIT_MSG] = "Share %s",
+    [MSG_LINK_STAGED] =
+        "'%s' linked as '%s' from %s. Commit it with .gitshared to confirm.",
+    [MSG_LINK_DONE] = "'%s' linked as '%s' from %s.",
+    [MSG_LINK_COMMIT_MSG] = "Link %s",
+    [MSG_PUB_CREATED] = "%s: new version created",
+    [MSG_PUB_PUSHED] = "%s: sent to %u of %u peers",
+    [MSG_PUB_NO_PEERS] = "%s: no peers to send it to",
+    [MSG_PUB_TO_APPLY] =
+        "%s: a newer version exists: run 'git shared update' first",
+    [MSG_PUB_DIVERGED] =
+        "%s: diverged from the latest version: run 'git shared update'",
+    [MSG_SKIP_STATE] = "%s: %s, nothing to do",
+    [MSG_UPD_RECEIVED] = "%s: new version received",
+    [MSG_UPD_APPLIED] = "%s: new version applied. Commit it to confirm.",
+    [MSG_UPD_UP_TO_DATE] = "%s: up to date",
+    [MSG_UPD_TO_PUBLISH] =
+        "%s: local change not published yet: run 'git shared publish'",
+    [MSG_UPD_DIVERGED] = "%s: diverged: merging is not implemented yet",
+    [MSG_UPD_COMMIT_MSG] = "Update %s",
 
     [MSG_STATUS_NONE] = "No shared files in this repository.",
     [MSG_STATUS_FIELD_PATH] = "path",

@@ -105,3 +105,55 @@ int str_eq(const Str_t *s, const char *p)
 {
     return strcmp(str_cstr(s), p) == 0;
 }
+
+void str_setlen(Str_t *s, size_t len)
+{
+    if ((s->buf != NULL) && (len <= s->len)) {
+        s->len = len;
+        s->buf[len] = '\0';
+    }
+}
+
+void str_addz(Str_t *s, const char *p)
+{
+    str_addn(s, p, strlen(p) + 1U); /* '\0' compreso: fa da separatore */
+}
+
+const char *str_znext(const Str_t *s, const char *cur)
+{
+    const char *next = NULL;
+
+    if (cur == NULL) {
+        next = (s->len > 0U) ? s->buf : NULL;
+    } else {
+        next = cur + strlen(cur) + 1U;
+        if (next >= (s->buf + s->len)) {
+            next = NULL;
+        }
+    }
+    return next;
+}
+
+int str_zhas(const Str_t *s, const char *p)
+{
+    const char *c = str_znext(s, NULL);
+    int found = 0;
+
+    while ((c != NULL) && (found == 0)) {
+        found = (strcmp(c, p) == 0);
+        c = str_znext(s, c);
+    }
+    return found;
+}
+
+size_t str_zcount(const Str_t *s)
+{
+    const char *c = str_znext(s, NULL);
+    size_t n = 0U;
+
+    while (c != NULL) {
+        n++;
+        c = str_znext(s, c);
+    }
+    return n;
+}

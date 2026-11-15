@@ -179,6 +179,50 @@ eGsErr_t git_run(const char *const args[], unsigned flags, Str_t *out)
     return err;
 }
 
+eGsErr_t git_update_ref(const char *ref, const Oid_t *new_oid,
+                        const Oid_t *old_oid, const char *reason)
+{
+    const char *args[] = { "update-ref", "-m", reason, ref, NULL, NULL, NULL };
+    char new_hex[OID_HEX_SIZE];
+    char old_hex[OID_HEX_SIZE];
+
+    oid_to_hex(new_oid, new_hex);
+    args[4] = new_hex;
+    if (old_oid != NULL) {
+        oid_to_hex(old_oid, old_hex);
+        args[5] = old_hex;
+    } else {
+        args[5] = ""; /* valore vecchio vuoto: la ref non deve esistere */
+    }
+    return git_run(args, 0U, NULL);
+}
+
+eGsErr_t git_delete_refs(const Str_t *refs)
+{
+    static const char *const args[] = { "update-ref", "--stdin", NULL };
+    const char *r;
+    Str_t out = STR_INIT;
+    Proc_t p;
+    int code = 0;
+    eGsErr_t err = GS_OK;
+
+    if (refs->len > 0U) {
+        err = git_start(&p, args, PROC_STDIN_PIPE);
+        if (err == GS_OK) {
+            for (r = str_znext(refs, NULL); r != NULL; r = str_znext(refs, r)) {
+                (void)fprintf(p.in, "delete %s\n", r);
+            }
+            proc_close_in(&p);
+            err = proc_collect(&p, &out, &code);
+            if ((err == GS_OK) && (code != 0)) {
+                err = GS_ERR_GIT;
+            }
+        }
+    }
+    str_free(&out);
+    return err;
+}
+
 /* ---- Interrogazioni in serie ------------------------------------------- */
 
 eGsErr_t git_batch_open(GitBatch_t *b)

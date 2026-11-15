@@ -55,6 +55,16 @@ eGsErr_t git_capture(const char *const args[], unsigned flags, Str_t *out,
  * NULL; se c'e', riceve lo stdout senza il fine riga finale. */
 eGsErr_t git_run(const char *const args[], unsigned flags, Str_t *out);
 
+/*
+ * Aggiornamento atomico e condizionato di una ref (REQ-NF-005): riesce
+ * solo se la ref vale old_oid, o non esiste se old_oid e' NULL.
+ */
+eGsErr_t git_update_ref(const char *ref, const Oid_t *new_oid,
+                        const Oid_t *old_oid, const char *reason);
+
+/* Cancella le ref di un elenco compatto (str_addz) con un solo processo. */
+eGsErr_t git_delete_refs(const Str_t *refs);
+
 /* ---- Interrogazioni in serie -------------------------------------------
  * Un solo processo "git cat-file --batch-check" risponde a tutte le
  * domande ("HEAD:<path>", "refs/shared/<id>:content", ...): si paga

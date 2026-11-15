@@ -22,8 +22,11 @@ typedef struct {
 
 static const CmdDef_t commands[] = {
     { "help", cmd_help, MSG_USAGE_HELP },
+    { "link", cmd_link, MSG_USAGE_LINK },
+    { "publish", cmd_publish, MSG_USAGE_PUBLISH },
     { "set", cmd_set, MSG_USAGE_SET },
     { "status", cmd_status, MSG_USAGE_STATUS },
+    { "update", cmd_update, MSG_USAGE_UPDATE },
 };
 
 static const CmdDef_t *find_command(const char *name)

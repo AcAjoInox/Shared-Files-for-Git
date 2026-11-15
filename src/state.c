@@ -16,11 +16,27 @@
 #include <string.h>
 
 #include "chain.h"
+#include "msg.h"
 
 int state_is_derived(eState_t st)
 {
     return (st == STATE_ALIGNED) || (st == STATE_TO_APPLY) ||
            (st == STATE_TO_PUBLISH) || (st == STATE_DIVERGED);
+}
+
+const char *state_name(eState_t st)
+{
+    static const eMsgId_t names[] = {
+        [STATE_ALIGNED] = MSG_STATE_ALIGNED,
+        [STATE_TO_APPLY] = MSG_STATE_TO_APPLY,
+        [STATE_TO_PUBLISH] = MSG_STATE_TO_PUBLISH,
+        [STATE_DIVERGED] = MSG_STATE_DIVERGED,
+        [STATE_PENDING] = MSG_STATE_PENDING,
+        [STATE_UNLINKED] = MSG_STATE_UNLINKED,
+        [STATE_INCONSISTENT] = MSG_STATE_INCONSISTENT,
+    };
+
+    return msg(names[st]);
 }
 
 /* Nuovo blob di una riga di `git log --raw`:

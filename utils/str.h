@@ -38,7 +38,18 @@ void str_addch(Str_t *s, char c);
 void str_addf(Str_t *s, const char *fmt, ...) GS_PRINTF(2, 3);
 void str_vaddf(Str_t *s, const char *fmt, va_list ap);
 void str_trim_eol(Str_t *s);
+void str_setlen(Str_t *s, size_t len); /* accorcia: len <= s->len */
 const char *str_cstr(const Str_t *s);
 int str_eq(const Str_t *s, const char *p);
+
+/*
+ * Elenchi compatti: piu' stringhe in un solo buffer, ognuna chiusa da
+ * '\0' ("main\0release\0"). Un'allocazione per tutto l'elenco.
+ *   for (p = str_znext(s, NULL); p != NULL; p = str_znext(s, p)) ...
+ */
+void str_addz(Str_t *s, const char *p);
+const char *str_znext(const Str_t *s, const char *cur);
+int str_zhas(const Str_t *s, const char *p);
+size_t str_zcount(const Str_t *s);
 
 #endif /* GS_STR_H */

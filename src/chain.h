@@ -9,11 +9,20 @@
 
 #include "err.h"
 #include "git.h"
+#include "str.h"
+
+/* "refs/shared/<id>" in ref (che viene prima svuotata). */
+void chain_ref(Str_t *ref, const char *id);
 
 /*
- * Crea la prima versione con il blob dato e la scrive in refs/shared/<id>,
- * solo se la ref non esiste (REQ-NF-005). Messaggio: "shared: <name>".
+ * Commit di versione con il blob dato e il genitore dato (NULL per la
+ * prima versione). Autore e data dell'utente (D-013), messaggio
+ * "shared: <name>". Non tocca nessuna ref.
  */
+eGsErr_t chain_commit(const Oid_t *blob, const Oid_t *parent,
+                      const char *name, Oid_t *out);
+
+/* Prima versione: chain_commit + ref creata solo se non esiste. */
 eGsErr_t chain_create_first(const char *id, const Oid_t *blob,
                             const char *name);
 

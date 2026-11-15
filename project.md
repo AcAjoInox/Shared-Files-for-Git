@@ -265,7 +265,9 @@ La v0 è il **core solo locale**: tutto ciò che serve perché due o più repo s
 | **M2 – Due repo** | `link` su destinazione nuova, `publish`, `update` in fast-forward, `status` senza merge | REQ-F-002 (parte), REQ-F-004, REQ-F-005, REQ-F-007, REQ-F-009, REQ-F-010 |
 | **M3 – Hook** | Installazione con marker; `pre-commit` che avvisa; `post-commit` che pubblica e completa le operazioni in attesa | REQ-F-006, REQ-F-016, REQ-F-023 |
 
-> **Stato (2026-11-15): M0 e M1 completati.** `make` compila senza warning (`-Wall -Wextra -Wpedantic -Wshadow`), `make test` passa 111 test (§7). Tempi medi su Windows (soglia di REQ-NF-007: 300 ms): `status` con 5 file allineati 81 ms; con un file da pubblicare 93 ms; con un file con 30 commit di storia 118 ms; `set` 157 ms. I file `*_posix.c` non sono ancora stati compilati né provati su Linux.
+> **Stato (2026-11-15): M0, M1 e M2 completati.** `make` compila senza warning (`-Wall -Wextra -Wpedantic -Wshadow`), `make test` passa 185 test (§7). Tempi medi su Windows (soglia di REQ-NF-007: `status` 300 ms, pubblicazione verso 32 peer 1 s): `status` con 5 file allineati 81 ms; con un file da pubblicare 93 ms; con un file con 30 commit di storia 118 ms; `set` 157 ms; `publish` verso 8 peer 386 ms; `update` da 8 peer 293 ms. Da misurare: `publish` verso 32 peer. I file `*_posix.c` non sono ancora stati compilati né provati su Linux.
+>
+> Limiti noti di M2: `update` non unisce ancora le divergenze (REQ-F-011): le segnala e si ferma; `link` richiede che la destinazione non esista (D-062 e D-064 fuori dalla v0); senza hook (M3) la pubblicazione e il completamento di `set`/`link` avvengono al primo comando `git shared` dopo il commit.
 >
 > Limiti noti di M1: la regola dei merge di D-065 (basi diverse dai due genitori → *divergente*) non è applicata; la catena si legge seguendo il primo genitore (le versioni di merge arrivano con M2); sul branch nato prima del `set` lo stato è *incoerente* (A-21).
 
@@ -306,10 +308,11 @@ I moduli di base non legati a git shared (`proc`, `sys`, `str`, `mem`, `err`) st
 |---|---|---|
 | Ingresso | `main` | Opzioni globali, tabella dei sottocomandi, codici di uscita |
 | Comandi | `cmd_*` | Un file per sottocomando: `set`, `link`, `status`, `update`, `publish`, `hook`, `help` |
+| | `cmd_common` | Parti comuni: opzioni `-c`/`-m`/`-f`, apertura della repo, commit dedicato, scrittura di un blob nel file, scelta dei file su cui lavorare |
 | Modello | `shared` | La repo (`Repo_t`: radice, branch, voci) e i file shared (`.gitshared` + sezioni locali); completamento delle operazioni in attesa (REQ-F-023) |
 | | `state` | Derivazione dello stato e della base (D-054, D-065) |
 | | `chain` | Catena `refs/shared/<id>`: creazione di una versione, blob delle versioni |
-| | `peers` | Membership; push e fetch verso i peer (M2) |
+| | `peers` | Membership, annuncio, push e fetch verso i peer: **in parallelo**, il tempo è quello del peer più lento. Verso un peer sempre `--git-dir=<peer>/.git`, così un peer cancellato non porta a una repo che lo contiene |
 | | `hooks` | Installazione dei blocchi con marker (M3) |
 | Accesso a git | `git` | Lancia comandi git; oid in binario (`Oid_t`, 33 byte); dialogo con `cat-file --batch-check` (`GitBatch_t`) |
 | Piattaforma | `proc` | Processi **senza shell**, con stdin e stdout in pipe: `proc_win.c` (`CreateProcess`), `proc_posix.c` (`fork` + `exec`) |
@@ -327,17 +330,17 @@ git-shared-file/
 ├── src/                      il core
 │   ├── main.c
 │   ├── cmd.h                 prototipi dei sottocomandi
+│   ├── cmd_common.c/.h       parti comuni ai sottocomandi
 │   ├── cmd_set.c  cmd_link.c  cmd_status.c  cmd_update.c
 │   ├── cmd_publish.c  cmd_hook.c  cmd_help.c
 │   ├── shared.c/.h  state.c/.h  chain.c/.h  peers.c/.h  hooks.c/.h
 │   ├── git.c/.h
-│   ├── path.c/.h
 │   ├── bounds.h
 │   └── msg.c/.h
 ├── utils/                    moduli di base, senza dipendenze da src/
 │   ├── proc.c/.h  proc_win.c  proc_posix.c
 │   ├── sys.h  sys_win.c/.h  sys_posix.c
-│   ├── str.c/.h  mem.c/.h
+│   ├── str.c/.h  mem.c/.h  path.c/.h
 │   └── err.h
 ├── doc/                      sorgente del manuale (A-06)
 ├── test/
@@ -407,8 +410,10 @@ Tutti i file in formato config di git si leggono e scrivono **solo** con `git co
 - Lettura: blob di T = `git rev-parse refs/shared/<id>:content`; ordine = `git merge-base --is-ancestor`.
 - Pubblicazione: `git push <peer> refs/shared/<id>:refs/shared/<id>` (D-040), senza `+`: il fast-forward lo verifica git.
 
-#### Ref temporanee di `update`
-`git fetch <peer> +refs/shared/<id>:refs/shared-incoming/<id>/<k>`, con `k` = posizione del peer nell'elenco. Qui il `+` è corretto: sono copie di lavoro. Si cancellano a fine `update` (`git update-ref -d`). Il prefisso `refs/shared-incoming/` non ricade sotto `refs/shared/`, quindi non si confonde con le catene.
+#### Ref temporanee di `update` e `link`
+`git fetch <peer> +refs/shared/<id>:refs/shared-incoming/<id>/<k>`, con `k` = posizione del peer nell'elenco. Qui il `+` è corretto: sono copie di lavoro. `update` le cancella alla fine (`update-ref --stdin`, un processo per tutte). `link` tiene `refs/shared-incoming/<id>/0` fino al commit: protegge dal gc gli oggetti ricevuti e al completamento diventa `refs/shared/<id>`; se l'attesa viene scartata, si cancella. Il prefisso `refs/shared-incoming/` non ricade sotto `refs/shared/`, quindi non si confonde con le catene.
+
+Fetch in parallelo nella stessa repo: `--no-write-fetch-head` (nessun FETCH_HEAD condiviso) e `--no-auto-gc` (git ≥ 2.29, entro il minimo 2.34).
 
 #### Hook (v0: blocco con marker)
 - Cartella degli hook da `git rev-parse --git-path hooks`, che rispetta `core.hooksPath`.
@@ -442,6 +447,22 @@ Caso comune (tutti i file allineati): **5 processi, qualunque sia il numero di f
 5. `update-index --add -- .gitshared`.
 6. Con `-c`/`-m`: `commit --only -- .gitshared`, poi il completamento.
 
+#### `link`
+1. Sorgente: `rev-parse --show-toplevel --show-prefix --show-object-format` nella cartella del file indicato (un processo); stesso algoritmo di hash (REQ-NF-009); voce nel suo `.gitshared` (D-019).
+2. Destinazione: path della sorgente o quello dato (D-028); non deve essere già shared, avere un nome già usato o esistere (v0).
+3. `fetch` della catena in `refs/shared-incoming/<id>/0`.
+4. Attesa con `pendingSource` **per prima**; sezione in `.gitshared`; file dal blob di T (`update-index --cacheinfo` + `checkout-index`, D-042); staging.
+5. Con `-c`/`-m`: commit di `.gitshared` e del file, poi il completamento.
+
+#### `publish`
+Per ogni file: *da pubblicare* → `mktree` + `commit-tree -p T` + `update-ref` condizionato a T; poi, anche se *allineato*, `push --porcelain` (senza `+`) verso tutti i peer **in parallelo**. Esito per peer: codice 0 inviato o già aggiornato; codice 1 con una riga `!` rifiutato (il peer ha una versione nuova: "non-fast-forward" o "fetch first"); altro irraggiungibile (REQ-F-008).
+
+#### `update`
+Per ogni file: `fetch` dai peer **in parallelo**; `merge-base --independent T I1 … In` (un processo): una sola versione rimasta e diversa da T → `update-ref` condizionato (fast-forward); più versioni → divergenza (merge non ancora implementato). Poi lo stato: *da applicare* → controllo delle modifiche locali (`diff --quiet HEAD`, REQ-F-010) e T nel file (D-042). Con `-c`/`-m` commit dei soli file applicati.
+
+#### Completamento di un `link` (REQ-F-002, D-059)
+Come `set` per i branch attivi; poi la ref temporanea diventa `refs/shared/<id>` (con un nuovo fetch se manca); membership = peer della sorgente + la sorgente, senza se stessa (massimo 32, D-034); annuncio in parallelo a ogni peer con `config --replace-all --fixed-value shared.<id>.peer <radice>` (nessun duplicato, un processo per peer); per ultima la rimozione dell'attesa. Un peer irraggiungibile produce un avviso e non blocca (B-07).
+
 #### Completamento di un `set` (REQ-F-023)
 Quando la sezione con quell'ID compare in `HEAD:.gitshared`: (1) branch attivi copiati dal default di `.gitshared`, o il branch corrente; (2) prima versione della catena (`mktree` dallo stdin, `commit-tree`, `update-ref` con valore vecchio vuoto: solo se la ref non esiste); (3) rimozione dell'attesa. L'ordine permette di ripetere tutto dopo un'interruzione. Se il file non è ancora in HEAD, l'attesa resta e l'utente riceve un avviso. Se la sezione non è né in HEAD né nel working tree, l'attesa viene scartata.
 ### 6.5 Gestione errori
@@ -460,6 +481,7 @@ Quando la sezione con quell'ID compare in `HEAD:.gitshared`: (1) branch attivi c
 | `t0002-status.sh` | REQ-F-012 (parte), REQ-F-021, REQ-NF-003 e D-067 (path con spazi e non ASCII, senza shell), §6.3 | 25 |
 | `t0003-set.sh` | REQ-F-001, REQ-F-021, REQ-F-022 (sospensione), REQ-F-023 (attesa, completamento, annullamento), D-006, D-007, D-057 | 59 |
 | `t0004-base.sh` | REQ-F-012, D-054, D-065 (revert, `reset`, B-14), con catene di più versioni costruite a mano | 8 |
+| `t0005-peers.sh` | REQ-F-002, REQ-F-004…REQ-F-010, D-028, D-040, D-059: link, membership e annuncio, publish, update, modifiche locali, divergenze, peer irraggiungibile, push rifiutato. File condiviso: `breef.md` del progetto | 74 |
 
 ## 8. Stile di programmazione
 > Preferenze dell'autore (background embedded, orientamento MISRA). Sezione viva: si aggiunge man mano. Vale per le parti scritte in C (D-063).

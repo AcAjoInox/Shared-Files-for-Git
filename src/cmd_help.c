@@ -20,7 +20,11 @@ static const char manual[] =
     "\n"
     "SYNOPSIS\n"
     "    git shared set [-c | -m <message>] [--] <path>\n"
+    "    git shared link [-c | -m <message>] [--] <source-file> "
+    "[<destination>]\n"
     "    git shared status\n"
+    "    git shared publish [<path>]\n"
+    "    git shared update [-f] [-c | -m <message>] [<path>]\n"
     "    git shared help [<command>]\n"
     "\n"
     "DESCRIPTION\n"
@@ -35,6 +39,25 @@ static const char manual[] =
     "        takes effect when .gitshared is committed. -c commits right\n"
     "        away with a standard message, -m <message> with <message>.\n"
     "        Nothing is committed by default.\n"
+    "\n"
+    "    link [-c | -m <message>] [--] <source-file> [<destination>]\n"
+    "        Link to this repository a file shared by another repository,\n"
+    "        given by its path in that repository. The file is written\n"
+    "        from its latest version and staged with .gitshared. When they\n"
+    "        are committed the repositories become peers: each one learns\n"
+    "        about the other and about the other peers.\n"
+    "\n"
+    "    publish [<path>]\n"
+    "        For each shared file changed and committed on top of the\n"
+    "        latest version, create a new version and send it to the\n"
+    "        peers. A peer that already has a newer version refuses it:\n"
+    "        run update first.\n"
+    "\n"
+    "    update [-f] [-c | -m <message>] [<path>]\n"
+    "        Get the versions from the peers and apply the latest one to\n"
+    "        the working tree and the index. Local changes are never\n"
+    "        overwritten, unless -f is given. Nothing is committed by\n"
+    "        default.\n"
     "\n"
     "    status\n"
     "        Show each shared file with its state: aligned, new version to\n"
@@ -59,8 +82,11 @@ static const struct {
     eMsgId_t usage;
 } topics[] = {
     { "help", MSG_USAGE_HELP },
+    { "link", MSG_USAGE_LINK },
+    { "publish", MSG_USAGE_PUBLISH },
     { "set", MSG_USAGE_SET },
     { "status", MSG_USAGE_STATUS },
+    { "update", MSG_USAGE_UPDATE },
 };
 
 int cmd_help(int argc, char **argv)

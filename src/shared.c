@@ -9,6 +9,7 @@
 #include "chain.h"
 #include "mem.h"
 #include "msg.h"
+#include "peers.h"
 #include "sys.h"
 
 /* Processi avviati da repo_open e non ancora chiusi. */
@@ -31,6 +32,8 @@ static void entry_init(SharedEntry_t *e)
     str_init(&e->name);
     str_init(&e->path);
     str_init(&e->branches);
+    str_init(&e->peers);
+    str_init(&e->pending_src);
     e->id[0] = '\0';
     e->in_gitshared = 0U;
     e->in_config = 0U;
@@ -43,6 +46,8 @@ static void entry_free(SharedEntry_t *e)
     str_free(&e->name);
     str_free(&e->path);
     str_free(&e->branches);
+    str_free(&e->peers);
+    str_free(&e->pending_src);
 }
 
 void repo_close(Repo_t *r)
@@ -59,6 +64,7 @@ void repo_close(Repo_t *r)
     str_free(&r->top);
     str_free(&r->prefix);
     str_free(&r->branch);
+    str_free(&r->objfmt);
 }
 
 SharedEntry_t *repo_add(Repo_t *r)
@@ -108,17 +114,14 @@ SharedEntry_t *repo_find_name(Repo_t *r, const char *name)
     return find_sub(r, name, strlen(name), 0);
 }
 
+SharedEntry_t *repo_find_id(Repo_t *r, const char *id)
+{
+    return find_sub(r, id, strlen(id), 1);
+}
+
 int shared_is_active(const SharedEntry_t *e, const char *branch)
 {
-    const char *b = str_cstr(&e->branches);
-    const char *end = b + e->branches.len;
-    int active = 0;
-
-    while ((branch[0] != '\0') && (b < end) && (active == 0)) {
-        active = (strcmp(b, branch) == 0);
-        b += strlen(b) + 1U;
-    }
-    return active;
+    return (branch[0] != '\0') && str_zhas(&e->branches, branch);
 }
 
 static int id_is_valid(const char *s, size_t len)
@@ -202,12 +205,6 @@ static int field_is(const CfgKey_t *k, const char *name)
     return (strncmp(k->field, name, n) == 0) && (k->field[n] == '\n');
 }
 
-static void add_branch(SharedEntry_t *e, const char *branch)
-{
-    str_add(&e->branches, branch);
-    str_addch(&e->branches, '\0');
-}
-
 /* Record di .gitshared: sezione per nome. */
 static void parse_gitshared_rec(Repo_t *r, const char *rec, int with_branches)
 {
@@ -231,14 +228,15 @@ static void parse_gitshared_rec(Repo_t *r, const char *rec, int with_branches)
             str_reset(&e->path);
             str_add(&e->path, k.value);
         } else if (with_branches && field_is(&k, "branch")) {
-            add_branch(e, k.value);
+            str_addz(&e->branches, k.value);
         } else {
             /* altri campi (url: fase 2) */
         }
     }
 }
 
-/* Record di .git/config (scope locale): sezione per ID. */
+/* Record di .git/config (scope locale): sezione per ID. I nomi delle
+ * variabili arrivano in minuscolo da git ("pendingsource"). */
 static void parse_local_rec(Repo_t *r, const char *rec)
 {
     static const char *const pending[] = { "", "set", "link", "unlink" };
@@ -260,20 +258,21 @@ static void parse_local_rec(Repo_t *r, const char *rec)
                     e->pending = i;
                 }
             }
+        } else if (field_is(&k, "pendingsource")) {
+            str_reset(&e->pending_src);
+            str_add(&e->pending_src, k.value);
         } else if (field_is(&k, "branch")) {
-            add_branch(e, k.value);
+            str_addz(&e->branches, k.value);
+        } else if (field_is(&k, "peer")) {
+            str_addz(&e->peers, k.value);
         } else {
-            /* peer: M2 */
+            /* campi sconosciuti: ignorati */
         }
     }
 }
 
-/*
- * Carica un .gitshared: dal working tree (file) o da un commit (blob, es.
- * "HEAD:.gitshared"). Un blob mancante o illeggibile da' zero voci.
- */
-static eGsErr_t load_gitshared(Repo_t *r, const char *src, int is_blob,
-                               int with_branches)
+eGsErr_t repo_load_gitshared(Repo_t *r, const char *src, int is_blob,
+                             int with_branches)
 {
     const char *args[] = { "config", "-z", NULL, NULL, "--get-regexp",
                            "^shared\\.", NULL };
@@ -294,7 +293,7 @@ static eGsErr_t load_gitshared(Repo_t *r, const char *src, int is_blob,
     }
     err = proc_finish(&p, &code);
     /* 0 = trovato, 1 = nessuna chiave o file assente, altro = file non
-     * valido (verificato con git 2.43). */
+     * valido (verificato con git 2.43). Un blob illeggibile vale vuoto. */
     if ((err == GS_OK) && (code > 1) && !is_blob) {
         err = GS_ERR_FORMAT;
     }
@@ -309,10 +308,49 @@ exit:
     return err;
 }
 
+/* Divide l'output di rev-parse (una riga per valore; il prefisso puo'
+ * essere una riga vuota). */
+static eGsErr_t parse_locate(const Str_t *out, int code, Str_t *top,
+                             Str_t *prefix, Str_t *objfmt)
+{
+    const char *l1 = str_cstr(out);
+    const char *l2;
+    const char *l3;
+    eGsErr_t err = GS_ERR_NOT_REPO; /* anche dentro .git: nessun worktree */
+
+    l2 = strchr(l1, '\n');
+    l3 = (l2 != NULL) ? strchr(l2 + 1, '\n') : NULL;
+    if ((code == 0) && (l2 != NULL) && (l2 != l1) && (l3 != NULL)) {
+        str_addn(top, l1, (size_t)(l2 - l1));
+        str_addn(prefix, l2 + 1, (size_t)(l3 - (l2 + 1)));
+        str_add(objfmt, l3 + 1);
+        str_trim_eol(objfmt);
+        err = GS_OK;
+    }
+    return err;
+}
+
+eGsErr_t repo_locate(const char *dir, Str_t *top, Str_t *prefix,
+                     Str_t *objfmt)
+{
+    const char *args[] = { "-C", dir, "rev-parse", "--show-toplevel",
+                           "--show-prefix", "--show-object-format", NULL };
+    Str_t out = STR_INIT;
+    int code = 0;
+    eGsErr_t err = git_capture(args, PROC_STDERR_NULL, &out, &code);
+
+    if (err == GS_OK) {
+        err = parse_locate(&out, code, top, prefix, objfmt);
+    }
+    str_free(&out);
+    return err;
+}
+
 eGsErr_t repo_open(Repo_t *r)
 {
     static const char *const a_top[] = { "rev-parse", "--show-toplevel",
-                                         "--show-prefix", NULL };
+                                         "--show-prefix",
+                                         "--show-object-format", NULL };
     static const char *const a_head[] = { "symbolic-ref", "-q", "HEAD", NULL };
     static const char *const a_cfg[] = { "config", "-z", "--show-scope",
                                          "--get-regexp", "^shared\\.", NULL };
@@ -322,7 +360,6 @@ eGsErr_t repo_open(Repo_t *r)
     Proc_t p_cfg;
     Str_t out = STR_INIT;
     Str_t file = STR_INIT;
-    const char *nl;
     const char *scope;
     const char *rec;
     const char *end;
@@ -348,24 +385,18 @@ eGsErr_t repo_open(Repo_t *r)
     }
     run |= RUN_CFG;
 
-    /* Radice e prefisso: una riga ciascuno (il prefisso puo' essere vuoto). */
     run &= ~RUN_TOP;
     err = proc_collect(&p_top, &out, &code);
+    if (err == GS_OK) {
+        err = parse_locate(&out, code, &r->top, &r->prefix, &r->objfmt);
+    }
     if (err != GS_OK) {
         goto exit;
     }
-    nl = strchr(str_cstr(&out), '\n');
-    if ((code != 0) || (nl == NULL) || (nl == out.buf)) {
-        err = GS_ERR_NOT_REPO; /* anche dentro .git: nessun working tree */
-        goto exit;
-    }
-    str_addn(&r->top, out.buf, (size_t)(nl - out.buf));
-    str_add(&r->prefix, nl + 1);
-    str_trim_eol(&r->prefix);
 
     /* .gitshared mentre gli altri due processi finiscono. */
     str_addf(&file, "%s/.gitshared", str_cstr(&r->top));
-    err = load_gitshared(r, str_cstr(&file), 0, 0);
+    err = repo_load_gitshared(r, str_cstr(&file), 0, 0);
     if (err != GS_OK) {
         goto exit;
     }
@@ -420,46 +451,43 @@ exit:
 
 /* ---- Operazioni in attesa (REQ-F-023) ----------------------------------- */
 
-/* Esegue "git config <a1> <a2> [<a3>]" (a3 puo' essere NULL). */
-static eGsErr_t config_set(const char *a1, const char *a2, const char *a3)
+/* "git config <a1> <a2> [<a3>]" (a3 puo' essere NULL). */
+static eGsErr_t config_run(const char *a1, const char *a2, const char *a3)
 {
     const char *args[] = { "config", a1, a2, a3, NULL };
 
     return git_run(args, 0U, NULL);
 }
 
-/*
- * Completa un `set` committato. Ordine pensato per poter ripetere tutto
- * dopo un'interruzione: branch attivi, catena (solo se manca), e per
- * ultima la rimozione dell'attesa.
- */
-static eGsErr_t complete_set(Repo_t *r, SharedEntry_t *e,
-                             const SharedEntry_t *committed, GitBatch_t *b)
+/* "git config <op> shared.<id>.<field> [<value>]". */
+static eGsErr_t config_key(const char *op, const char *id, const char *field,
+                           const char *value)
+{
+    Str_t key = STR_INIT;
+    eGsErr_t err;
+
+    str_addf(&key, "shared.%s.%s", id, field);
+    err = config_run(op, str_cstr(&key), value);
+    str_free(&key);
+    return err;
+}
+
+/* Branch attivi: copia del default (D-057); se manca, il corrente. */
+static eGsErr_t copy_branches(const Repo_t *r, SharedEntry_t *e,
+                              const SharedEntry_t *committed)
 {
     const char *unset_args[] = { "config", "--unset-all", NULL, NULL };
     const Str_t *list = &committed->branches;
-    Str_t name = STR_INIT;
-    Str_t key = STR_INIT;
     Str_t current = STR_INIT;
+    Str_t key = STR_INIT;
     Str_t ignored = STR_INIT;
-    Oid_t blob;
-    Oid_t tip;
     const char *br;
-    const char *end;
     int code = 0;
-    eGsErr_t err = GS_OK;
+    eGsErr_t err;
 
-    str_addf(&name, "HEAD:%s", str_cstr(&committed->path));
-    if (git_batch_blob(b, str_cstr(&name), &blob) == 0) {
-        msg_warning(MSG_WARN_NOT_IN_HEAD, str_cstr(&committed->path));
-        goto exit; /* resta in attesa */
-    }
-
-    /* 1. Branch attivi: copia del default (D-057); se manca, il corrente. */
     if (list->len == 0U) {
         if (r->branch.len > 0U) {
-            str_add(&current, str_cstr(&r->branch));
-            str_addch(&current, '\0');
+            str_addz(&current, str_cstr(&r->branch));
         } else {
             msg_warning(MSG_WARN_NO_BRANCH, str_cstr(&committed->name), e->id);
         }
@@ -468,88 +496,210 @@ static eGsErr_t complete_set(Repo_t *r, SharedEntry_t *e,
     str_addf(&key, "shared.%s.branch", e->id);
     unset_args[2] = str_cstr(&key);
     err = git_capture(unset_args, 0U, &ignored, &code); /* 5 = non c'era */
-    if (err != GS_OK) {
-        goto exit;
-    }
     str_reset(&e->branches);
-    br = str_cstr(list);
-    end = br + list->len;
-    while ((br < end) && (err == GS_OK)) {
-        err = config_set("--add", str_cstr(&key), br);
-        add_branch(e, br);
-        br += strlen(br) + 1U;
+    for (br = str_znext(list, NULL); (br != NULL) && (err == GS_OK);
+         br = str_znext(list, br)) {
+        err = config_run("--add", str_cstr(&key), br);
+        str_addz(&e->branches, br);
     }
-    if (err != GS_OK) {
-        goto exit;
-    }
+    str_free(&ignored);
+    str_free(&key);
+    str_free(&current);
+    return err;
+}
 
-    /* 2. Catena, se non esiste gia'. */
-    str_reset(&name);
-    str_addf(&name, "refs/shared/%s", e->id);
-    if (git_batch_query(b, str_cstr(&name), &tip) != GIT_OBJ_COMMIT) {
-        err = chain_create_first(e->id, &blob, str_cstr(&committed->name));
-        if (err != GS_OK) {
-            msg_error(MSG_ERR_CHAIN, str_cstr(&committed->name));
-            goto exit;
-        }
-    }
+/* Fine dell'attesa: per ultima, cosi' un'interruzione si puo' ripetere. */
+static eGsErr_t end_pending(SharedEntry_t *e)
+{
+    eGsErr_t err = config_key("--unset", e->id, "pending", NULL);
 
-    /* 3. Fine dell'attesa. */
-    str_reset(&key);
-    str_addf(&key, "shared.%s.pending", e->id);
-    err = config_set("--unset", str_cstr(&key), NULL);
+    if ((err == GS_OK) && (e->pending_src.len > 0U)) {
+        err = config_key("--unset", e->id, "pendingsource", NULL);
+    }
     if (err == GS_OK) {
         e->pending = SHARED_PENDING_NONE;
         e->in_config = 1U;
+        str_reset(&e->pending_src);
+    }
+    return err;
+}
+
+static eGsErr_t complete_set(const Repo_t *r, SharedEntry_t *e,
+                             const SharedEntry_t *committed, const Oid_t *blob,
+                             GitBatch_t *b)
+{
+    Str_t ref = STR_INIT;
+    Oid_t tip;
+    eGsErr_t err = copy_branches(r, e, committed);
+
+    if (err == GS_OK) {
+        chain_ref(&ref, e->id);
+        if (git_batch_query(b, str_cstr(&ref), &tip) != GIT_OBJ_COMMIT) {
+            err = chain_create_first(e->id, blob, str_cstr(&committed->name));
+            if (err != GS_OK) {
+                msg_error(MSG_ERR_CHAIN, str_cstr(&committed->name));
+            }
+        }
+    }
+    if (err == GS_OK) {
+        err = end_pending(e);
+    }
+    str_free(&ref);
+    return err;
+}
+
+/*
+ * Completa un link (REQ-F-002, D-059): catena dalla ref temporanea del
+ * fetch fatto al comando, membership (peer della sorgente + la sorgente),
+ * annuncio ai peer.
+ */
+static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
+                              const SharedEntry_t *committed, GitBatch_t *b)
+{
+    PeerTally_t tally = { 0U, 0U, 0U };
+    Str_t ref = STR_INIT;
+    Str_t incoming = STR_INIT;
+    Str_t found = STR_INIT;
+    Str_t del = STR_INIT;
+    const char *p;
+    uint8_t ok = 0U;
+    Oid_t tip;
+    eGsErr_t err = copy_branches(r, e, committed);
+
+    if (err != GS_OK) {
+        goto exit;
     }
 
+    /* 1. Catena: la ref temporanea diventa refs/shared/<id>. */
+    chain_ref(&ref, e->id);
+    peers_incoming_ref(&incoming, e->id, 0U);
+    if (git_batch_query(b, str_cstr(&ref), &tip) != GIT_OBJ_COMMIT) {
+        if (git_batch_query(b, str_cstr(&incoming), &tip) != GIT_OBJ_COMMIT) {
+            /* ref temporanea persa: si rifa' il fetch dalla sorgente */
+            str_addz(&found, str_cstr(&e->pending_src));
+            peers_fetch(str_cstr(&committed->path), e->id, &found, &ok, &tally);
+            str_reset(&found);
+        }
+        if (git_batch_query(b, str_cstr(&incoming), &tip) != GIT_OBJ_COMMIT) {
+            msg_error(MSG_ERR_CHAIN, str_cstr(&committed->name));
+            err = GS_ERR_GIT;
+            goto exit;
+        }
+        err = git_update_ref(str_cstr(&ref), &tip, NULL, "git shared: link");
+        if (err != GS_OK) {
+            goto exit;
+        }
+    }
+    if (git_batch_query(b, str_cstr(&incoming), &tip) == GIT_OBJ_COMMIT) {
+        str_addz(&del, str_cstr(&incoming));
+        (void)git_delete_refs(&del);
+    }
+
+    /* 2. Membership: i peer della sorgente piu' la sorgente, senza se'. */
+    if (peers_of(str_cstr(&e->pending_src), e->id, &found) != GS_OK) {
+        msg_warning(MSG_WARN_PEER_UNREACHABLE, str_cstr(&committed->path),
+                    str_cstr(&e->pending_src));
+    }
+    str_addz(&found, str_cstr(&e->pending_src));
+    for (p = str_znext(&found, NULL); (p != NULL) && (err == GS_OK);
+         p = str_znext(&found, p)) {
+        if (!str_eq(&r->top, p) && !str_zhas(&e->peers, p)) {
+            if (str_zcount(&e->peers) >= GS_PEER_MAX) {
+                msg_error(MSG_ERR_TOO_MANY_PEERS, str_cstr(&committed->path),
+                          GS_PEER_MAX);
+                err = GS_ERR_USAGE;
+            } else {
+                err = config_key("--add", e->id, "peer", p);
+                str_addz(&e->peers, p);
+            }
+        }
+    }
+    if (err != GS_OK) {
+        goto exit;
+    }
+
+    /* 3. Annuncio: ogni peer aggiunge questa repo ai propri (REQ-F-002).
+     * Un peer irraggiungibile non blocca (REQ-F-008, B-07). */
+    peers_announce(e->id, &e->peers, str_cstr(&r->top), &tally);
+
+    err = end_pending(e);
+
 exit:
-    str_free(&ignored);
-    str_free(&current);
-    str_free(&key);
-    str_free(&name);
+    str_free(&del);
+    str_free(&found);
+    str_free(&incoming);
+    str_free(&ref);
+    return err;
+}
+
+/* Attesa non committata e sparita dal working tree: annullata. */
+static eGsErr_t discard_pending(SharedEntry_t *e, GitBatch_t *b)
+{
+    Str_t section = STR_INIT;
+    Str_t incoming = STR_INIT;
+    Str_t del = STR_INIT;
+    Oid_t tip;
+    eGsErr_t err;
+
+    str_addf(&section, "shared.%s", e->id);
+    err = config_run("--remove-section", str_cstr(&section), NULL);
+    if (err == GS_OK) {
+        if (e->pending == SHARED_PENDING_LINK) {
+            peers_incoming_ref(&incoming, e->id, 0U);
+            if (git_batch_query(b, str_cstr(&incoming), &tip) == GIT_OBJ_COMMIT) {
+                str_addz(&del, str_cstr(&incoming));
+                (void)git_delete_refs(&del);
+            }
+        }
+        msg_warning(MSG_WARN_DISCARDED, e->id);
+        e->in_config = 0U;
+        e->pending = SHARED_PENDING_NONE;
+    }
+    str_free(&del);
+    str_free(&incoming);
+    str_free(&section);
     return err;
 }
 
 eGsErr_t repo_complete_pending(Repo_t *r, GitBatch_t *b)
 {
     Repo_t head = REPO_INIT;
-    Str_t section = STR_INIT;
-    const SharedEntry_t *committed;
+    Str_t name = STR_INIT;
+    SharedEntry_t *committed;
     SharedEntry_t *e;
+    Oid_t blob;
     size_t i;
     int loaded = 0;
     eGsErr_t err = GS_OK;
 
     for (i = 0U; (i < r->n) && (err == GS_OK); i++) {
         e = &r->v[i];
-        if (e->pending == SHARED_PENDING_SET) {
+        if ((e->pending == SHARED_PENDING_SET) || (e->pending == SHARED_PENDING_LINK)) {
             if (loaded == 0) {
                 /* Letto una sola volta, e solo se c'e' qualcosa in attesa. */
-                err = load_gitshared(&head, "HEAD:.gitshared", 1, 1);
+                err = repo_load_gitshared(&head, "HEAD:.gitshared", 1, 1);
                 loaded = 1;
             }
-            committed = (err == GS_OK)
-                            ? find_sub(&head, e->id, strlen(e->id), 1)
-                            : NULL;
+            committed = (err == GS_OK) ? repo_find_id(&head, e->id) : NULL;
             if (committed != NULL) {
-                err = complete_set(r, e, committed, b);
-            } else if ((err == GS_OK) && !e->in_gitshared) {
-                /* Ne' committata ne' nel working tree: annullata. */
-                str_reset(&section);
-                str_addf(&section, "shared.%s", e->id);
-                err = config_set("--remove-section", str_cstr(&section), NULL);
-                if (err == GS_OK) {
-                    msg_warning(MSG_WARN_DISCARDED, e->id);
-                    e->in_config = 0U;
-                    e->pending = SHARED_PENDING_NONE;
+                str_reset(&name);
+                str_addf(&name, "HEAD:%s", str_cstr(&committed->path));
+                if (git_batch_blob(b, str_cstr(&name), &blob) == 0) {
+                    /* .gitshared committato ma il file no: si aspetta */
+                    msg_warning(MSG_WARN_NOT_IN_HEAD, str_cstr(&committed->path));
+                } else if (e->pending == SHARED_PENDING_SET) {
+                    err = complete_set(r, e, committed, &blob, b);
+                } else {
+                    err = complete_link(r, e, committed, b);
                 }
+            } else if ((err == GS_OK) && !e->in_gitshared) {
+                err = discard_pending(e, b);
             } else {
                 /* ancora in attesa di commit */
             }
         }
     }
-    str_free(&section);
+    str_free(&name);
     repo_close(&head);
     return err;
 }

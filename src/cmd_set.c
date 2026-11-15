@@ -12,70 +12,8 @@
 #include <string.h>
 
 #include "cmd.h"
-#include "err.h"
-#include "git.h"
-#include "msg.h"
-#include "shared.h"
+#include "cmd_common.h"
 #include "sys.h"
-
-static const char gitshared_header[] =
-    "# Managed by 'git shared': do not edit by hand.\n"
-    "# This repository shares files with other repositories: "
-    "run 'git shared status'.\n";
-
-typedef struct {
-    const char *path;    /* come scritto dall'utente */
-    const char *message; /* messaggio di commit; NULL = standard */
-    unsigned commit : 1U;
-} SetOpts_t;
-
-/* GS_ERR_USAGE se gli argomenti non vanno (messaggio gia' stampato). */
-static eGsErr_t parse_args(int argc, char **argv, SetOpts_t *o)
-{
-    int i = 1;
-    int end_opts = 0;
-    eGsErr_t err = GS_ERR_USAGE;
-
-    o->path = NULL;
-    o->message = NULL;
-    o->commit = 0U;
-    while ((i < argc) && (end_opts == 0) && (argv[i][0] == '-')) {
-        if (strcmp(argv[i], "--") == 0) {
-            end_opts = 1;
-        } else if ((strcmp(argv[i], "-c") == 0) ||
-                   (strcmp(argv[i], "--commit") == 0)) {
-            o->commit = 1U;
-        } else if (strcmp(argv[i], "-m") == 0) {
-            if ((i + 1) >= argc) {
-                msg_error(MSG_ERR_OPT_VALUE, argv[i]);
-                goto exit;
-            }
-            i++;
-            o->message = argv[i];
-            o->commit = 1U;
-        } else {
-            msg_error(MSG_ERR_UNKNOWN_OPT, argv[i]);
-            goto exit;
-        }
-        i++;
-    }
-    if (i >= argc) {
-        msg_error(MSG_ERR_MISSING_PATH);
-        goto exit;
-    }
-    if ((i + 1) < argc) {
-        msg_error(MSG_ERR_TOO_MANY_ARGS);
-        goto exit;
-    }
-    o->path = argv[i];
-    err = GS_OK;
-
-exit:
-    if (err != GS_OK) {
-        fputs(msg(MSG_USAGE_SET), stderr);
-    }
-    return err;
-}
 
 /*
  * Path relativo alla radice del file indicato dall'utente, controllando
@@ -125,117 +63,39 @@ exit:
     return err;
 }
 
-/* Aggiunge la sezione a .gitshared, creandolo con l'intestazione se manca.
- * In caso di errore lascia .gitshared com'era. */
-static eGsErr_t write_gitshared(const Repo_t *r, const char *name,
-                                const char *id, const char *path)
-{
-    const char *args[] = { "config", "-f", NULL, NULL, NULL, NULL, NULL };
-    Str_t file = STR_INIT;
-    Str_t key = STR_INIT;
-    FILE *f;
-    int created = 0;
-    int put_rc;
-    int close_rc;
-    eGsErr_t err = GS_ERR_SYS;
-
-    str_addf(&file, "%s/.gitshared", str_cstr(&r->top));
-    f = sys_fopen(str_cstr(&file), "rb");
-    if (f != NULL) {
-        (void)fclose(f);
-    } else {
-        f = sys_fopen(str_cstr(&file), "wb");
-        if (f == NULL) {
-            goto exit;
-        }
-        created = 1;
-        put_rc = fputs(gitshared_header, f);
-        close_rc = fclose(f);
-        if ((put_rc < 0) || (close_rc != 0)) {
-            goto exit;
-        }
-    }
-
-    args[2] = str_cstr(&file);
-    str_addf(&key, "shared.%s.id", name);
-    args[3] = str_cstr(&key);
-    args[4] = id;
-    err = git_run(args, 0U, NULL);
-    if (err == GS_OK) {
-        str_reset(&key);
-        str_addf(&key, "shared.%s.path", name);
-        args[3] = str_cstr(&key);
-        args[4] = path;
-        err = git_run(args, 0U, NULL);
-    }
-    if ((err == GS_OK) && (r->branch.len > 0U)) {
-        /* default dei branch attivi: il branch corrente (D-057) */
-        str_reset(&key);
-        str_addf(&key, "shared.%s.branch", name);
-        args[3] = "--add";
-        args[4] = str_cstr(&key);
-        args[5] = str_cstr(&r->branch);
-        err = git_run(args, 0U, NULL);
-    }
-    if ((err != GS_OK) && (created == 0)) {
-        str_reset(&key);
-        str_addf(&key, "shared.%s", name);
-        args[3] = "--remove-section";
-        args[4] = str_cstr(&key);
-        args[5] = NULL;
-        (void)git_run(args, PROC_STDERR_NULL, NULL);
-    }
-
-exit:
-    if ((err != GS_OK) && (created != 0)) {
-        (void)sys_remove(str_cstr(&file));
-    }
-    str_free(&key);
-    str_free(&file);
-    return err;
-}
-
 int cmd_set(int argc, char **argv)
 {
-    SetOpts_t o;
+    CmdOpts_t o;
     Repo_t repo = REPO_INIT;
     GitBatch_t batch;
     SharedEntry_t *e;
     Str_t full = STR_INIT;
-    Str_t key = STR_INIT;
     Str_t text = STR_INIT;
+    Str_t paths = STR_INIT;
     const char *name;
     const char *slash;
-    const char *args[] = { "-C", NULL, NULL, NULL, NULL, NULL, NULL, NULL,
-                           NULL, NULL };
     char id[GS_ID_HEX_LEN + 1U];
-    int batch_open = 0;
+    int first;
+    int opened = 0;
     int rc = GS_EXIT_USAGE;
-    eGsErr_t err;
 
-    if (parse_args(argc, argv, &o) != GS_OK) {
+    first = cmd_parse(argc, argv, CMD_OPT_COMMIT, MSG_USAGE_SET, &o);
+    if (first < 0) {
         goto exit;
     }
-    rc = GS_EXIT_FATAL;
-    err = repo_open(&repo);
-    if (err != GS_OK) {
-        msg_fatal((err == GS_ERR_NOT_REPO)  ? MSG_ERR_NOT_REPO
-                  : (err == GS_ERR_FORMAT) ? MSG_ERR_READ_GITSHARED
-                                           : MSG_ERR_PROC,
-                  "git");
+    if ((first + 1) != argc) {
+        msg_error((first >= argc) ? MSG_ERR_MISSING_PATH : MSG_ERR_TOO_MANY_ARGS);
+        fputs(msg(MSG_USAGE_SET), stderr);
         goto exit;
     }
-    if (git_batch_open(&batch) != GS_OK) {
-        msg_fatal(MSG_ERR_PROC, "git cat-file");
+    rc = cmd_open(&repo, &batch);
+    if (rc != GS_EXIT_OK) {
         goto exit;
     }
-    batch_open = 1;
-    if (repo_complete_pending(&repo, &batch) != GS_OK) {
-        msg_error(MSG_ERR_PENDING);
-    }
+    opened = 1;
 
     rc = GS_EXIT_ERROR;
-    if (resolve_path(o.path, &full) != GS_OK) {
+    if (resolve_path(argv[first], &full) != GS_OK) {
         goto exit;
     }
     e = repo_find_path(&repo, str_cstr(&full));
@@ -255,29 +115,16 @@ int cmd_set(int argc, char **argv)
     }
 
     /* 1. Attesa (locale): per prima, vedi intestazione. */
-    str_addf(&key, "shared.%s.pending", id);
-    args[0] = "config";
-    args[1] = str_cstr(&key);
-    args[2] = "set";
-    args[3] = NULL;
-    if (git_run(args, 0U, NULL) != GS_OK) {
+    if (cmd_set_pending(id, "set", NULL) != GS_OK) {
         msg_error(MSG_ERR_PENDING);
         goto exit;
     }
-    /* 2. Sezione in .gitshared. */
-    if (write_gitshared(&repo, name, id, str_cstr(&full)) != GS_OK) {
+    /* 2. Sezione in .gitshared; 3. staging (plumbing, REQ-NF-006). */
+    if (cmd_write_gitshared(&repo, name, id, str_cstr(&full)) != GS_OK) {
         msg_error(MSG_ERR_WRITE_GITSHARED);
         goto exit;
     }
-    /* 3. Staging (plumbing, REQ-NF-006). */
-    args[0] = "-C";
-    args[1] = str_cstr(&repo.top);
-    args[2] = "update-index";
-    args[3] = "--add";
-    args[4] = "--";
-    args[5] = ".gitshared";
-    args[6] = NULL;
-    if (git_run(args, 0U, NULL) != GS_OK) {
+    if (cmd_stage(&repo, ".gitshared") != GS_OK) {
         msg_error(MSG_ERR_STAGE_GITSHARED);
         goto exit;
     }
@@ -303,27 +150,20 @@ int cmd_set(int argc, char **argv)
         str_addf(&text, msg(MSG_SET_COMMIT_MSG), str_cstr(&full));
         o.message = str_cstr(&text);
     }
-    args[2] = "commit";
-    args[3] = "-q";
-    args[4] = "-m";
-    args[5] = o.message;
-    args[6] = "--only";
-    args[7] = "--";
-    args[8] = ".gitshared";
-    args[9] = NULL;
-    if (git_run(args, 0U, NULL) != GS_OK) {
+    str_addz(&paths, ".gitshared");
+    if (cmd_commit(&repo, o.message, &paths) != GS_OK) {
         msg_error(MSG_ERR_COMMIT);
         goto exit;
     }
-    /* Il processo cat-file e' nato prima del commit: se ne apre uno nuovo
-     * per essere certi di vedere il nuovo HEAD. */
+    /* cat-file e' nato prima del commit: uno nuovo vede di sicuro il nuovo
+     * HEAD. */
     git_batch_close(&batch);
-    batch_open = 0;
     if (git_batch_open(&batch) != GS_OK) {
         msg_fatal(MSG_ERR_PROC, "git cat-file");
+        opened = 0;
+        repo_close(&repo);
         goto exit;
     }
-    batch_open = 1;
     if (repo_complete_pending(&repo, &batch) != GS_OK) {
         msg_error(MSG_ERR_PENDING);
         goto exit;
@@ -338,12 +178,12 @@ int cmd_set(int argc, char **argv)
     rc = GS_EXIT_OK;
 
 exit:
-    if (batch_open != 0) {
+    if (opened != 0) {
         git_batch_close(&batch);
+        repo_close(&repo);
     }
-    repo_close(&repo);
+    str_free(&paths);
     str_free(&text);
-    str_free(&key);
     str_free(&full);
     return rc;
 }

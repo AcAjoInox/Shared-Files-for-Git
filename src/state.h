@@ -23,6 +23,9 @@ typedef enum {
 /* 1 per gli stati che dipendono dal branch (possono essere "sospesi"). */
 int state_is_derived(eState_t st);
 
+/* Nome dello stato per l'utente. */
+const char *state_name(eState_t st);
+
 eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
                       eState_t *st);
 

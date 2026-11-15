@@ -5,18 +5,23 @@
 
 #include <stdio.h>
 
-eGsErr_t chain_create_first(const char *id, const Oid_t *blob,
-                            const char *name)
+void chain_ref(Str_t *ref, const char *id)
+{
+    str_reset(ref);
+    str_addf(ref, "refs/shared/%s", id);
+}
+
+eGsErr_t chain_commit(const Oid_t *blob, const Oid_t *parent,
+                      const char *name, Oid_t *out)
 {
     static const char *const a_mktree[] = { "mktree", NULL };
-    const char *a_commit[] = { "commit-tree", NULL, "-m", NULL, NULL };
-    const char *a_ref[] = { "update-ref", "-m", "git shared: first version",
-                            NULL, NULL, "", NULL };
+    const char *a_commit[] = { "commit-tree", NULL, "-m", NULL, NULL, NULL,
+                               NULL };
     char hex[OID_HEX_SIZE];
+    char parent_hex[OID_HEX_SIZE];
     Str_t tree = STR_INIT;
     Str_t commit = STR_INIT;
     Str_t msg = STR_INIT;
-    Str_t ref = STR_INIT;
     Proc_t p;
     int code = 0;
     eGsErr_t err;
@@ -40,26 +45,40 @@ eGsErr_t chain_create_first(const char *id, const Oid_t *blob,
         goto exit;
     }
 
-    /* 2. Commit senza genitori: autore e data dell'utente (D-013). */
+    /* 2. Il commit. */
     str_addf(&msg, "shared: %s", name);
     a_commit[1] = str_cstr(&tree);
     a_commit[3] = str_cstr(&msg);
+    if (parent != NULL) {
+        oid_to_hex(parent, parent_hex);
+        a_commit[4] = "-p";
+        a_commit[5] = parent_hex;
+    }
     err = git_run(a_commit, 0U, &commit);
-    if (err != GS_OK) {
-        goto exit;
+    if ((err == GS_OK) && !oid_from_hex(out, commit.buf, commit.len)) {
+        err = GS_ERR_FORMAT;
     }
 
-    /* 3. La ref, solo se non esiste: il valore vecchio "" lo pretende. */
-    str_addf(&ref, "refs/shared/%s", id);
-    a_ref[3] = str_cstr(&ref);
-    a_ref[4] = str_cstr(&commit);
-    err = git_run(a_ref, 0U, NULL);
-
 exit:
-    str_free(&ref);
     str_free(&msg);
     str_free(&commit);
     str_free(&tree);
+    return err;
+}
+
+eGsErr_t chain_create_first(const char *id, const Oid_t *blob,
+                            const char *name)
+{
+    Str_t ref = STR_INIT;
+    Oid_t commit;
+    eGsErr_t err = chain_commit(blob, NULL, name, &commit);
+
+    if (err == GS_OK) {
+        chain_ref(&ref, id);
+        err = git_update_ref(str_cstr(&ref), &commit, NULL,
+                             "git shared: first version");
+    }
+    str_free(&ref);
     return err;
 }
 
@@ -73,7 +92,7 @@ eGsErr_t chain_blobs(GitBatch_t *b, const char *id, OidList_t *out)
     eGsErr_t err = GS_OK;
 
     out->n = 0U;
-    str_addf(&name, "refs/shared/%s", id);
+    chain_ref(&name, id);
     type = git_batch_query(b, str_cstr(&name), &commit);
     while (type == GIT_OBJ_COMMIT) {
         oid_to_hex(&commit, hex);

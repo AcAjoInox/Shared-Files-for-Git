@@ -15,16 +15,6 @@
 #include "shared.h"
 #include "state.h"
 
-static const eMsgId_t state_msg[] = {
-    [STATE_ALIGNED] = MSG_STATE_ALIGNED,
-    [STATE_TO_APPLY] = MSG_STATE_TO_APPLY,
-    [STATE_TO_PUBLISH] = MSG_STATE_TO_PUBLISH,
-    [STATE_DIVERGED] = MSG_STATE_DIVERGED,
-    [STATE_PENDING] = MSG_STATE_PENDING,
-    [STATE_UNLINKED] = MSG_STATE_UNLINKED,
-    [STATE_INCONSISTENT] = MSG_STATE_INCONSISTENT,
-};
-
 static void print_entry(const SharedEntry_t *e, eState_t st, int suspended)
 {
     if (e->in_gitshared) {
@@ -36,9 +26,9 @@ static void print_entry(const SharedEntry_t *e, eState_t st, int suspended)
     printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_ID), e->id);
     printf("    %-6s ", msg(MSG_STATUS_FIELD_STATE));
     if (suspended != 0) {
-        printf(msg(MSG_STATUS_SUSPENDED), msg(state_msg[st]));
+        printf(msg(MSG_STATUS_SUSPENDED), state_name(st));
     } else {
-        fputs(msg(state_msg[st]), stdout);
+        fputs(state_name(st), stdout);
     }
     putchar('\n');
 }

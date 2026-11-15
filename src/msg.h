@@ -14,6 +14,9 @@ typedef enum {
     MSG_USAGE_MAIN,
     MSG_USAGE_HELP,
     MSG_USAGE_SET,
+    MSG_USAGE_LINK,
+    MSG_USAGE_PUBLISH,
+    MSG_USAGE_UPDATE,
     MSG_USAGE_STATUS,
 
     MSG_ERR_UNKNOWN_CMD,     /* sottocomando */
@@ -38,15 +41,46 @@ typedef enum {
     MSG_ERR_PENDING,
     MSG_ERR_COMMIT,
     MSG_ERR_CHAIN,           /* nome */
+    MSG_ERR_SRC_NOT_REPO,    /* path */
+    MSG_ERR_SRC_NOT_SHARED,  /* path */
+    MSG_ERR_SRC_NO_VERSIONS, /* path, repo sorgente */
+    MSG_ERR_SAME_REPO,
+    MSG_ERR_HASH_MISMATCH,   /* algoritmo sorgente, algoritmo destinazione */
+    MSG_ERR_DEST_PATH,       /* path */
+    MSG_ERR_DEST_EXISTS,     /* path */
+    MSG_ERR_ALREADY_LINKED,  /* nome, id */
+    MSG_ERR_WRITE_FILE,      /* path */
+    MSG_ERR_NOT_SHARED_PATH, /* path */
+    MSG_ERR_LOCAL_CHANGES,   /* path */
+    MSG_ERR_PEER_REJECTED,   /* file, peer */
+    MSG_ERR_TOO_MANY_PEERS,  /* file, massimo (unsigned) */
+    MSG_ERR_PUBLISH,         /* file */
 
     MSG_WARN_BAD_ENTRY,      /* nome della sezione */
     MSG_WARN_NOT_IN_HEAD,    /* path */
     MSG_WARN_NO_BRANCH,      /* nome, id */
     MSG_WARN_DISCARDED,      /* id */
+    MSG_WARN_PEER_UNREACHABLE, /* file, peer */
+    MSG_WARN_SUSPENDED,      /* file */
 
     MSG_SET_STAGED,          /* path, nome */
     MSG_SET_DONE,            /* path, nome */
     MSG_SET_COMMIT_MSG,      /* path */
+    MSG_LINK_STAGED,         /* path, nome, repo sorgente */
+    MSG_LINK_DONE,           /* path, nome, repo sorgente */
+    MSG_LINK_COMMIT_MSG,     /* path */
+    MSG_PUB_CREATED,         /* file */
+    MSG_PUB_PUSHED,          /* file, peer raggiunti (unsigned), peer (unsigned) */
+    MSG_PUB_NO_PEERS,        /* file */
+    MSG_PUB_TO_APPLY,        /* file */
+    MSG_PUB_DIVERGED,        /* file */
+    MSG_SKIP_STATE,          /* file, stato */
+    MSG_UPD_RECEIVED,        /* file */
+    MSG_UPD_APPLIED,         /* file */
+    MSG_UPD_UP_TO_DATE,      /* file */
+    MSG_UPD_TO_PUBLISH,      /* file */
+    MSG_UPD_DIVERGED,        /* file */
+    MSG_UPD_COMMIT_MSG,      /* path o "shared files" */
 
     MSG_STATUS_NONE,
     MSG_STATUS_FIELD_PATH,

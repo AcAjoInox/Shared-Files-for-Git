@@ -1,0 +1,75 @@
+/*
+ * cmd_common.h - parti comuni ai sottocomandi.
+ */
+#ifndef GS_CMD_COMMON_H
+#define GS_CMD_COMMON_H
+
+#include <stddef.h>
+
+#include "err.h"
+#include "git.h"
+#include "msg.h"
+#include "shared.h"
+
+/* Opzioni ammesse da cmd_parse. */
+#define CMD_OPT_COMMIT 0x1U /* -c, --commit, -m <msg> (D-007) */
+#define CMD_OPT_FORCE  0x2U /* -f, --force */
+
+typedef struct {
+    const char *message; /* -m; NULL = messaggio standard */
+    unsigned commit : 1U;
+    unsigned force : 1U;
+} CmdOpts_t;
+
+/*
+ * Opzioni comuni, fino al primo argomento che non e' un'opzione (o dopo
+ * "--"). Ritorna l'indice del primo argomento posizionale; -1 se le
+ * opzioni non vanno (errore e uso gia' stampati).
+ */
+int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
+              CmdOpts_t *o);
+
+/*
+ * Apre la repo e il processo cat-file e completa le operazioni in attesa.
+ * GS_EXIT_OK oppure il codice di uscita da restituire (messaggio stampato).
+ * Se riesce, il chiamante chiude con git_batch_close e repo_close.
+ */
+int cmd_open(Repo_t *r, GitBatch_t *b);
+
+/* Operazione in attesa in .git/config (REQ-F-023): op = "set" | "link";
+ * src = radice della sorgente per link, NULL altrimenti. */
+eGsErr_t cmd_set_pending(const char *id, const char *op, const char *src);
+
+/*
+ * Sezione [shared "<name>"] in .gitshared (id, path, branch corrente come
+ * default, D-057); crea il file con l'intestazione se manca. In caso di
+ * errore .gitshared resta com'era.
+ */
+eGsErr_t cmd_write_gitshared(const Repo_t *r, const char *name,
+                             const char *id, const char *path);
+
+/* Mette in staging un path relativo alla radice (update-index). */
+eGsErr_t cmd_stage(const Repo_t *r, const char *path);
+
+/* Porta un blob nell'index e nel working tree, senza passare il contenuto
+ * per l'estensione (D-042): update-index --cacheinfo + checkout-index. */
+eGsErr_t cmd_write_file(const Repo_t *r, const char *path, const Oid_t *blob);
+
+/* 1 se il file ha modifiche non committate (working tree o index). */
+int cmd_has_local_changes(const Repo_t *r, const char *path);
+
+/* Commit dedicato dei soli path dati, relativi alla radice (D-007, A-29). */
+eGsErr_t cmd_commit(const Repo_t *r, const char *message, const Str_t *paths);
+
+/* Path dell'utente (relativo alla cartella corrente) -> relativo alla
+ * radice. 0 se assoluto o fuori dalla repo. */
+int cmd_repo_path(const Repo_t *r, const char *user_path, Str_t *out);
+
+/*
+ * Voci su cui lavorano publish e update: tutte quelle collegate, o quella
+ * del path dato (NULL = tutte). Ritorna 0 se il path non e' un file shared
+ * (errore stampato). sel[i] = 1 per le voci scelte.
+ */
+int cmd_select(Repo_t *r, const char *user_path, unsigned char *sel);
+
+#endif /* GS_CMD_COMMON_H */
