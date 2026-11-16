@@ -65,27 +65,6 @@ void repo_close(Repo_t *r)
     str_free(&r->prefix);
     str_free(&r->branch);
     str_free(&r->objfmt);
-    r->auto_publish = 0U;
-}
-
-/* Booleano di git config: falso per false/no/off/0 (maiuscole comprese). */
-static int cfg_bool(const char *v)
-{
-    static const char *const falses[] = { "false", "no", "off", "0" };
-    size_t i;
-    size_t k;
-    int is_false = 0;
-
-    for (i = 0U; (i < (sizeof falses / sizeof falses[0])) && (is_false == 0); i++) {
-        k = 0U;
-        while ((falses[i][k] != '\0') &&
-               (((unsigned)(unsigned char)v[k] | 0x20U) ==
-                (unsigned)(unsigned char)falses[i][k])) { /* minuscolo ASCII */
-            k++;
-        }
-        is_false = (falses[i][k] == '\0') && (v[k] == '\0');
-    }
-    return !is_false;
 }
 
 SharedEntry_t *repo_add(Repo_t *r)
@@ -433,7 +412,7 @@ eGsErr_t repo_open(Repo_t *r)
     }
 
     /* Record "scope\0chiave\nvalore\0": le sezioni per ID contano solo se
-     * locali; shared.autoPublish vale da qualunque livello. */
+     * locali. */
     run &= ~RUN_CFG;
     err = proc_collect(&p_cfg, &out, &code);
     if (err != GS_OK) {
@@ -449,12 +428,10 @@ eGsErr_t repo_open(Repo_t *r)
         scope = rec;
         rec += strlen(rec) + 1U;
         if (rec < end) {
-            if (strncmp(rec, "shared.autopublish\n", 19U) == 0) {
-                r->auto_publish = cfg_bool(rec + 19) ? 1U : 0U;
-            } else if (strcmp(scope, "local") == 0) {
+            if (strcmp(scope, "local") == 0) {
                 parse_local_rec(r, rec);
             } else {
-                /* chiavi per ID fuori dal livello locale: ignorate */
+                /* chiavi fuori dal livello locale: ignorate */
             }
             rec += strlen(rec) + 1U;
         }

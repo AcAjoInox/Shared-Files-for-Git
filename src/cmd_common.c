@@ -208,12 +208,12 @@ eGsErr_t cmd_write_file(const Repo_t *r, const char *path, const Oid_t *blob)
     return err;
 }
 
-int cmd_has_local_changes(const Repo_t *r, const char *path)
+int cmd_worktree_differs(const Repo_t *r, const char *path)
 {
-    /* diff confronta HEAD con working tree e index, normalizzando i fine
-     * riga come fa git: 0 = nessuna modifica, 1 = modifiche. */
+    /* "git diff" senza revisioni confronta l'index con il working tree,
+     * normalizzando i fine riga come fa git: 0 = uguali, 1 = diversi. */
     const char *args[] = { "-C", NULL, "--literal-pathspecs", "diff",
-                           "--quiet", "HEAD", "--", path, NULL };
+                           "--quiet", "--", path, NULL };
     Str_t out = STR_INIT;
     int code = 1;
 
@@ -225,16 +225,57 @@ int cmd_has_local_changes(const Repo_t *r, const char *path)
     return code != 0;
 }
 
+int cmd_has_local_changes(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b)
+{
+    const char *path = str_cstr(&e->path);
+    OidList_t chain = OIDLIST_INIT;
+    Str_t name = STR_INIT;
+    Oid_t h;
+    Oid_t i;
+    int local = 1; /* nel dubbio, il lavoro dell'utente si protegge */
+
+    /* 1. Working tree diverso dall'index: modifica non in staging. */
+    if (cmd_worktree_differs(r, path)) {
+        goto exit;
+    }
+    /* 2. Index (stage 0; assente se in conflitto o tolto dall'index). */
+    str_addf(&name, ":%s", path);
+    if (git_batch_blob(b, str_cstr(&name), &i) == 0) {
+        goto exit;
+    }
+    /* 3. Index uguale a HEAD: nessuna modifica. */
+    str_reset(&name);
+    str_addf(&name, "HEAD:%s", path);
+    if ((git_batch_blob(b, str_cstr(&name), &h) != 0) && oid_eq(&i, &h)) {
+        local = 0;
+        goto exit;
+    }
+    /* 4. Index uguale a una versione della catena: e' un update applicato
+     * e non committato, non lavoro dell'utente (D-076). */
+    if ((chain_blobs(b, e->id, &chain) == GS_OK) && oidlist_has(&chain, &i)) {
+        local = 0;
+    }
+
+exit:
+    oidlist_free(&chain);
+    str_free(&name);
+    return local;
+}
+
 eGsErr_t cmd_commit(const Repo_t *r, const char *message, const Str_t *paths)
 {
     size_t n = str_zcount(paths);
-    const char **args = xmalloc((n + 9U) * sizeof *args);
+    const char **args = xmalloc((n + 10U) * sizeof *args);
     const char *p;
     size_t i = 0U;
     eGsErr_t err;
 
+    /* --only: solo questi path, anche se in staging c'e' altro (B-25).
+     * --literal-pathspecs: un nome con '*' o '?' non diventa un glob che
+     * fa entrare altri file nel commit (C-06). */
     args[i++] = "-C";
     args[i++] = str_cstr(&r->top);
+    args[i++] = "--literal-pathspecs";
     args[i++] = "commit";
     args[i++] = "-q";
     args[i++] = "-m";
@@ -255,12 +296,8 @@ int cmd_reopen(Repo_t *r, GitBatch_t *b)
     int rc = GS_EXIT_OK;
 
     git_batch_close(b);
-    if (r->auto_publish != 0U) {
-        /* c'e' il post-commit: puo' aver gia' completato, si rilegge */
-        repo_close(r);
-        rc = cmd_open(r, b);
-    } else if (git_batch_open(b) != GS_OK) {
-        /* solo un cat-file nuovo, che veda il nuovo HEAD */
+    if (git_batch_open(b) != GS_OK) {
+        /* un cat-file nuovo, che veda il nuovo HEAD */
         msg_fatal(MSG_ERR_PROC, "git cat-file");
         repo_close(r);
         rc = GS_EXIT_FATAL;

@@ -36,24 +36,15 @@ Ricevere e applicare sono separati di proposito: nessuno ti cambia un file sotto
 
 ## Le regole, valide ovunque
 1. **Conta solo ciò che è committato.** Una modifica non committata non viene mai pubblicata. Finché non fai commit puoi annullare tutto con `git restore`. Vale anche per `set`, `link` e `unlink`: le altre repo ne vengono a sapere solo al commit.
-2. **Decidi sempre tu.** I comandi `git shared` preparano le modifiche ma non fanno commit da soli. Se vuoi il commit immediato usa `-c` oppure `-m "messaggio"`.
+2. **Decidi sempre tu.** I comandi `git shared` preparano le modifiche ma non fanno commit da soli. Se vuoi il commit immediato usa `-c` oppure `-m "messaggio"`: il commit contiene solo il file shared e `.gitshared`, e il resto che hai in staging resta lì.
 3. **Meglio aggiornarsi prima di modificare, ma nessuno ti blocca.** Se la tua copia è indietro rispetto all'ultima versione e committi una modifica al file shared, il commit passa, ma la modifica non viene pubblicata: il file risulta *divergente* (lo dicono `status` e `publish`) e `git shared update` unisce la tua versione con l'ultima.
-4. **Il tuo lavoro non si perde.** `update` si rifiuta di sovrascrivere modifiche non committate. Per forzare serve `-f`.
+4. **Il tuo lavoro non si perde.** `update` si rifiuta di sovrascrivere modifiche non committate, anche quelle in staging. Per forzare serve `-f`. Una versione portata da un `update` precedente e non ancora committata non conta come modifica tua: un nuovo `update` la sostituisce con l'ultima.
 5. **Nessuna modifica viene scartata.** Se due repo hanno modificato il file ognuna per conto suo, le versioni risultano *divergenti* e `git shared update` le unisce come farebbe `git merge`. Se toccano le stesse righe trovi i soliti marker di conflitto, li risolvi e fai commit.
 
 ## Uso in locale
 Le repo stanno sulla stessa macchina e si conoscono tramite il loro path.
 
-**Quando si pubblica:** quando lo decidi tu, con `git shared publish`. Puoi committare, correggere, rifare il commit: i peer ricevono solo la versione che pubblichi. Il commit non costa nulla in più: git shared non interviene.
-
-Se preferisci che la nuova versione parta da sola a ogni commit:
-
-```bash
-git config shared.autoPublish true
-git shared hook install
-```
-
-Da quel momento il commit di una modifica al file shared la invia subito ai peer, e ti avvisa se l'hai fatta partendo da una versione vecchia. Costa qualche decina di millisecondi a ogni commit.
+**Quando si pubblica:** solo quando lo decidi tu, con `git shared publish`. Puoi committare, correggere, rifare il commit: i peer ricevono solo la versione che pubblichi. Il commit non costa nulla in più: git shared non interviene.
 
 ```bash
 # Nel progetto A: dichiaro shared l'header
@@ -106,7 +97,7 @@ Le repo stanno su un servizio di hosting. I peer non sono più path ma **URL**, 
 | | In locale | In remoto |
 |---|---|---|
 | I peer sono | path sulla macchina | URL in `.gitshared` |
-| Si pubblica | con `git shared publish` (o al commit, se lo scegli) | al `git push` |
+| Si pubblica | con `git shared publish` | al `git push` |
 | Collegamento | `git shared link <path>` | dopo il clone, di nuovo `link` |
 | Modifiche contemporanee | rare | normali: una passa, l'altra fa `update` |
 | Permessi | nessun problema | serve la scrittura sui peer, altrimenti si aggiornano da soli |
@@ -120,7 +111,7 @@ Le repo stanno su un servizio di hosting. I peer non sono più path ma **URL**, 
 | `git shared status` | Mostra lo stato di ogni file shared |
 | `git shared update [<file>]` | Prende le versioni dai peer e applica l'ultima |
 | `git shared publish [<file>]` | Crea la nuova versione e la invia ai peer |
-| `git shared hook install` | Allinea gli hook alla configurazione (per esempio dopo aver cambiato `shared.autoPublish`) |
+| `git shared hook install` | Installa gli hook di avviso, per esempio in una repo i cui file shared non li hanno ancora |
 | `git shared mv <vecchio> <nuovo>` | Rinomina un file shared |
 | `git shared branch <file> [--add\|--remove <branch>]` | Mostra o modifica i branch su cui il file è shared; con `--default` modifica l'elenco di default in `.gitshared`, con `--reset` lo ricopia in locale |
 | `git shared prune` | Toglie dall'elenco i peer che non esistono più |
@@ -134,6 +125,7 @@ Gli stati che vedi in `git shared status`:
 |---|---|---|
 | allineato | Hai l'ultima versione | Niente |
 | da applicare | Esiste una versione più recente | `git shared update` |
+| da committare | Hai applicato l'ultima versione con `update`, ma non hai ancora fatto commit | `git commit`, oppure `git restore --staged --worktree <file>` per annullare |
 | da pubblicare | Hai una modifica che i peer non hanno | `git shared publish` |
 | divergente | Tu e un peer avete modificato il file separatamente | `git shared update`, che unisce |
 | in attesa di commit | Hai lanciato `set`, `link` o `unlink` ma non hai ancora committato | `git commit`, oppure `git restore` per annullare |

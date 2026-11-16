@@ -64,9 +64,8 @@ typedef enum {
     MSG_WARN_PEER_UNREACHABLE, /* file, peer */
     MSG_WARN_SUSPENDED,      /* file */
     MSG_WARN_HOOK,           /* path dell'hook */
-    MSG_HOOK_DIVERGED,       /* file */
     MSG_HOOK_NOT_ALIGNED,    /* file, stato, comando */
-    MSG_HOOKS_INSTALLED,     /* "on" | "off" */
+    MSG_HOOKS_INSTALLED,
 
     MSG_SET_STAGED,          /* path, nome */
     MSG_SET_DONE,            /* path, nome */
@@ -86,6 +85,7 @@ typedef enum {
     MSG_UPD_UP_TO_DATE,      /* file */
     MSG_UPD_TO_PUBLISH,      /* file */
     MSG_UPD_DIVERGED,        /* file */
+    MSG_UPD_TO_COMMIT,       /* file */
     MSG_UPD_COMMIT_MSG,      /* path o "shared files" */
 
     MSG_STATUS_NONE,
@@ -99,6 +99,7 @@ typedef enum {
     MSG_STATE_TO_APPLY,
     MSG_STATE_TO_PUBLISH,
     MSG_STATE_DIVERGED,
+    MSG_STATE_TO_COMMIT,
     MSG_STATE_PENDING,
     MSG_STATE_UNLINKED,
     MSG_STATE_INCONSISTENT,

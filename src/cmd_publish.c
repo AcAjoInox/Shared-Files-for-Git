@@ -72,6 +72,9 @@ int cmd_publish(int argc, char **argv)
         } else if (st == STATE_TO_APPLY) {
             msg_error(MSG_PUB_TO_APPLY, label);
             rc = GS_EXIT_ERROR;
+        } else if (st == STATE_TO_COMMIT) {
+            msg_error(MSG_UPD_TO_COMMIT, label);
+            rc = GS_EXIT_ERROR;
         } else if (st == STATE_DIVERGED) {
             msg_error(MSG_PUB_DIVERGED, label);
             rc = GS_EXIT_ERROR;

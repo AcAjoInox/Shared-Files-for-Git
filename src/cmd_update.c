@@ -6,8 +6,11 @@
  *   1. fetch dai peer, in parallelo, in ref temporanee;
  *   2. se una versione ricevuta discende da T, T avanza in fast-forward
  *      (merge-base --independent: un solo processo per tutte le versioni);
- *   3. se lo stato e' "da applicare", T va nel working tree e nell'index.
- * Non committa, salvo -c/-m (D-007). Modifiche locali: rifiuta, salvo -f.
+ *   3. se lo stato e' "da applicare", T va nel working tree e nell'index;
+ *      se e' "da committare" (applicata prima, D-076), non c'e' niente da
+ *      scrivere.
+ * Non committa, salvo -c/-m (D-007, D-075). Modifiche locali: rifiuta,
+ * salvo -f; una versione applicata e non committata non lo e' (D-076).
  *
  * v0 (M2): il merge delle divergenze (REQ-F-011) non c'e' ancora.
  */
@@ -125,7 +128,7 @@ static int apply(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     Oid_t t;
     int ok = 0;
 
-    if (!force && cmd_has_local_changes(r, label)) {
+    if (!force && cmd_has_local_changes(r, e, b)) {
         msg_error(MSG_ERR_LOCAL_CHANGES, label); /* REQ-F-010, D-022 */
         goto exit;
     }
@@ -217,6 +220,18 @@ int cmd_update(int argc, char **argv)
         } else if (st == STATE_TO_APPLY) {
             if (!apply(&repo, e, &batch, o.force, &applied)) {
                 rc = GS_EXIT_ERROR;
+            }
+        } else if (st == STATE_TO_COMMIT) {
+            /* Gia' applicata (D-076): con -c si committa, se il working
+             * tree e' ancora quello applicato (--only committa il WT). */
+            if (o.commit == 0U) {
+                printf(msg(MSG_UPD_TO_COMMIT), label);
+                putchar('\n');
+            } else if (cmd_worktree_differs(&repo, label)) {
+                msg_error(MSG_ERR_LOCAL_CHANGES, label);
+                rc = GS_EXIT_ERROR;
+            } else {
+                str_addz(&applied, label);
             }
         } else if (st == STATE_TO_PUBLISH) {
             printf(msg(MSG_UPD_TO_PUBLISH), label);

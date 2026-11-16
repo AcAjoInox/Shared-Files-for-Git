@@ -15,21 +15,16 @@
 #define HOOK_END   "# <<< git shared <<<"
 #define HOOK_SHEBANG "#!/bin/sh\n"
 
-typedef enum {
-    HOOK_NEVER = 0, /* il blocco si toglie se c'e' */
-    HOOK_AUTO,      /* solo con shared.autoPublish */
-    HOOK_ALWAYS
-} eHookWhen_t;
-
+/* want = 0: il blocco si toglie se c'e' (hook di versioni precedenti). */
 static const struct {
     const char *event;
-    eHookWhen_t when;
+    unsigned want;
 } hooks[] = {
-    { "pre-commit", HOOK_NEVER }, /* installato da M3, tolto da D-073 */
-    { "post-commit", HOOK_AUTO },
-    { "post-checkout", HOOK_ALWAYS },
-    { "post-merge", HOOK_ALWAYS },
-    { "post-rewrite", HOOK_ALWAYS },
+    { "pre-commit", 0U },  /* installato dalla prima versione di M3 (D-073) */
+    { "post-commit", 0U }, /* installato con shared.autoPublish (D-074) */
+    { "post-checkout", 1U },
+    { "post-merge", 1U },
+    { "post-rewrite", 1U },
 };
 
 /*
@@ -164,8 +159,7 @@ eGsErr_t hooks_sync(const Repo_t *r)
         str_reset(&path);
         str_addf(&path, "%s/%s", str_cstr(&dir), hooks[i].event);
         read_file(str_cstr(&path), &old);
-        want = (hooks[i].when == HOOK_ALWAYS) ||
-               ((hooks[i].when == HOOK_AUTO) && (r->auto_publish != 0U));
+        want = (hooks[i].want != 0U);
         has = (strstr(str_cstr(&old), HOOK_BEGIN) != NULL);
         one = GS_OK;
         if (want && !has) {

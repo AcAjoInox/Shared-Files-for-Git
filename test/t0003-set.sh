@@ -157,4 +157,31 @@ git commit -q -m "add new.h"
 run git shared status
 expect_out "file committato: allineato" "aligned"
 
+# --- nomi con spazi e caratteri non ASCII (reportIdea C-01) ------------------
+# Senza "ls-files -z" git restituiva "\"dir \303\250/perch\303\251.h\"".
+make_repo u
+cd "$TRASH/u" || exit 1
+mkdir "dir è"
+put "dir è/perché.h" p
+run git shared set -c "dir è/perché.h"
+expect_rc "nome non ASCII: codice 0" 0
+expect_out "nome non ASCII: confermato" "'dir è/perché.h' is now shared as 'perché.h'"
+expect_eq "nome non ASCII: path in .gitshared" \
+	"$(git config -f .gitshared 'shared.perché.h.path')" "dir è/perché.h"
+UID_=$(git config -f .gitshared 'shared.perché.h.id')
+expect_ok "nome non ASCII: catena creata" git rev-parse -q --verify "refs/shared/$UID_"
+run git shared status
+expect_out "nome non ASCII: allineato" "aligned"
+expect_no_out "nome non ASCII: niente ottale" '\303'
+expect_eq "nome non ASCII: nessun avviso" "$ERR" ""
+
+# Dalla sottocartella, con il path relativo.
+put "dir è/città.h" c
+cd "dir è" || exit 1
+run git shared set "città.h"
+expect_rc "non ASCII da sottocartella: codice 0" 0
+expect_eq "non ASCII da sottocartella: path dalla radice" \
+	"$(git config -f ../.gitshared 'shared.città.h.path')" "dir è/città.h"
+cd .. || exit 1
+
 done_testing

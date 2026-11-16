@@ -198,4 +198,64 @@ run git shared update
 expect_rc "versioni divergenti tra peer: codice 1" 1
 expect_err "versioni divergenti tra peer: segnalate" "merging is not implemented yet"
 
+# --- nomi con spazi e caratteri non ASCII (reportIdea C-01) ------------------
+make_repo U1
+cd "$TRASH/U1" || exit 1
+mkdir "dir è"
+put "dir è/perché.h" v1
+git shared set -c "dir è/perché.h" >/dev/null
+UID_=$(git config -f .gitshared 'shared.perché.h.id')
+
+make_repo U2
+cd "$TRASH/U2" || exit 1
+put x.c x
+run git shared link -c "../U1/dir è/perché.h"
+expect_rc "link non ASCII: codice 0" 0
+expect_out "link non ASCII: confermato" "'dir è/perché.h' linked as 'perché.h'"
+expect_eq "link non ASCII: path in .gitshared" \
+	"$(git config -f .gitshared 'shared.perché.h.path')" "dir è/perché.h"
+expect_eq "link non ASCII: file scritto e committato" "$(git show 'HEAD:dir è/perché.h')" "v1"
+expect_eq "link non ASCII: U1 conosce U2" \
+	"$(git -C ../U1 config --get-all "shared.$UID_.peer")" "$(top U2)"
+run git shared status
+expect_out "link non ASCII: allineato" "aligned"
+expect_eq "link non ASCII: nessun avviso" "$ERR" ""
+
+# Destinazione non ASCII diversa dalla sorgente (D-028).
+make_repo U3
+cd "$TRASH/U3" || exit 1
+put x.c x
+run git shared link -c "../U1/dir è/perché.h" "inc/però.h"
+expect_rc "destinazione non ASCII: codice 0" 0
+expect_eq "destinazione non ASCII: file scritto" "$(cat inc/però.h)" "v1"
+expect_eq "destinazione non ASCII: path in .gitshared" \
+	"$(git config -f .gitshared 'shared.perché.h.path')" "inc/però.h"
+
+# Ciclo completo: publish da U1, update in U2 e U3.
+cd "$TRASH/U1" || exit 1
+put "dir è/perché.h" v2
+run git shared publish
+expect_out "non ASCII: publish a entrambi" "sent to 2 of 2 peers"
+cd "$TRASH/U2" || exit 1
+run git shared update -c
+expect_out "non ASCII: update in U2" "dir è/perché.h: new version applied and committed"
+expect_eq "non ASCII: U2 ha v2" "$(git show 'HEAD:dir è/perché.h')" "v2"
+cd "$TRASH/U3" || exit 1
+git shared update -c >/dev/null 2>&1
+expect_eq "non ASCII: U3 ha v2" "$(git show 'HEAD:inc/però.h')" "v2"
+
+# --- link -c committa solo il file e .gitshared (B-25) ----------------------
+# ab.h in staging resta fuori dal commit. Il nome "a[b].h" contiene un
+# carattere jolly: con --literal-pathspecs (C-06) e' solo un nome.
+make_repo G
+cd "$TRASH/G" || exit 1
+put ab.h a
+printf 'in staging\n' >ab.h
+git add ab.h
+run git shared link -c ../U1/dir\ è/perché.h "a[b].h"
+expect_rc "link -c con '[': codice 0" 0
+expect_eq "link -c: il commit contiene solo file e .gitshared" \
+	"$(git show --name-only --format= HEAD | sort | tr '\n' ' ')" ".gitshared a[b].h "
+expect_eq "link -c: ab.h resta in staging" "$(git diff --cached --name-only)" "ab.h"
+
 done_testing

@@ -55,18 +55,27 @@ eGsErr_t cmd_stage(const Repo_t *r, const char *path);
  * per l'estensione (D-042): update-index --cacheinfo + checkout-index. */
 eGsErr_t cmd_write_file(const Repo_t *r, const char *path, const Oid_t *blob);
 
-/* 1 se il file ha modifiche non committate (working tree o index). */
-int cmd_has_local_changes(const Repo_t *r, const char *path);
+/* 1 se il working tree del file e' diverso dall'index. */
+int cmd_worktree_differs(const Repo_t *r, const char *path);
+
+/*
+ * 1 se il file ha modifiche dell'utente non committate (REQ-F-010): il
+ * working tree e' diverso dall'index, oppure l'index e' diverso da HEAD e
+ * da ogni versione della catena. Una versione applicata da update e non
+ * ancora committata non e' una modifica locale (D-076). Controlla anche
+ * l'index: una modifica in staging e' protetta (reportIdea B-30).
+ */
+int cmd_has_local_changes(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b);
 
 /* Commit dedicato dei soli path dati, relativi alla radice (D-007, A-29). */
 eGsErr_t cmd_commit(const Repo_t *r, const char *message, const Str_t *paths);
 
 /*
  * Dopo un commit lanciato dal comando: completa le attese con un cat-file
- * nuovo (che veda il nuovo HEAD). Con il post-commit installato
- * (autoPublish) rilegge anche repo e configurazione, perche' l'hook puo'
- * aver gia' completato. GS_EXIT_OK o il codice di uscita (messaggio
- * stampato); se non riesce, repo e cat-file sono chiusi.
+ * nuovo (che veda il nuovo HEAD). Nessun hook gira sul commit (D-074),
+ * quindi repo e configurazione lette prima valgono ancora. GS_EXIT_OK o il
+ * codice di uscita (messaggio stampato); se non riesce, repo e cat-file
+ * sono chiusi.
  */
 int cmd_reopen(Repo_t *r, GitBatch_t *b);
 

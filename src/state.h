@@ -1,7 +1,8 @@
 /*
  * state.h - stato di un file shared, ricavato ogni volta (D-041, D-054,
- * D-065). Nessuno stato salvato: solo H (blob in HEAD), T (blob dell'ultima
- * versione), la catena e la storia del file sul branch.
+ * D-065, D-076). Nessuno stato salvato: solo H (blob in HEAD), I (blob
+ * nell'index), T (blob dell'ultima versione), la catena e la storia del
+ * file sul branch.
  */
 #ifndef GS_STATE_H
 #define GS_STATE_H
@@ -15,6 +16,7 @@ typedef enum {
     STATE_TO_APPLY,    /* base piu' vecchia di T, nessuna modifica locale */
     STATE_TO_PUBLISH,  /* base = T, H diverso: modifica non pubblicata */
     STATE_DIVERGED,    /* modifica da una base vecchia, o nessuna base */
+    STATE_TO_COMMIT,   /* H diverso da T, index = T: update da committare */
     STATE_PENDING,     /* set/link/unlink non ancora committato */
     STATE_UNLINKED,    /* in .gitshared ma non in .git/config (es. clone) */
     STATE_INCONSISTENT /* in config ma non in .gitshared, o file assente */

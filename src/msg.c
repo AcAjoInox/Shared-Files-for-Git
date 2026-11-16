@@ -48,8 +48,8 @@ static const char *const msg_en[] = {
         "usage: git shared hook install\n"
         "   or: git shared hook <event> [<args>]\n"
         "\n"
-        "    install    align the hooks with shared.autoPublish; also for a\n"
-        "               repository whose shared files have no hooks yet\n"
+        "    install    install the hooks in a repository whose shared files\n"
+        "               have none yet, and remove the ones no longer used\n"
         "    <event>    called by the hooks; not meant to be run by hand\n",
 
     [MSG_ERR_UNKNOWN_CMD] = "unknown subcommand: '%s'",
@@ -110,11 +110,8 @@ static const char *const msg_en[] = {
     [MSG_WARN_PEER_UNREACHABLE] = "%s: peer %s not reachable",
     [MSG_WARN_SUSPENDED] = "%s: suspended on this branch",
     [MSG_WARN_HOOK] = "cannot install the hook '%s'",
-    [MSG_HOOK_DIVERGED] =
-        "%s: changed from an old version: it is now diverged and it was "
-        "not published (run 'git shared update')",
     [MSG_HOOK_NOT_ALIGNED] = "%s: %s (run 'git shared %s')",
-    [MSG_HOOKS_INSTALLED] = "Hooks installed (publish at commit: %s).",
+    [MSG_HOOKS_INSTALLED] = "Hooks installed.",
 
     [MSG_SET_STAGED] =
         "'%s' is now shared as '%s'. Commit .gitshared to confirm.",
@@ -139,6 +136,9 @@ static const char *const msg_en[] = {
     [MSG_UPD_TO_PUBLISH] =
         "%s: local change not published yet: run 'git shared publish'",
     [MSG_UPD_DIVERGED] = "%s: diverged: merging is not implemented yet",
+    [MSG_UPD_TO_COMMIT] =
+        "%s: the latest version is applied but not committed: commit it "
+        "to confirm",
     [MSG_UPD_COMMIT_MSG] = "Update %s",
 
     [MSG_STATUS_NONE] = "No shared files in this repository.",
@@ -152,6 +152,7 @@ static const char *const msg_en[] = {
     [MSG_STATE_TO_APPLY] = "new version to apply",
     [MSG_STATE_TO_PUBLISH] = "to publish",
     [MSG_STATE_DIVERGED] = "diverged",
+    [MSG_STATE_TO_COMMIT] = "applied, to commit",
     [MSG_STATE_PENDING] = "pending commit",
     [MSG_STATE_UNLINKED] = "unlinked",
     [MSG_STATE_INCONSISTENT] = "inconsistent",

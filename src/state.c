@@ -21,7 +21,8 @@
 int state_is_derived(eState_t st)
 {
     return (st == STATE_ALIGNED) || (st == STATE_TO_APPLY) ||
-           (st == STATE_TO_PUBLISH) || (st == STATE_DIVERGED);
+           (st == STATE_TO_PUBLISH) || (st == STATE_DIVERGED) ||
+           (st == STATE_TO_COMMIT);
 }
 
 const char *state_name(eState_t st)
@@ -31,6 +32,7 @@ const char *state_name(eState_t st)
         [STATE_TO_APPLY] = MSG_STATE_TO_APPLY,
         [STATE_TO_PUBLISH] = MSG_STATE_TO_PUBLISH,
         [STATE_DIVERGED] = MSG_STATE_DIVERGED,
+        [STATE_TO_COMMIT] = MSG_STATE_TO_COMMIT,
         [STATE_PENDING] = MSG_STATE_PENDING,
         [STATE_UNLINKED] = MSG_STATE_UNLINKED,
         [STATE_INCONSISTENT] = MSG_STATE_INCONSISTENT,
@@ -141,6 +143,7 @@ eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     Str_t name = STR_INIT;
     Oid_t h;
     Oid_t t;
+    Oid_t i;
     size_t base = 0U;
     int found = 0;
     eGsErr_t err = GS_OK;
@@ -170,6 +173,14 @@ eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     /* Caso comune: un confronto di oid, nessuna storia da leggere. */
     if (oid_eq(&h, &t)) {
         *st = STATE_ALIGNED;
+        goto exit;
+    }
+    /* L'ultima versione e' gia' nell'index (update senza commit): resta
+     * solo il commit (D-076). Una domanda in piu', solo se H != T. */
+    str_reset(&name);
+    str_addf(&name, ":%s", str_cstr(&e->path));
+    if ((git_batch_blob(b, str_cstr(&name), &i) != 0) && oid_eq(&i, &t)) {
+        *st = STATE_TO_COMMIT;
         goto exit;
     }
 

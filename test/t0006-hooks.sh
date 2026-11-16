@@ -1,7 +1,7 @@
 #!/bin/sh
-# t0006-hooks.sh - hook: di default solo avvisi, pubblicazione al commit su
-# richiesta (REQ-F-004, REQ-F-013, REQ-F-016, REQ-F-023, D-030, D-069,
-# D-072, D-073).
+# t0006-hooks.sh - hook: solo avvisi, nessun hook sui commit; si pubblica
+# solo con publish (REQ-F-004, REQ-F-013, REQ-F-016, REQ-F-023, D-030,
+# D-069, D-073, D-074).
 
 . "$(dirname "$0")/lib.sh"
 
@@ -17,7 +17,7 @@ has_block() {
 	grep -q ">>> git shared >>>" ".git/hooks/$1" 2>/dev/null
 }
 
-# --- A: default (autoPublish spento) --------------------------------------
+# --- A: hook installati da set ---------------------------------------------
 make_repo A
 cd "$TRASH/A" || exit 1
 printf '#!/bin/sh\necho "hook-utente" >&2\nexit 0\n' >.git/hooks/pre-commit
@@ -46,7 +46,7 @@ git shared set altro.h >/dev/null
 expect_eq "secondo set: nessun blocco duplicato" "$(grep -c '>>> git shared >>>' .git/hooks/post-merge)" 1
 git commit -q -m "share altro.h" 2>/dev/null
 
-# --- B: link; di default il commit non pubblica (D-073) ----------------------
+# --- B: link; il commit non pubblica (D-074) ---------------------------------
 make_repo B
 cd "$TRASH/B" || exit 1
 put x.c x
@@ -62,39 +62,24 @@ expect_out "default: B da pubblicare" "to publish"
 run git shared publish
 expect_out "publish: inviata ad A" "sent to 1 of 1 peers"
 
-# --- autoPublish acceso: il post-commit pubblica -----------------------------
+# --- shared.autoPublish rimasto in config: ignorato (D-074) ------------------
 git config shared.autoPublish true
 run git shared hook install
 expect_rc "hook install: codice 0" 0
-expect_out "hook install: pubblicazione al commit attiva" "Hooks installed (publish at commit: on)."
-expect_ok "autoPublish: blocco nel post-commit" has_block post-commit
-expect_fail "autoPublish: nessun pre-commit" has_block pre-commit
+expect_out "hook install: messaggio" "Hooks installed."
+expect_fail "autoPublish in config: nessun blocco nel post-commit" has_block post-commit
+OLD_A=$(git -C ../A rev-parse "refs/shared/$ID")
 printf 'seconda riga di B\n' >>breef.md
 run git commit -q -a -m "B modifica ancora"
-expect_err "post-commit: nuova versione creata" "breef.md: new version created"
-expect_err "post-commit: inviata ad A" "sent to 1 of 1 peers"
-expect_eq "post-commit: A ha ricevuto" \
-	"$(git -C ../A rev-parse "refs/shared/$ID")" "$(git rev-parse "refs/shared/$ID")"
-
-# Commit che non tocca file shared: nessun output.
-put note.txt n
-printf 'n2\n' >note.txt
-run git commit -q -a -m "solo note"
-expect_eq "autoPublish: commit senza file shared, nessun output" "$OUT$ERR" ""
-
-# --- A con autoPublish: commit da base vecchia -> avviso dopo il commit -------
-cd "$TRASH/A" || exit 1
-git config shared.autoPublish true
-git shared hook install >/dev/null
-OLD_HEAD=$(git rev-parse HEAD)
-printf 'modifica di A da base vecchia\n' >>breef.md
-run git commit -q -a -m "A da base vecchia"
-expect_rc "base vecchia: il commit passa" 0
-expect_err "base vecchia: avviso dopo il commit" "it is now diverged and it was not published"
-expect_no_out "base vecchia: niente invio" "sent to"
-git reset -q --hard "$OLD_HEAD"
+expect_eq "autoPublish in config: commit senza output" "$OUT$ERR" ""
+expect_eq "autoPublish in config: A non riceve al commit" \
+	"$(git -C ../A rev-parse "refs/shared/$ID")" "$OLD_A"
+run git shared publish
+expect_out "autoPublish in config: si pubblica con publish" "sent to 1 of 1 peers"
+git config --unset shared.autoPublish
 
 # --- post-checkout: avviso solo sul branch attivo (REQ-F-013) -----------------
+cd "$TRASH/A" || exit 1
 git checkout -q -b feature 2>/dev/null
 run git checkout -q main
 expect_err "post-checkout: avviso sul branch attivo" \
@@ -106,49 +91,59 @@ case "$ERR" in
 esac
 git checkout -q main 2>/dev/null
 
-# update -c: il post-commit non crea una nuova versione per un update.
 run git shared update -c
 expect_out "update -c: applicata e committata" "applied and committed"
-case "$OUT$ERR" in
-*"new version created"*) not_ok "update -c: nessuna nuova versione" "$OUT$ERR" ;;
-*) ok "update -c: nessuna nuova versione" ;;
-esac
+expect_no_out "update -c: nessuna nuova versione" "new version created"
 
-# --- autoPublish spento di nuovo: il post-commit si toglie ---------------------
+# --- blocchi di versioni precedenti: hook install li toglie -------------------
 cd "$TRASH/B" || exit 1
-git config shared.autoPublish false
-run git shared hook install
-expect_out "hook install: pubblicazione al commit spenta" "(publish at commit: off)"
-expect_fail "autoPublish spento: post-commit creato da git shared cancellato" \
-	test -e .git/hooks/post-commit
+OLD_BLOCK='# >>> git shared >>>
+git-shared hook EVENT "$@" </dev/null || :
+# <<< git shared <<<'
+# old_hook <evento> [<righe dell'utente>]: hook con il blocco di una
+# versione precedente subito dopo "#!/bin/sh"
+old_hook() {
+	printf '#!/bin/sh\n%s\n%s' "$(printf '%s' "$OLD_BLOCK" | sed "s/EVENT/$1/")" "$2" \
+		>".git/hooks/$1"
+}
 
-# post-commit dell'utente: il blocco si aggiunge e si toglie senza toccare il resto
-printf '#!/bin/sh\necho "post-utente" >&2\n' >.git/hooks/post-commit
-git config shared.autoPublish true
-git shared hook install >/dev/null
-expect_ok "post-commit dell'utente: blocco aggiunto" has_block post-commit
-git config shared.autoPublish false
+# Il blocco rimasto nel post-commit non fa nulla al commit.
+old_hook post-commit
+printf 'terza riga di B\n' >>breef.md
+OLD_A=$(git -C ../A rev-parse "refs/shared/$ID")
+run git commit -q -a -m "B con il vecchio post-commit"
+expect_eq "vecchio post-commit: commit senza output" "$OUT$ERR" ""
+expect_eq "vecchio post-commit: A non riceve" \
+	"$(git -C ../A rev-parse "refs/shared/$ID")" "$OLD_A"
+
+run git shared hook install
+expect_fail "post-commit creato da git shared: cancellato" test -e .git/hooks/post-commit
+
+# post-commit dell'utente con il vecchio blocco: si toglie solo il blocco
+old_hook post-commit 'echo "post-utente" >&2
+'
 git shared hook install >/dev/null
 expect_eq "post-commit dell'utente: contenuto ripristinato" \
 	"$(cat .git/hooks/post-commit)" "$(printf '#!/bin/sh\necho "post-utente" >&2')"
 
-# pre-commit installato da M3: hook install lo ripulisce
-printf '#!/bin/sh\n# >>> git shared >>>\ngit-shared hook pre-commit "$@" </dev/null || :\n# <<< git shared <<<\n' \
-	>.git/hooks/pre-commit
+# pre-commit installato dalla prima versione di M3
+old_hook pre-commit
 git shared hook install >/dev/null
 expect_fail "blocco pre-commit di M3 rimosso" test -e .git/hooks/pre-commit
 
 # --- repo con il blocco ma senza .gitshared: nessun output ----------------------
 make_repo E
 cd "$TRASH/E" || exit 1
-cp "$TRASH/A/.git/hooks/post-commit" .git/hooks/post-commit
+cp "$TRASH/A/.git/hooks/post-merge" .git/hooks/post-merge
 put e.txt e
-printf 'e2\n' >e.txt
-run git commit -q -a -m e
+git checkout -q -b e2 2>/dev/null
+put e.txt e2
+git checkout -q main 2>/dev/null
+run git merge -q e2
 expect_eq "senza .gitshared: nessun output" "$OUT$ERR" ""
 
 run git shared help
 expect_out "manuale: sezione HOOKS" "HOOKS"
-expect_out "manuale: shared.autoPublish" "shared.autoPublish"
+expect_no_out "manuale: niente shared.autoPublish" "autoPublish"
 
 done_testing

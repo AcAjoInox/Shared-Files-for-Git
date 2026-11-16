@@ -44,10 +44,9 @@ typedef struct {
     SharedEntry_t *v;
     size_t n;
     size_t cap;
-    unsigned auto_publish : 1U; /* shared.autoPublish, default 0 (D-073) */
 } Repo_t;
 
-#define REPO_INIT { STR_INIT, STR_INIT, STR_INIT, STR_INIT, NULL, 0U, 0U, 0U }
+#define REPO_INIT { STR_INIT, STR_INIT, STR_INIT, STR_INIT, NULL, 0U, 0U }
 
 /*
  * Apre la repo della cartella corrente e carica i file shared.

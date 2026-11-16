@@ -235,7 +235,7 @@ int cmd_link(int argc, char **argv)
         msg_error(MSG_ERR_COMMIT);
         goto exit;
     }
-    /* Il post-commit puo' aver gia' completato: si rilegge tutto. */
+    /* Completamento con un cat-file che veda il nuovo HEAD. */
     if (cmd_reopen(&repo, &batch) != GS_EXIT_OK) {
         opened = 0;
         goto exit;
