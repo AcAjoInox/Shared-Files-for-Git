@@ -56,6 +56,8 @@ typedef enum {
     MSG_ERR_PEER_REJECTED,   /* file, peer */
     MSG_ERR_TOO_MANY_PEERS,  /* file, massimo (unsigned) */
     MSG_ERR_PUBLISH,         /* file */
+    MSG_ERR_MERGE,           /* file */
+    MSG_ERR_CONFLICT_OPEN,   /* file, path */
 
     MSG_WARN_BAD_ENTRY,      /* nome della sezione */
     MSG_WARN_NOT_IN_HEAD,    /* path */
@@ -65,6 +67,7 @@ typedef enum {
     MSG_WARN_PEER_UNREACHABLE, /* file, peer */
     MSG_WARN_SUSPENDED,      /* file */
     MSG_WARN_HOOK,           /* path dell'hook */
+    MSG_WARN_MERGE_DROPPED,  /* file */
     MSG_HOOK_NOT_ALIGNED,    /* file, stato, comando */
     MSG_HOOKS_INSTALLED,
 
@@ -79,13 +82,16 @@ typedef enum {
     MSG_PUB_NO_PEERS,        /* file */
     MSG_PUB_TO_APPLY,        /* file */
     MSG_PUB_DIVERGED,        /* file */
+    MSG_PUB_MERGING,         /* file */
     MSG_SKIP_STATE,          /* file, stato */
     MSG_UPD_RECEIVED,        /* file */
     MSG_UPD_APPLIED,         /* file */
     MSG_UPD_COMMITTED,       /* file */
     MSG_UPD_UP_TO_DATE,      /* file */
     MSG_UPD_TO_PUBLISH,      /* file */
-    MSG_UPD_DIVERGED,        /* file */
+    MSG_UPD_MERGED,          /* file */
+    MSG_UPD_MERGED_COMMITTED, /* file */
+    MSG_UPD_MERGED_PUBLISH,  /* file */
     MSG_UPD_TO_COMMIT,       /* file */
     MSG_UPD_COMMIT_MSG,      /* path o "shared files" */
 
@@ -102,6 +108,7 @@ typedef enum {
     MSG_STATE_TO_PUBLISH,
     MSG_STATE_DIVERGED,
     MSG_STATE_TO_COMMIT,
+    MSG_STATE_MERGING,
     MSG_STATE_PENDING,
     MSG_STATE_UNLINKED,
     MSG_STATE_INCONSISTENT,

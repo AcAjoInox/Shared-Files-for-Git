@@ -62,6 +62,10 @@ eGsErr_t git_run(const char *const args[], unsigned flags, Str_t *out);
 eGsErr_t git_update_ref(const char *ref, const Oid_t *new_oid,
                         const Oid_t *old_oid, const char *reason);
 
+/* Scrive una ref qualunque sia il suo valore (ref di lavoro, non la
+ * catena). */
+eGsErr_t git_set_ref(const char *ref, const Oid_t *new_oid, const char *reason);
+
 /* Cancella le ref di un elenco compatto (str_addz) con un solo processo. */
 eGsErr_t git_delete_refs(const Str_t *refs);
 

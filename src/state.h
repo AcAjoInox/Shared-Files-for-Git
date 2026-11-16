@@ -1,6 +1,6 @@
 /*
  * state.h - stato di un file shared, ricavato ogni volta (D-041, D-054,
- * D-065, D-076). Nessuno stato salvato: solo H (blob in HEAD), I (blob
+ * D-065, D-076). Nessuno stato salvato, salvo l'unione in corso (D-078): solo H (blob in HEAD), I (blob
  * nell'index), T (blob dell'ultima versione), la catena e la storia del
  * file sul branch.
  */
@@ -17,6 +17,7 @@ typedef enum {
     STATE_TO_PUBLISH,  /* base = T, H diverso: modifica non pubblicata */
     STATE_DIVERGED,    /* modifica da una base vecchia, o nessuna base */
     STATE_TO_COMMIT,   /* H diverso da T, index = T: update da committare */
+    STATE_MERGING,     /* unione in corso: conflitto o risoluzione in staging */
     STATE_PENDING,     /* set/link/unlink non ancora committato */
     STATE_UNLINKED,    /* in .gitshared ma non in .git/config (es. clone) */
     STATE_INCONSISTENT /* in config ma non in .gitshared, o file assente */
@@ -28,7 +29,18 @@ int state_is_derived(eState_t st);
 /* Nome dello stato per l'utente. */
 const char *state_name(eState_t st);
 
+/* Cio' che lo stato ha usato: chi agisce dopo (publish, update) parte da
+ * questi valori invece di rileggerli (reportIdea B-31). Un oid con
+ * len = 0 non e' stato ricavato. */
+typedef struct {
+    Oid_t h;    /* blob del file in HEAD */
+    Oid_t t;    /* blob dell'ultima versione */
+    Oid_t tip;  /* commit dell'ultima versione (refs/shared/<id>) */
+    Oid_t base; /* blob della base; solo per "divergente", 0 = nessuna base */
+} StateInfo_t;
+
+/* info puo' essere NULL. */
 eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
-                      eState_t *st);
+                      eState_t *st, StateInfo_t *info);
 
 #endif /* GS_STATE_H */

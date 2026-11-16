@@ -174,7 +174,8 @@ expect_rc "publish divergente: codice 1" 1
 expect_err "publish divergente: niente invio" "diverged from the latest version"
 run git shared update
 expect_rc "update divergente: codice 1" 1
-expect_err "update divergente: merge non ancora disponibile" "merging is not implemented yet"
+# C e B hanno aggiunto righe in fondo: conflitto (le unioni sono in t0009)
+expect_err "update divergente: conflitto da risolvere" "merge conflict"
 
 # --- peer irraggiungibile e push rifiutato ----------------------------------------
 cd "$TRASH" || exit 1
@@ -196,7 +197,7 @@ expect_rc "push rifiutato: codice 1" 1
 expect_err "push rifiutato: errore" "rejected by"
 run git shared update
 expect_rc "versioni divergenti tra peer: codice 1" 1
-expect_err "versioni divergenti tra peer: segnalate" "merging is not implemented yet"
+expect_err "versioni divergenti tra peer: conflitto da risolvere" "merge conflict"
 
 # --- nomi con spazi e caratteri non ASCII (reportIdea C-01) ------------------
 make_repo U1

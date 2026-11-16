@@ -51,7 +51,7 @@ static void hook_warn(void)
     if (git_batch_open(&batch) == GS_OK) {
         for (i = 0U; i < repo.n; i++) {
             e = &repo.v[i];
-            if (is_live(&repo, e) && (state_derive(&repo, e, &batch, &st) == GS_OK) &&
+            if (is_live(&repo, e) && (state_derive(&repo, e, &batch, &st, NULL) == GS_OK) &&
                 (st != STATE_ALIGNED) && state_is_derived(st)) {
                 if (st == STATE_TO_COMMIT) {
                     msg_warning(MSG_UPD_TO_COMMIT, str_cstr(&e->path));

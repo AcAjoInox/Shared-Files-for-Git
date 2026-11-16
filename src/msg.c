@@ -39,6 +39,9 @@ static const char *const msg_en[] = {
     [MSG_USAGE_UPDATE] =
         "usage: git shared update [-f] [-c | -m <message>] [<path>]\n"
         "\n"
+        "Diverged versions are merged. After a conflict: fix the file,\n"
+        "'git add' it and run 'git shared update' again.\n"
+        "\n"
         "    -f, --force       overwrite local changes\n"
         "    -c, --commit      commit the applied files right away\n"
         "    -m <message>      commit right away with <message>\n",
@@ -98,6 +101,10 @@ static const char *const msg_en[] = {
         "run 'git shared update'",
     [MSG_ERR_TOO_MANY_PEERS] = "%s: too many peers (at most %u)",
     [MSG_ERR_PUBLISH] = "%s: cannot create the new version",
+    [MSG_ERR_MERGE] = "%s: cannot merge",
+    [MSG_ERR_CONFLICT_OPEN] =
+        "%s: merge conflict: fix it, 'git add' it, then run "
+        "'git shared update' (to give up: git restore -s HEAD -SW -- '%s')",
 
     [MSG_WARN_BAD_ENTRY] = "ignoring invalid entry '%s' in .gitshared",
     [MSG_WARN_NOT_IN_HEAD] =
@@ -113,6 +120,8 @@ static const char *const msg_en[] = {
     [MSG_WARN_PEER_UNREACHABLE] = "%s: peer %s not reachable",
     [MSG_WARN_SUSPENDED] = "%s: suspended on this branch",
     [MSG_WARN_HOOK] = "cannot install the hook '%s'",
+    [MSG_WARN_MERGE_DROPPED] =
+        "%s: the merge in progress was abandoned: dropped",
     [MSG_HOOK_NOT_ALIGNED] = "%s: %s (run 'git shared %s')",
     [MSG_HOOKS_INSTALLED] = "Hooks installed.",
 
@@ -131,6 +140,8 @@ static const char *const msg_en[] = {
         "%s: a newer version exists: run 'git shared update' first",
     [MSG_PUB_DIVERGED] =
         "%s: diverged from the latest version: run 'git shared update'",
+    [MSG_PUB_MERGING] =
+        "%s: merge in progress: run 'git shared update' first",
     [MSG_SKIP_STATE] = "%s: %s, nothing to do",
     [MSG_UPD_RECEIVED] = "%s: new version received",
     [MSG_UPD_APPLIED] = "%s: new version applied. Commit it to confirm.",
@@ -138,7 +149,12 @@ static const char *const msg_en[] = {
     [MSG_UPD_UP_TO_DATE] = "%s: up to date",
     [MSG_UPD_TO_PUBLISH] =
         "%s: local change not published yet: run 'git shared publish'",
-    [MSG_UPD_DIVERGED] = "%s: diverged: merging is not implemented yet",
+    [MSG_UPD_MERGED] =
+        "%s: merged. Commit it to confirm, then run 'git shared publish'.",
+    [MSG_UPD_MERGED_COMMITTED] =
+        "%s: merged and committed. Run 'git shared publish' to send it.",
+    [MSG_UPD_MERGED_PUBLISH] =
+        "%s: merged, nothing to commit. Run 'git shared publish' to send it.",
     [MSG_UPD_TO_COMMIT] =
         "%s: the latest version is applied but not committed: commit it "
         "to confirm",
@@ -157,6 +173,7 @@ static const char *const msg_en[] = {
     [MSG_STATE_TO_PUBLISH] = "to publish",
     [MSG_STATE_DIVERGED] = "diverged",
     [MSG_STATE_TO_COMMIT] = "applied, to commit",
+    [MSG_STATE_MERGING] = "merge in progress",
     [MSG_STATE_PENDING] = "pending commit",
     [MSG_STATE_UNLINKED] = "unlinked",
     [MSG_STATE_INCONSISTENT] = "inconsistent",

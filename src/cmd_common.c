@@ -321,41 +321,33 @@ int cmd_reopen(Repo_t *r, GitBatch_t *b)
     return rc;
 }
 
-/* Nuova versione: blob di HEAD, genitore T, ref condizionata a T. */
-static eGsErr_t new_version(const SharedEntry_t *e, GitBatch_t *b)
+/* Nuova versione: blob di HEAD, genitore T, ref condizionata a T. H e T
+ * sono quelli da cui e' stato ricavato lo stato (reportIdea B-31). */
+static eGsErr_t new_version(const SharedEntry_t *e, const StateInfo_t *si)
 {
-    Str_t name = STR_INIT;
     Str_t ref = STR_INIT;
-    Oid_t h;
-    Oid_t t;
     Oid_t v;
-    eGsErr_t err = GS_ERR_GIT;
+    eGsErr_t err = chain_commit(&si->h, &si->tip, NULL, str_cstr(&e->name), &v);
 
-    str_addf(&name, "HEAD:%s", str_cstr(&e->path));
-    chain_ref(&ref, e->id);
-    if ((git_batch_blob(b, str_cstr(&name), &h) != 0) &&
-        (git_batch_query(b, str_cstr(&ref), &t) == GIT_OBJ_COMMIT)) {
-        err = chain_commit(&h, &t, str_cstr(&e->name), &v);
-        if (err == GS_OK) {
-            /* Condizionata: se nel frattempo un peer ha cambiato T, non
-             * si sovrascrive niente (REQ-NF-005, D-072). */
-            err = git_update_ref(str_cstr(&ref), &v, &t, "git shared: publish");
-        }
+    if (err == GS_OK) {
+        /* Condizionata: se nel frattempo un peer ha cambiato T, non si
+         * sovrascrive niente (REQ-NF-005, D-072). */
+        chain_ref(&ref, e->id);
+        err = git_update_ref(str_cstr(&ref), &v, &si->tip, "git shared: publish");
     }
     str_free(&ref);
-    str_free(&name);
     return err;
 }
 
-int cmd_publish_entry(const SharedEntry_t *e, GitBatch_t *b, int create)
+int cmd_publish_entry(const SharedEntry_t *e, const StateInfo_t *create)
 {
     PeerTally_t tally = { 0U, 0U, 0U };
     const char *label = str_cstr(&e->path);
     unsigned npeers = (unsigned)str_zcount(&e->peers);
     int rc = GS_EXIT_OK;
 
-    if (create != 0) {
-        if (new_version(e, b) != GS_OK) {
+    if (create != NULL) {
+        if (new_version(e, create) != GS_OK) {
             msg_error(MSG_ERR_PUBLISH, label);
             rc = GS_EXIT_ERROR;
             goto exit;

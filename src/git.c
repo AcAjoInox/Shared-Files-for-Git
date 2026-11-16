@@ -197,6 +197,16 @@ eGsErr_t git_update_ref(const char *ref, const Oid_t *new_oid,
     return git_run(args, 0U, NULL);
 }
 
+eGsErr_t git_set_ref(const char *ref, const Oid_t *new_oid, const char *reason)
+{
+    const char *args[] = { "update-ref", "-m", reason, ref, NULL, NULL };
+    char new_hex[OID_HEX_SIZE];
+
+    oid_to_hex(new_oid, new_hex);
+    args[4] = new_hex;
+    return git_run(args, 0U, NULL);
+}
+
 eGsErr_t git_delete_refs(const Str_t *refs)
 {
     static const char *const args[] = { "update-ref", "--stdin", NULL };

@@ -12,13 +12,14 @@ void chain_ref(Str_t *ref, const char *id)
 }
 
 eGsErr_t chain_commit(const Oid_t *blob, const Oid_t *parent,
-                      const char *name, Oid_t *out)
+                      const Oid_t *parent2, const char *name, Oid_t *out)
 {
     static const char *const a_mktree[] = { "mktree", NULL };
     const char *a_commit[] = { "commit-tree", NULL, "-m", NULL, NULL, NULL,
-                               NULL };
+                               NULL, NULL, NULL };
     char hex[OID_HEX_SIZE];
     char parent_hex[OID_HEX_SIZE];
+    char parent2_hex[OID_HEX_SIZE];
     Str_t tree = STR_INIT;
     Str_t commit = STR_INIT;
     Str_t msg = STR_INIT;
@@ -53,6 +54,11 @@ eGsErr_t chain_commit(const Oid_t *blob, const Oid_t *parent,
         oid_to_hex(parent, parent_hex);
         a_commit[4] = "-p";
         a_commit[5] = parent_hex;
+        if (parent2 != NULL) {
+            oid_to_hex(parent2, parent2_hex);
+            a_commit[6] = "-p";
+            a_commit[7] = parent2_hex;
+        }
     }
     err = git_run(a_commit, 0U, &commit);
     if ((err == GS_OK) && !oid_from_hex(out, commit.buf, commit.len)) {
@@ -71,7 +77,7 @@ eGsErr_t chain_create_first(const char *id, const Oid_t *blob,
 {
     Str_t ref = STR_INIT;
     Oid_t commit;
-    eGsErr_t err = chain_commit(blob, NULL, name, &commit);
+    eGsErr_t err = chain_commit(blob, NULL, NULL, name, &commit);
 
     if (err == GS_OK) {
         chain_ref(&ref, id);

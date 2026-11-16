@@ -16,13 +16,14 @@
 #include <string.h>
 
 #include "chain.h"
+#include "merge.h"
 #include "msg.h"
 
 int state_is_derived(eState_t st)
 {
     return (st == STATE_ALIGNED) || (st == STATE_TO_APPLY) ||
            (st == STATE_TO_PUBLISH) || (st == STATE_DIVERGED) ||
-           (st == STATE_TO_COMMIT);
+           (st == STATE_TO_COMMIT) || (st == STATE_MERGING);
 }
 
 const char *state_name(eState_t st)
@@ -33,6 +34,7 @@ const char *state_name(eState_t st)
         [STATE_TO_PUBLISH] = MSG_STATE_TO_PUBLISH,
         [STATE_DIVERGED] = MSG_STATE_DIVERGED,
         [STATE_TO_COMMIT] = MSG_STATE_TO_COMMIT,
+        [STATE_MERGING] = MSG_STATE_MERGING,
         [STATE_PENDING] = MSG_STATE_PENDING,
         [STATE_UNLINKED] = MSG_STATE_UNLINKED,
         [STATE_INCONSISTENT] = MSG_STATE_INCONSISTENT,
@@ -137,16 +139,23 @@ exit:
 }
 
 eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
-                      eState_t *st)
+                      eState_t *st, StateInfo_t *info)
 {
     OidList_t chain = OIDLIST_INIT;
     Str_t name = STR_INIT;
-    Oid_t h;
-    Oid_t t;
+    char hex[OID_HEX_SIZE];
+    StateInfo_t si;
     Oid_t i;
+    Oid_t k;
     size_t base = 0U;
     int found = 0;
+    int unmerged = 0;
     eGsErr_t err = GS_OK;
+
+    si.h.len = 0U;
+    si.t.len = 0U;
+    si.tip.len = 0U;
+    si.base.len = 0U;
 
     if (e->pending != SHARED_PENDING_NONE) {
         *st = STATE_PENDING;
@@ -161,17 +170,33 @@ eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         goto exit;
     }
     str_addf(&name, "HEAD:%s", str_cstr(&e->path));
-    if (git_batch_blob(b, str_cstr(&name), &h) == 0) {
+    if (git_batch_blob(b, str_cstr(&name), &si.h) == 0) {
         goto exit; /* file cancellato o rinominato (REQ-F-020) */
     }
-    str_reset(&name);
-    str_addf(&name, "refs/shared/%s:content", e->id);
-    if (git_batch_blob(b, str_cstr(&name), &t) == 0) {
+    /* Prima il commit, poi il suo blob: T e il suo contenuto sono della
+     * stessa versione anche se un peer invia mentre si legge (B-31). */
+    chain_ref(&name, e->id);
+    if (git_batch_query(b, str_cstr(&name), &si.tip) != GIT_OBJ_COMMIT) {
+        si.tip.len = 0U;
         goto exit; /* catena assente */
+    }
+    oid_to_hex(&si.tip, hex);
+    str_reset(&name);
+    str_addf(&name, "%s:content", hex);
+    if (git_batch_blob(b, str_cstr(&name), &si.t) == 0) {
+        goto exit;
+    }
+
+    /* Unione in corso (D-078): conta solo se l'index la conferma. */
+    merge_ref(&name, e->id);
+    if ((git_batch_query(b, str_cstr(&name), &k) == GIT_OBJ_COMMIT) &&
+        merge_is_live(b, str_cstr(&e->path), &si.h, &unmerged)) {
+        *st = STATE_MERGING;
+        goto exit;
     }
 
     /* Caso comune: un confronto di oid, nessuna storia da leggere. */
-    if (oid_eq(&h, &t)) {
+    if (oid_eq(&si.h, &si.t)) {
         *st = STATE_ALIGNED;
         goto exit;
     }
@@ -179,7 +204,7 @@ eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
      * solo il commit (D-076). Una domanda in piu', solo se H != T. */
     str_reset(&name);
     str_addf(&name, ":%s", str_cstr(&e->path));
-    if ((git_batch_blob(b, str_cstr(&name), &i) != 0) && oid_eq(&i, &t)) {
+    if ((git_batch_blob(b, str_cstr(&name), &i) != 0) && oid_eq(&i, &si.t)) {
         *st = STATE_TO_COMMIT;
         goto exit;
     }
@@ -196,13 +221,17 @@ eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         *st = STATE_DIVERGED; /* nessuna base (caso D-029) */
     } else if (base == 0U) {
         *st = STATE_TO_PUBLISH;
-    } else if (oid_eq(&h, &chain.v[base])) {
+    } else if (oid_eq(&si.h, &chain.v[base])) {
         *st = STATE_TO_APPLY;
     } else {
         *st = STATE_DIVERGED;
+        si.base = chain.v[base];
     }
 
 exit:
+    if (info != NULL) {
+        *info = si;
+    }
     oidlist_free(&chain);
     str_free(&name);
     return err;

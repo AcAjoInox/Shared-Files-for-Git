@@ -26,6 +26,7 @@ int cmd_publish(int argc, char **argv)
     const char *label;
     unsigned char *sel = NULL;
     eState_t st;
+    StateInfo_t si;
     size_t i;
     int first;
     int opened = 0;
@@ -57,7 +58,7 @@ int cmd_publish(int argc, char **argv)
             continue;
         }
         label = str_cstr(&e->path);
-        if (state_derive(&repo, e, &batch, &st) != GS_OK) {
+        if (state_derive(&repo, e, &batch, &st, &si) != GS_OK) {
             msg_fatal(MSG_ERR_PROC, "git");
             rc = GS_EXIT_FATAL;
             goto exit;
@@ -66,7 +67,7 @@ int cmd_publish(int argc, char **argv)
             msg_warning(MSG_WARN_SUSPENDED, label); /* atto esplicito: si fa */
         }
         if ((st == STATE_TO_PUBLISH) || (st == STATE_ALIGNED)) {
-            if (cmd_publish_entry(e, &batch, st == STATE_TO_PUBLISH) != GS_EXIT_OK) {
+            if (cmd_publish_entry(e, (st == STATE_TO_PUBLISH) ? &si : NULL) != GS_EXIT_OK) {
                 rc = GS_EXIT_ERROR;
             }
         } else if (st == STATE_TO_APPLY) {
@@ -74,6 +75,9 @@ int cmd_publish(int argc, char **argv)
             rc = GS_EXIT_ERROR;
         } else if (st == STATE_TO_COMMIT) {
             msg_error(MSG_UPD_TO_COMMIT, label);
+            rc = GS_EXIT_ERROR;
+        } else if (st == STATE_MERGING) {
+            msg_error(MSG_PUB_MERGING, label);
             rc = GS_EXIT_ERROR;
         } else if (st == STATE_DIVERGED) {
             msg_error(MSG_PUB_DIVERGED, label);

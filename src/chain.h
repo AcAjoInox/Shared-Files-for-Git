@@ -15,12 +15,13 @@
 void chain_ref(Str_t *ref, const char *id);
 
 /*
- * Commit di versione con il blob dato e il genitore dato (NULL per la
- * prima versione). Autore e data dell'utente (D-013), messaggio
- * "shared: <name>". Non tocca nessuna ref.
+ * Commit di versione con il blob dato e i genitori dati: parent = NULL per
+ * la prima versione; parent2 != NULL per l'unione di due versioni (D-078).
+ * Autore e data dell'utente (D-013), messaggio "shared: <name>". Non tocca
+ * nessuna ref.
  */
 eGsErr_t chain_commit(const Oid_t *blob, const Oid_t *parent,
-                      const char *name, Oid_t *out);
+                      const Oid_t *parent2, const char *name, Oid_t *out);
 
 /* Prima versione: chain_commit + ref creata solo se non esiste. */
 eGsErr_t chain_create_first(const char *id, const Oid_t *blob,
@@ -28,7 +29,7 @@ eGsErr_t chain_create_first(const char *id, const Oid_t *blob,
 
 /*
  * Blob delle versioni, dalla piu' recente (out->v[0] = T) alla piu'
- * vecchia, seguendo il primo genitore. Due domande per versione sullo
+ * vecchia, seguendo il primo genitore (in un'unione: la T di partenza). Due domande per versione sullo
  * stesso processo cat-file: nessun processo nuovo. Catena assente: lista
  * vuota.
  */

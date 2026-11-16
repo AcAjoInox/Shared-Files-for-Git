@@ -88,7 +88,7 @@ int cmd_status(int argc, char **argv)
         if (e->in_gitshared && !e->valid) {
             msg_warning(MSG_WARN_BAD_ENTRY, str_cstr(&e->name));
         } else if (e->in_gitshared || e->in_config) {
-            if (state_derive(&repo, e, &batch, &st) != GS_OK) {
+            if (state_derive(&repo, e, &batch, &st, NULL) != GS_OK) {
                 msg_fatal(MSG_ERR_PROC, "git");
                 rc = GS_EXIT_FATAL;
                 goto exit;

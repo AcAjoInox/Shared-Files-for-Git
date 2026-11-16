@@ -10,6 +10,7 @@
 #include "git.h"
 #include "msg.h"
 #include "shared.h"
+#include "state.h"
 
 /* Opzioni ammesse da cmd_parse. */
 #define CMD_OPT_COMMIT 0x1U /* -c, --commit, -m <msg> (D-007) */
@@ -83,12 +84,13 @@ eGsErr_t cmd_commit(const Repo_t *r, const char *message, const Str_t *paths);
 int cmd_reopen(Repo_t *r, GitBatch_t *b);
 
 /*
- * Pubblica un file: con create = 1 crea prima la nuova versione (stato
- * "da pubblicare", la base e' T: D-065), poi invia T a tutti i peer.
+ * Pubblica un file: con create != NULL crea prima la nuova versione (stato
+ * "da pubblicare", la base e' T: D-065) dal blob di HEAD e dalla T che lo
+ * stato ha usato (reportIdea B-31), poi invia T a tutti i peer.
  * GS_EXIT_OK, oppure GS_EXIT_ERROR se la versione non si crea o un peer
  * la rifiuta (messaggi stampati).
  */
-int cmd_publish_entry(const SharedEntry_t *e, GitBatch_t *b, int create);
+int cmd_publish_entry(const SharedEntry_t *e, const StateInfo_t *create);
 
 /* Path dell'utente (relativo alla cartella corrente) -> relativo alla
  * radice. 0 se assoluto o fuori dalla repo. */
