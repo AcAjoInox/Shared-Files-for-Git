@@ -9,6 +9,13 @@
  *
  * v0: la destinazione non deve esistere (D-062, riuso della storia, e
  * D-064, --adopt, non sono ancora implementati).
+ *
+ * Ri-aggancio (D-043, D-079): se .gitshared dichiara gia' lo stesso ID ma
+ * la repo non ha dati locali ("scollegato": un clone, o un'attesa scartata
+ * durante un git stash), link non da' errore. Riprende nome e path della
+ * sezione, rifa' fetch, attesa e hook, e non tocca il file: lo stato si
+ * ricava poi come per ogni file shared. Se la sezione e' gia' committata
+ * il collegamento vale subito.
  */
 #include <stdio.h>
 #include <string.h>
@@ -117,8 +124,11 @@ int cmd_link(int argc, char **argv)
     Str_t text = STR_INIT;
     Str_t paths = STR_INIT;
     Oid_t blob;
+    Oid_t head_blob;
     uint8_t fetched = 0U;
     int first;
+    int relink = 0;
+    int dest_new = 1; /* il file non e' in HEAD: entra nel commit */
     int opened = 0;
     int rc = GS_EXIT_USAGE;
 
@@ -157,22 +167,35 @@ int cmd_link(int argc, char **argv)
         str_add(&dest, str_cstr(&src.rel));
     }
     e = repo_find_id(&repo, str_cstr(&id));
-    if ((e != NULL) && (e->in_gitshared || e->in_config)) {
+    relink = (e != NULL) && e->in_gitshared && e->valid && !e->in_config;
+    if (relink) {
+        /* Ri-aggancio: vale la sezione che c'e' (nome e path locali). */
+        if (((argc - first) == 2) && !str_eq(&e->path, str_cstr(&dest))) {
+            msg_error(MSG_ERR_RELINK_PATH, str_cstr(&e->name),
+                      str_cstr(&e->path));
+            goto exit;
+        }
+        str_reset(&dest);
+        str_add(&dest, str_cstr(&e->path));
+        str_reset(&name);
+        str_add(&name, str_cstr(&e->name));
+    } else if ((e != NULL) && (e->in_gitshared || e->in_config)) {
         msg_error(MSG_ERR_ALREADY_LINKED, str_cstr(&name), str_cstr(&id));
         goto exit;
-    }
-    e = repo_find_path(&repo, str_cstr(&dest));
-    if (e != NULL) {
-        msg_error(MSG_ERR_ALREADY_SHARED, str_cstr(&dest), str_cstr(&e->name));
-        goto exit;
-    }
-    if (repo_find_name(&repo, str_cstr(&name)) != NULL) {
-        msg_error(MSG_ERR_NAME_USED, str_cstr(&name));
-        goto exit;
-    }
-    if (dest_exists(&repo, &batch, str_cstr(&dest))) {
-        msg_error(MSG_ERR_DEST_EXISTS, str_cstr(&dest));
-        goto exit;
+    } else {
+        e = repo_find_path(&repo, str_cstr(&dest));
+        if (e != NULL) {
+            msg_error(MSG_ERR_ALREADY_SHARED, str_cstr(&dest), str_cstr(&e->name));
+            goto exit;
+        }
+        if (repo_find_name(&repo, str_cstr(&name)) != NULL) {
+            msg_error(MSG_ERR_NAME_USED, str_cstr(&name));
+            goto exit;
+        }
+        if (dest_exists(&repo, &batch, str_cstr(&dest))) {
+            msg_error(MSG_ERR_DEST_EXISTS, str_cstr(&dest));
+            goto exit;
+        }
     }
 
     /* --- catena: fetch in refs/shared-incoming/<id>/0 (D-040) ---------- */
@@ -191,14 +214,27 @@ int cmd_link(int argc, char **argv)
         msg_error(MSG_ERR_PENDING);
         goto exit;
     }
-    if (cmd_write_gitshared(&repo, str_cstr(&name), str_cstr(&id),
-                            str_cstr(&dest)) != GS_OK) {
-        msg_error(MSG_ERR_WRITE_GITSHARED);
-        goto exit;
-    }
-    if (cmd_write_file(&repo, str_cstr(&dest), &blob) != GS_OK) {
-        msg_error(MSG_ERR_WRITE_FILE, str_cstr(&dest));
-        goto exit;
+    if (!relink) {
+        if (cmd_write_gitshared(&repo, str_cstr(&name), str_cstr(&id),
+                                str_cstr(&dest)) != GS_OK) {
+            msg_error(MSG_ERR_WRITE_GITSHARED);
+            goto exit;
+        }
+        if (cmd_write_file(&repo, str_cstr(&dest), &blob) != GS_OK) {
+            msg_error(MSG_ERR_WRITE_FILE, str_cstr(&dest));
+            goto exit;
+        }
+    } else {
+        /* Il file non si tocca. Se non e' in HEAD (attesa scartata da uno
+         * stash, poi stash pop) torna in staging con .gitshared; se c'e',
+         * eventuali modifiche dell'utente restano fuori dal commit. */
+        str_reset(&text);
+        str_addf(&text, "HEAD:%s", str_cstr(&dest));
+        dest_new = !git_batch_blob(&batch, str_cstr(&text), &head_blob);
+        if (dest_new && (cmd_stage(&repo, str_cstr(&dest)) != GS_OK)) {
+            msg_error(MSG_ERR_WRITE_FILE, str_cstr(&dest));
+            goto exit;
+        }
     }
     if (cmd_stage(&repo, ".gitshared") != GS_OK) {
         msg_error(MSG_ERR_STAGE_GITSHARED);
@@ -206,17 +242,38 @@ int cmd_link(int argc, char **argv)
     }
     (void)hooks_sync(&repo); /* REQ-F-016: un errore e' solo un avviso */
 
-    e = repo_add(&repo);
-    str_add(&e->name, str_cstr(&name));
-    str_add(&e->path, str_cstr(&dest));
+    if (!relink) {
+        e = repo_add(&repo);
+        str_add(&e->name, str_cstr(&name));
+        str_add(&e->path, str_cstr(&dest));
+        memcpy(e->id, str_cstr(&id), GS_ID_HEX_LEN + 1U);
+        e->in_gitshared = 1U;
+        e->valid = 1U;
+    } else {
+        e = repo_find_id(&repo, str_cstr(&id));
+    }
     str_add(&e->pending_src, str_cstr(&src.top));
     str_add(&e->pending_path, str_cstr(&dest));
     str_add(&e->pending_branch, str_cstr(&repo.branch));
-    memcpy(e->id, str_cstr(&id), GS_ID_HEX_LEN + 1U);
-    e->in_gitshared = 1U;
     e->in_config = 1U;
-    e->valid = 1U;
     e->pending = SHARED_PENDING_LINK;
+
+    /* Ri-aggancio con la sezione gia' committata (es. un clone): niente
+     * da committare, il collegamento vale subito. */
+    if (relink) {
+        if (cmd_reopen(&repo, &batch) != GS_EXIT_OK) {
+            opened = 0;
+            goto exit;
+        }
+        e = repo_find_id(&repo, str_cstr(&id));
+        if ((e != NULL) && (e->pending == SHARED_PENDING_NONE)) {
+            printf(msg(MSG_LINK_DONE), str_cstr(&dest), str_cstr(&name),
+                   str_cstr(&src.top));
+            putchar('\n');
+            rc = GS_EXIT_OK;
+            goto exit;
+        }
+    }
 
     if (o.commit == 0U) {
         printf(msg(MSG_LINK_STAGED), str_cstr(&dest), str_cstr(&name),
@@ -233,7 +290,9 @@ int cmd_link(int argc, char **argv)
         o.message = str_cstr(&text);
     }
     str_addz(&paths, ".gitshared");
-    str_addz(&paths, str_cstr(&dest));
+    if (dest_new) {
+        str_addz(&paths, str_cstr(&dest));
+    }
     if (cmd_commit(&repo, o.message, &paths) != GS_OK) {
         msg_error(MSG_ERR_COMMIT);
         goto exit;

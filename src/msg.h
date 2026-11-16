@@ -50,6 +50,7 @@ typedef enum {
     MSG_ERR_DEST_PATH,       /* path */
     MSG_ERR_DEST_EXISTS,     /* path */
     MSG_ERR_ALREADY_LINKED,  /* nome, id */
+    MSG_ERR_RELINK_PATH,     /* nome, path */
     MSG_ERR_WRITE_FILE,      /* path */
     MSG_ERR_NOT_SHARED_PATH, /* path */
     MSG_ERR_LOCAL_CHANGES,   /* path */

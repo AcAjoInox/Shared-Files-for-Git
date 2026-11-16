@@ -67,7 +67,11 @@ void peers_incoming_ref(Str_t *ref, const char *id, unsigned k)
 void peers_push(const char *label, const char *id, const Str_t *peers,
                 PeerTally_t *t)
 {
-    const char *args[] = { "push", "--porcelain", NULL, NULL, NULL };
+    /* --no-verify: il push di refs/shared/<id> non e' un push dell'utente;
+     * il suo pre-push (test, lint, lfs) non deve girare ne' bloccarlo
+     * (reportIdea C-20). */
+    const char *args[] = { "push", "--porcelain", "--no-verify", NULL, NULL,
+                           NULL };
     size_t n = str_zcount(peers);
     Job_t *jobs = xmalloc(((n > 0U) ? n : 1U) * sizeof *jobs);
     Str_t spec = STR_INIT;
@@ -79,10 +83,10 @@ void peers_push(const char *label, const char *id, const Str_t *peers,
     int rejected;
 
     str_addf(&spec, "refs/shared/%s:refs/shared/%s", id, id);
-    args[3] = str_cstr(&spec);
+    args[4] = str_cstr(&spec);
     for (k = 0U, peer = str_znext(peers, NULL); peer != NULL;
          k++, peer = str_znext(peers, peer)) {
-        args[2] = peer;
+        args[3] = peer;
         jobs[k].started = (git_start(&jobs[k].p, args, PROC_STDERR_NULL) == GS_OK);
     }
     for (k = 0U, peer = str_znext(peers, NULL); peer != NULL;

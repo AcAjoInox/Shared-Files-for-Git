@@ -92,6 +92,8 @@ static const char *const msg_en[] = {
     [MSG_ERR_DEST_EXISTS] =
         "'%s' already exists: linking an existing file is not supported yet",
     [MSG_ERR_ALREADY_LINKED] = "'%s' is already shared here (id %s)",
+    [MSG_ERR_RELINK_PATH] =
+        "'%s' is declared here at '%s': run link without <destination>",
     [MSG_ERR_WRITE_FILE] = "cannot write '%s'",
     [MSG_ERR_NOT_SHARED_PATH] = "'%s' is not a shared file",
     [MSG_ERR_LOCAL_CHANGES] =

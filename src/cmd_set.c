@@ -7,6 +7,10 @@
  *
  * L'attesa e' scritta per prima: se un passo successivo fallisce resta
  * un'attesa senza sezione, che il primo comando git shared scarta.
+ *
+ * File gia' dichiarato in .gitshared ma senza dati locali ("scollegato",
+ * es. un'attesa scartata durante un git stash e poi tornata): set non
+ * rifiuta, riusa l'ID e il nome che ci sono (D-079).
  */
 #include <stdio.h>
 #include <string.h>
@@ -78,10 +82,12 @@ int cmd_set(int argc, char **argv)
     Str_t full = STR_INIT;
     Str_t text = STR_INIT;
     Str_t paths = STR_INIT;
+    Str_t name_buf = STR_INIT;
     const char *name;
     const char *slash;
     char id[GS_ID_HEX_LEN + 1U];
     int first;
+    int readopt = 0;
     int opened = 0;
     int rc = GS_EXIT_USAGE;
 
@@ -105,19 +111,26 @@ int cmd_set(int argc, char **argv)
         goto exit;
     }
     e = repo_find_path(&repo, str_cstr(&full));
-    if (e != NULL) {
+    if ((e != NULL) && e->valid && !e->in_config) {
+        /* dichiarato ma scollegato: si riprende con il suo ID (D-079) */
+        readopt = 1;
+        str_add(&name_buf, str_cstr(&e->name));
+        name = str_cstr(&name_buf);
+        memcpy(id, e->id, sizeof id);
+    } else if (e != NULL) {
         msg_error(MSG_ERR_ALREADY_SHARED, str_cstr(&full), str_cstr(&e->name));
         goto exit;
-    }
-    slash = strrchr(str_cstr(&full), '/');
-    name = (slash != NULL) ? (slash + 1) : str_cstr(&full);
-    if (repo_find_name(&repo, name) != NULL) {
-        msg_error(MSG_ERR_NAME_USED, name);
-        goto exit;
-    }
-    if (shared_new_id(id) != GS_OK) {
-        msg_fatal(MSG_ERR_RANDOM);
-        goto exit;
+    } else {
+        slash = strrchr(str_cstr(&full), '/');
+        name = (slash != NULL) ? (slash + 1) : str_cstr(&full);
+        if (repo_find_name(&repo, name) != NULL) {
+            msg_error(MSG_ERR_NAME_USED, name);
+            goto exit;
+        }
+        if (shared_new_id(id) != GS_OK) {
+            msg_fatal(MSG_ERR_RANDOM);
+            goto exit;
+        }
     }
 
     /* 1. Attesa (locale): per prima, vedi intestazione. */
@@ -126,7 +139,10 @@ int cmd_set(int argc, char **argv)
         goto exit;
     }
     /* 2. Sezione in .gitshared; 3. staging (plumbing, REQ-NF-006). */
-    if (cmd_write_gitshared(&repo, name, id, str_cstr(&full)) != GS_OK) {
+    /* In ripresa .gitshared c'e' gia': dopo uno stash pop puo' non essere
+     * in staging, e cmd_stage qui sotto lo rimette. */
+    if ((readopt == 0) &&
+        (cmd_write_gitshared(&repo, name, id, str_cstr(&full)) != GS_OK)) {
         msg_error(MSG_ERR_WRITE_GITSHARED);
         goto exit;
     }
@@ -136,9 +152,13 @@ int cmd_set(int argc, char **argv)
     }
     (void)hooks_sync(&repo); /* REQ-F-016: un errore e' solo un avviso */
 
-    e = repo_add(&repo);
-    str_add(&e->name, name);
-    str_add(&e->path, str_cstr(&full));
+    if (readopt == 0) {
+        e = repo_add(&repo);
+        str_add(&e->name, name);
+        str_add(&e->path, str_cstr(&full));
+    } else {
+        e = repo_find_path(&repo, str_cstr(&full));
+    }
     str_add(&e->pending_path, str_cstr(&full));
     str_add(&e->pending_branch, str_cstr(&repo.branch));
     memcpy(e->id, id, sizeof id);
@@ -146,6 +166,22 @@ int cmd_set(int argc, char **argv)
     e->in_config = 1U;
     e->valid = 1U;
     e->pending = SHARED_PENDING_SET;
+
+    /* Ripresa: se la sezione e' gia' committata non c'e' niente da
+     * committare, e la dichiarazione vale subito. */
+    if (readopt != 0) {
+        if (cmd_reopen(&repo, &batch) != GS_EXIT_OK) {
+            opened = 0;
+            goto exit;
+        }
+        e = repo_find_path(&repo, str_cstr(&full));
+        if ((e != NULL) && (e->pending == SHARED_PENDING_NONE)) {
+            printf(msg(MSG_SET_DONE), str_cstr(&full), name);
+            putchar('\n');
+            rc = GS_EXIT_OK;
+            goto exit;
+        }
+    }
 
     if (o.commit == 0U) {
         printf(msg(MSG_SET_STAGED), str_cstr(&full), name);
@@ -183,6 +219,7 @@ exit:
         git_batch_close(&batch);
         repo_close(&repo);
     }
+    str_free(&name_buf);
     str_free(&paths);
     str_free(&text);
     str_free(&full);

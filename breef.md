@@ -88,7 +88,7 @@ Le repo stanno su un servizio di hosting. I peer non sono più path ma **URL**, 
 
 **Cosa arriva ai peer:** solo la notizia che esiste una versione nuova. I loro branch non vengono mai toccati. Chi lavora su quel progetto la applica con `git shared update` e un commit, come in locale.
 
-**Dopo un clone:** hai il file e hai `.gitshared`, ma il collegamento con i peer va rifatto a mano con `git shared link`, che riparte dal file che hai già senza toccarlo. La presenza di `.gitshared` ti avvisa che la repo ha file shared, e `git shared status` li mostra come *scollegati*.
+**Dopo un clone:** hai il file e hai `.gitshared`, ma il collegamento con i peer va rifatto con `git shared link <path del file in un peer>`: riparte dal file che hai già senza toccarlo, e vale subito. La presenza di `.gitshared` ti avvisa che la repo ha file shared, e `git shared status` li mostra come *scollegati*.
 
 **Se non hai il permesso di scrittura su un peer**, quel peer viene saltato. Si aggiornerà da solo al suo prossimo `git shared update`, che va a prendere le versioni dagli altri.
 

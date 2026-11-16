@@ -715,11 +715,65 @@ static eGsErr_t discard_pending(SharedEntry_t *e, GitBatch_t *b)
     return err;
 }
 
+/*
+ * Prima di scartare un'attesa (D-079): cerca l'ID nel .gitshared
+ * committato di ogni branch locale. Il commit di conferma puo' essere su
+ * un branch diverso da quello del comando (git switch -c, poi commit).
+ * Quasi tutti i branch hanno lo stesso .gitshared: si legge una volta
+ * sola ogni blob distinto. Se lo trova, `declared` contiene quel
+ * .gitshared e `rev` il nome della ref.
+ */
+static eGsErr_t find_on_branches(const char *id, GitBatch_t *b,
+                                 Repo_t *declared, Str_t *rev,
+                                 const SharedEntry_t **committed)
+{
+    static const char *const args[] = { "for-each-ref", "--format=%(refname)",
+                                        "refs/heads", NULL };
+    OidList_t seen = OIDLIST_INIT;
+    Str_t refs = STR_INIT;
+    Str_t name = STR_INIT;
+    char *line;
+    char *nl;
+    Oid_t blob;
+    eGsErr_t err = git_run(args, 0U, &refs);
+
+    *committed = NULL;
+    line = (err == GS_OK) ? refs.buf : NULL;
+    while ((line != NULL) && (*line != '\0') && (*committed == NULL) &&
+           (err == GS_OK)) {
+        nl = strchr(line, '\n');
+        if (nl != NULL) {
+            *nl = '\0';
+        }
+        str_reset(&name);
+        str_addf(&name, "%s:.gitshared", line);
+        if (git_batch_blob(b, str_cstr(&name), &blob) &&
+            !oidlist_has(&seen, &blob)) {
+            oidlist_add(&seen, &blob);
+            repo_close(declared);
+            err = repo_load_gitshared(declared, str_cstr(&name), 1, 1);
+            if (err == GS_OK) {
+                *committed = repo_find_id(declared, id);
+            }
+            if (*committed != NULL) {
+                str_reset(rev);
+                str_add(rev, line);
+            }
+        }
+        line = (nl != NULL) ? (nl + 1) : NULL;
+    }
+    str_free(&name);
+    str_free(&refs);
+    oidlist_free(&seen);
+    return err;
+}
+
 /* Un'attesa (set o link): completa, scarta o lascia com'e' (D-077). */
 static eGsErr_t settle_pending(Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
 {
     Repo_t declared = REPO_INIT; /* .gitshared committato */
     Str_t revs = STR_INIT;       /* dove cercare, elenco compatto */
+    Str_t other = STR_INIT;      /* branch trovato dalla ricerca estesa */
     Str_t name = STR_INIT;
     const SharedEntry_t *committed = NULL;
     const char *rev = NULL;
@@ -757,6 +811,14 @@ static eGsErr_t settle_pending(Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
         }
     }
 
+    /* 2b. Si sta per scartare (sul branch del comando, sezione sparita
+     * dal working tree): prima si guarda se un altro branch la dichiara
+     * (D-079, reportIdea B-39). */
+    if ((committed == NULL) && (err == GS_OK) && on_branch && !e->in_gitshared) {
+        err = find_on_branches(e->id, b, &declared, &other, &committed);
+        rev = str_cstr(&other);
+    }
+
     /* 3. Completamento, da qualunque branch. */
     if (committed != NULL) {
         str_reset(&name);
@@ -783,6 +845,7 @@ static eGsErr_t settle_pending(Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
 
     repo_close(&declared);
     str_free(&name);
+    str_free(&other);
     str_free(&revs);
     return err;
 }

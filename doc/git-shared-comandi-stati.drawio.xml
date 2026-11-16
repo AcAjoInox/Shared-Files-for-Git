@@ -1,0 +1,204 @@
+<?xml version="1.0" ?>
+<mxfile host="app.diagrams.net" type="device">
+  <diagram id="d1" name="Comandi e stati">
+    <mxGraphModel dx="1400" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2000" pageHeight="1400" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="c2" value="git shared in locale: comandi e stati di un file shared" style="text;html=1;align=left;verticalAlign=middle;fontSize=20;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="40" y="10" width="1000" height="36" as="geometry"/>
+        </mxCell>
+        <mxCell id="c3" value="Ogni riquadro colorato è uno stato mostrato da &lt;i&gt;git shared status&lt;/i&gt;; ogni freccia è un comando o un evento." style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="40" y="44" width="1200" height="26" as="geometry"/>
+        </mxCell>
+        <mxCell id="c4" value="1. Entrare e uscire: set, link, unlink" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="600" height="26" as="geometry"/>
+        </mxCell>
+        <mxCell id="c5" value="File normale tracciato&lt;br&gt;in questa repo" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="130" width="200" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="c6" value="File già shared&lt;br&gt;in un'altra repo" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="230" width="200" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="c7" value="in attesa di commit&lt;br&gt;&lt;span style='font-weight:normal;font-size:11px'&gt;.gitshared in staging,&lt;br&gt;attesa in .git/config; i peer non sanno nulla&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;strokeWidth=2;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="470" y="165" width="260" height="84" as="geometry"/>
+        </mxCell>
+        <mxCell id="c8" value="&lt;b&gt;git shared set&lt;/b&gt; &amp;lt;file&amp;gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.3;entryX=0;entryY=0.25;" edge="1" parent="1" source="c5" target="c7">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c9" value="&lt;b&gt;git shared link&lt;/b&gt; &amp;lt;path nell'altra repo&amp;gt;&lt;br&gt;fetch della catena, file scritto dall'ultima versione" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;entryX=0;entryY=0.75;" edge="1" parent="1" source="c6" target="c7">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c10" value="git restore .gitshared: attesa scartata" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;exitX=0.25;exitY=0;entryX=0.5;entryY=0;" edge="1" parent="1" source="c7" target="c5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="535" y="112"/>
+              <mxPoint x="160" y="112"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c11" value="2. Il ciclo normale e le divergenze" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="40" y="330" width="600" height="26" as="geometry"/>
+        </mxCell>
+        <mxCell id="c12" value="allineato&lt;br&gt;&lt;span style='font-weight:normal;font-size:11px'&gt;H = T&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;strokeWidth=2;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="780" y="400" width="200" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="c13" value="da pubblicare&lt;br&gt;&lt;span style='font-weight:normal;font-size:11px'&gt;modifica committata sull'ultima versione&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="400" width="220" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="c14" value="da applicare&lt;br&gt;&lt;span style='font-weight:normal;font-size:11px'&gt;esiste una versione più recente&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="300" y="400" width="220" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="c15" value="da committare&lt;br&gt;&lt;span style='font-weight:normal;font-size:11px'&gt;ultima versione nell'index, manca il commit&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="300" y="660" width="220" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="c16" value="divergente&lt;br&gt;&lt;span style='font-weight:normal;font-size:11px'&gt;modifica committata da una versione vecchia&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;strokeWidth=2;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="660" width="220" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="c17" value="unione in corso&lt;br&gt;&lt;span style='font-weight:normal;font-size:11px'&gt;conflitto nel file (marker, come git merge)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=13;fontStyle=1;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="770" y="900" width="220" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="c18" value="&lt;b&gt;git commit&lt;/b&gt;, poi il primo comando git shared&lt;br&gt;(o subito con -c / -m):&lt;br&gt;catena creata, branch attivi, peer che si conoscono" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="1" source="c7" target="c12">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c19" value="&lt;b&gt;git shared unlink&lt;/b&gt; + commit &amp;nbsp;&lt;i&gt;(fuori dalla v0)&lt;/i&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;strokeColor=#999999;fontColor=#666666;exitX=0.15;exitY=0;entryX=0;entryY=0.5;" edge="1" parent="1" source="c12" target="c5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="810" y="310"/>
+              <mxPoint x="30" y="310"/>
+              <mxPoint x="30" y="158"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c20" value="modifichi il file + &lt;b&gt;git commit&lt;/b&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.25;entryX=0;entryY=0.25;" edge="1" parent="1" source="c12" target="c13">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c21" value="&lt;b&gt;git shared publish&lt;/b&gt;&lt;br&gt;nuova versione, inviata ai peer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.75;entryX=1;entryY=0.75;" edge="1" parent="1" source="c13" target="c12">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c22" value="un peer pubblica:&lt;br&gt;T avanza, il tuo file non è toccato" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="c12" target="c14">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c23" value="&lt;b&gt;git shared update&lt;/b&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.35;exitY=1;entryX=0.35;entryY=0;" edge="1" parent="1" source="c14" target="c15">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c24" value="git restore" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;exitX=0.75;exitY=0;entryX=0.75;entryY=1;" edge="1" parent="1" source="c15" target="c14">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c25" value="&lt;b&gt;git commit&lt;/b&gt; &amp;nbsp;(o update -c)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.25;entryX=0.5;entryY=1;" edge="1" parent="1" source="c15" target="c12">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c26" value="un peer pubblica prima di te:&lt;br&gt;T avanza" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="c13" target="c16">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c27" value="modifichi e committi senza fare update" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.9;exitY=1;entryX=0.2;entryY=0;" edge="1" parent="1" source="c14" target="c16">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="498" y="560"/>
+              <mxPoint x="1294" y="560"/>
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="c28" value="&lt;b&gt;git shared update&lt;/b&gt;: unione pulita, la versione nuova nasce subito" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.75;entryX=1;entryY=0.75;" edge="1" parent="1" source="c16" target="c15">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c29" value="&lt;b&gt;git shared update&lt;/b&gt;:&lt;br&gt;le stesse righe cambiate da due parti" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#b85450;exitX=0.35;exitY=1;entryX=1;entryY=0.3;" edge="1" parent="1" source="c16" target="c17">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c30" value="rinunci: git restore -s HEAD -SW &amp;lt;file&amp;gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.75;entryX=0.75;entryY=1;" edge="1" parent="1" source="c17" target="c16">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c31" value="correggi il file, &lt;b&gt;git add&lt;/b&gt;,&lt;br&gt;poi &lt;b&gt;git shared update&lt;/b&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;entryX=0.5;entryY=1;" edge="1" parent="1" source="c17" target="c15">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c32" value="&lt;b&gt;Dopo un'unione&lt;/b&gt;: commit, poi &lt;b&gt;git shared publish&lt;/b&gt; per inviarla ai peer." style="shape=note;size=12;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=6;spacingRight=4;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="300" y="760" width="220" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="c33" value="&lt;b&gt;Publish rifiutato&lt;/b&gt; (un peer ha una versione che non hai): lancia &lt;b&gt;update&lt;/b&gt;. Le due versioni vengono unite, poi commit e di nuovo publish." style="shape=note;size=12;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=6;spacingRight=4;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="300" width="300" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="c34" value="3. Branch e stati particolari" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="1620" y="80" width="340" height="26" as="geometry"/>
+        </mxCell>
+        <mxCell id="c35" value="&lt;b&gt;sospeso&lt;/b&gt;&lt;br&gt;&lt;span style='font-weight:normal;font-size:11px'&gt;il branch corrente non è tra i branch attivi del file (o HEAD è staccata)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1620" y="120" width="340" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="c36" value="L'elenco dei &lt;b&gt;branch attivi&lt;/b&gt; è locale, per file. Nasce con il branch su cui lanci set o link (copiato dal default in .gitshared).&lt;br&gt;&lt;br&gt;Su un branch attivo valgono tutti gli stati e gli avvisi.&lt;br&gt;&lt;br&gt;Su un branch sospeso il file è un file normale: nessun avviso. update e publish funzionano se li lanci a mano, con un avviso.&lt;br&gt;&lt;br&gt;Quando la modifica arriva su un branch attivo (merge), risulta &lt;i&gt;da pubblicare&lt;/i&gt; o &lt;i&gt;divergente&lt;/i&gt;: nulla si perde." style="shape=note;size=12;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=6;spacingRight=4;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="1620" y="200" width="340" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="c37" value="&lt;b&gt;scollegato&lt;/b&gt;&lt;br&gt;&lt;span style='font-weight:normal;font-size:11px'&gt;.gitshared dichiara il file ma la repo non ha dati locali (es. dopo un clone)&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1620" y="480" width="340" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="c38" value="&lt;b&gt;incoerente&lt;/b&gt;&lt;br&gt;&lt;span style='font-weight:normal;font-size:11px'&gt;dati locali senza la sezione in .gitshared, oppure file cancellato o rinominato&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1620" y="570" width="340" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="c39" value="&lt;b&gt;Modifiche non committate&lt;/b&gt; (anche in staging): update non le sovrascrive mai, nemmeno per unire. Serve -f." style="shape=note;size=12;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=6;spacingRight=4;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="1620" y="660" width="340" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="c40" value="4. Che cosa crea un'unione nella catena delle versioni &amp;nbsp;(le frecce vanno dalla versione al suo genitore)" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#555555;" vertex="1" parent="1">
+          <mxGeometry x="40" y="1020" width="1200" height="26" as="geometry"/>
+        </mxCell>
+        <mxCell id="c41" value="&lt;b&gt;a) Divergenza del branch&lt;/b&gt;: hai modificato partendo da v1, intanto è arrivata v2" style="text;html=1;align=left;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1070" width="760" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="c42" value="v1" style="ellipse;whiteSpace=wrap;html=1;fontSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="60" y="1130" width="70" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="c43" value="v2 = T&lt;br&gt;" style="ellipse;whiteSpace=wrap;html=1;fontSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="300" y="1130" width="90" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="c44" value="M" style="ellipse;whiteSpace=wrap;html=1;fontSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="580" y="1130" width="70" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="c45" value="H: la tua modifica&lt;br&gt;(commit del progetto, non una versione)" style="rounded=1;whiteSpace=wrap;html=1;fontSize=12;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="250" y="1240" width="250" height="50" as="geometry"/>
+        </mxCell>
+        <mxCell id="c46" value="genitore" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="c43" target="c42">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c47" value="unico genitore" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;" edge="1" parent="1" source="c44" target="c43">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c48" value="base ricavata dalla storia" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;endArrow=open;endFill=0;exitX=0;exitY=0.5;entryX=0.5;entryY=1;" edge="1" parent="1" source="c45" target="c42">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c49" value="contenuto unito: base v1, tua H, loro v2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;endArrow=open;endFill=0;exitX=1;exitY=0.5;entryX=0.5;entryY=1;" edge="1" parent="1" source="c45" target="c44">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c50" value="T passa da v2 a M (fast-forward): i peer la accettano al publish." style="shape=note;size=12;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=6;spacingRight=4;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="680" y="1126" width="180" height="56" as="geometry"/>
+        </mxCell>
+        <mxCell id="c51" value="&lt;b&gt;b) Due peer hanno pubblicato senza vedersi&lt;/b&gt;: la tua T e la versione P del peer" style="text;html=1;align=left;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="980" y="1070" width="800" height="24" as="geometry"/>
+        </mxCell>
+        <mxCell id="c52" value="v1" style="ellipse;whiteSpace=wrap;html=1;fontSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="980" y="1180" width="70" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="c53" value="T locale" style="ellipse;whiteSpace=wrap;html=1;fontSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="1120" width="100" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="c54" value="P (peer)" style="ellipse;whiteSpace=wrap;html=1;fontSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="1220" y="1240" width="100" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="c55" value="M" style="ellipse;whiteSpace=wrap;html=1;fontSize=12;fillColor=#dae8fc;strokeColor=#6c8ebf;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="1180" width="70" height="44" as="geometry"/>
+        </mxCell>
+        <mxCell id="c56" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;entryX=1;entryY=0.3;" edge="1" parent="1" source="c53" target="c52">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c57" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;entryX=1;entryY=0.7;" edge="1" parent="1" source="c54" target="c52">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c58" value="1° genitore" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.3;entryX=1;entryY=0.5;" edge="1" parent="1" source="c55" target="c53">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c59" value="2° genitore" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.7;entryX=1;entryY=0.5;" edge="1" parent="1" source="c55" target="c54">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="c60" value="M discende da entrambe: sia tu sia il peer avanzate in fast-forward. Base dell'unione: l'antenato comune v1." style="shape=note;size=12;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=6;spacingRight=4;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="1600" y="1170" width="200" height="70" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

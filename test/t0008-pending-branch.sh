@@ -154,4 +154,161 @@ git checkout -q main
 run git shared status
 expect_out "link: su main allineato" "aligned"
 
+# --- B-39: commit di conferma su un altro branch, primo comando sul branch ------
+# --- del comando: non si scarta, si completa da li' (D-079) ---------------------
+make_repo n
+cd "$TRASH/n" || exit 1
+put o.txt o
+put c.h v1
+git shared set c.h >/dev/null
+ID=$(shared_id c.h)
+git switch -q -c feat
+git commit -q -m "share c.h"
+git switch -q main
+run git shared status
+case "$ERR" in
+*discarded*) not_ok "B-39: nessuno scarto" "$ERR" ;;
+*) ok "B-39: nessuno scarto" ;;
+esac
+expect_ok "B-39: completato dal branch che lo dichiara" has_chain "$ID"
+expect_eq "B-39: attesa tolta" "$(pending_key "$ID" pending)" ""
+expect_out "B-39: su main la sezione non c'e'" "inconsistent"
+git switch -q feat
+run git shared status
+expect_out "B-39: su feat collegato (attivo solo main)" \
+	"suspended on this branch (aligned)"
+
+# Molti branch con lo stesso .gitshared, uno solo con la sezione.
+make_repo q
+cd "$TRASH/q" || exit 1
+put o.txt o
+for i in 1 2 3 4 5; do git branch "b$i"; done
+put c.h v1
+git shared set c.h >/dev/null
+ID=$(shared_id c.h)
+git switch -q -c z-last
+git commit -q -m "share c.h"
+git switch -q main
+run git shared status
+expect_ok "B-39 con piu' branch: completato" has_chain "$ID"
+
+# --- B-40: attesa scartata durante un git stash, poi set riprende l'ID (D-079) ---
+make_repo p
+cd "$TRASH/p" || exit 1
+put o.txt o
+put c.h v1
+git shared set c.h >/dev/null
+ID=$(shared_id c.h)
+git stash -q
+run git shared status
+expect_err "B-40: scartata con lo stash" "discarded pending operation on 'c.h'"
+git stash pop -q
+run git shared status
+expect_out "B-40: dopo stash pop scollegato" "unlinked"
+run git shared set c.h
+expect_rc "B-40: set riprende: codice 0" 0
+expect_out "B-40: set riprende: da committare" "'c.h' is now shared as 'c.h'. Commit .gitshared"
+expect_eq "B-40: stesso ID" "$(shared_id c.h)" "$ID"
+expect_eq "B-40: una sola sezione" \
+	"$(git config -f .gitshared --get-regexp '[.]id$' | wc -l | tr -d ' ')" "1"
+expect_eq "B-40: di nuovo in attesa" "$(pending_key "$ID" pending)" "set"
+git commit -q -m "share c.h"
+run git shared status
+expect_out "B-40: allineato dopo il commit" "aligned"
+run git shared set c.h
+expect_rc "set su un file collegato: ancora rifiutato" 1
+expect_err "set su un file collegato: errore" "already shared"
+
+# Sezione gia' committata quando si riprende: vale subito, senza commit.
+make_repo t
+cd "$TRASH/t" || exit 1
+put o.txt o
+put c.h v1
+git shared set c.h >/dev/null
+ID=$(shared_id c.h)
+git stash -q
+git shared status >/dev/null 2>&1
+git stash pop -q
+git add .gitshared
+git commit -q -m "share c.h"
+run git shared set c.h
+expect_rc "ripresa gia' committata: codice 0" 0
+expect_no_out "ripresa gia' committata: nessun commit richiesto" "Commit .gitshared"
+expect_out "ripresa gia' committata: confermato" "'c.h' is now shared as 'c.h'."
+expect_ok "ripresa gia' committata: catena creata" has_chain "$ID"
+run git shared status
+expect_out "ripresa gia' committata: allineato" "aligned"
+
+# --- link scartato da uno stash: link lo riprende (D-079) ------------------------
+make_repo LA
+cd "$TRASH/LA" || exit 1
+put l.h v1
+git shared set -c l.h >/dev/null
+LID=$(shared_id l.h)
+make_repo LB
+cd "$TRASH/LB" || exit 1
+put o.txt o
+git shared link ../LA/l.h >/dev/null
+git stash -q -u
+run git shared status
+expect_err "link e stash: scartato" "discarded pending operation on 'l.h'"
+git stash pop -q
+run git shared status
+expect_out "link e stash: dopo stash pop scollegato" "unlinked"
+run git shared link ../LA/l.h other.h
+expect_rc "link e stash: destinazione diversa rifiutata" 1
+expect_err "link e stash: messaggio" "declared here at 'l.h'"
+run git shared link ../LA/l.h
+expect_rc "link e stash: link riprende: codice 0" 0
+expect_out "link e stash: da committare" "Commit it with .gitshared to confirm"
+expect_eq "link e stash: stesso ID" "$(shared_id l.h)" "$LID"
+expect_eq "link e stash: una sola sezione" \
+	"$(git config -f .gitshared --get-regexp '[.]id$' | wc -l | tr -d ' ')" "1"
+expect_eq "link e stash: file e .gitshared in staging" \
+	"$(git diff --cached --name-only | sort | tr '\n' ' ')" ".gitshared l.h "
+git commit -q -m "link l.h"
+run git shared status
+expect_out "link e stash: allineato dopo il commit" "aligned"
+expect_eq "link e stash: LA conosce LB" \
+	"$(git -C ../LA config --get-all "shared.$LID.peer")" "$(git rev-parse --show-toplevel)"
+run git shared link ../LA/l.h
+expect_rc "link su un file collegato: ancora rifiutato" 1
+expect_err "link su un file collegato: errore" "already shared here"
+
+# --- clone: link ricollega la copia ai peer (D-043) ------------------------------
+git clone -q "$TRASH/LA" "$TRASH/LC"
+cd "$TRASH/LC" || exit 1
+run git shared status
+expect_out "clone: scollegato" "unlinked"
+printf 'modifica locale non committata\n' >>l.h
+run git shared link ../LA/l.h
+expect_rc "clone: link: codice 0" 0
+expect_out "clone: collegato subito" "'l.h' linked as 'l.h' from"
+expect_no_out "clone: nessun commit richiesto" "Commit it"
+expect_ok "clone: file non toccato" grep -q "modifica locale non committata" l.h
+expect_eq "clone: modifica dell'utente non in staging" "$(git diff --cached --name-only)" ""
+expect_ok "clone: catena ricevuta" git rev-parse -q --verify "refs/shared/$LID"
+expect_eq "clone: catena uguale alla sorgente" \
+	"$(git rev-parse "refs/shared/$LID")" "$(git -C ../LA rev-parse "refs/shared/$LID")"
+expect_ok "clone: hook installati" grep -q "git shared" .git/hooks/post-merge
+expect_eq "clone: branch attivi dal default" "$(git config --get-all "shared.$LID.branch")" "main"
+case "$(git -C ../LA config --get-all "shared.$LID.peer")" in
+*"$(git rev-parse --show-toplevel)"*) ok "clone: LA conosce il clone" ;;
+*) not_ok "clone: LA conosce il clone" ;;
+esac
+case "$(git config --get-all "shared.$LID.peer")" in
+*LB*) ok "clone: il clone conosce anche LB" ;;
+*) not_ok "clone: il clone conosce anche LB" "$(git config --get-all "shared.$LID.peer")" ;;
+esac
+git checkout -q -- l.h
+run git shared status
+expect_out "clone: allineato" "aligned"
+cd "$TRASH/LA" || exit 1
+put l.h v2
+run git shared publish
+expect_out "clone: publish arriva a LB e al clone" "sent to 2 of 2 peers"
+cd "$TRASH/LC" || exit 1
+run git shared update -c
+expect_out "clone: update dal peer" "new version applied and committed"
+
 done_testing

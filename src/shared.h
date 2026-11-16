@@ -89,8 +89,9 @@ eGsErr_t shared_new_id(char id[GS_ID_HEX_LEN + 1U]);
  * Completa o scarta le operazioni in attesa (REQ-F-023, D-077). Conta il
  * branch su cui e' stato lanciato il comando, non quello corrente:
  *   - sezione committata su quel branch -> si completa, da qualunque branch;
- *   - sezione assente, si e' su quel branch e manca anche nel working tree
- *     -> annullata dall'utente (git restore): si scarta;
+ *   - sezione assente, si e' su quel branch e manca anche nel working tree:
+ *     se un altro branch locale la dichiara si completa da li' (D-079),
+ *     altrimenti e' annullata dall'utente (git restore) e si scarta;
  *   - altrimenti l'attesa resta.
  * Senza branch registrato (HEAD staccata al comando) vale HEAD.
  * Nella v0: set e link.

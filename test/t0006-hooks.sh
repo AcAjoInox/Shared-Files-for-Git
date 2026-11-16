@@ -146,4 +146,23 @@ run git shared help
 expect_out "manuale: sezione HOOKS" "HOOKS"
 expect_no_out "manuale: niente shared.autoPublish" "autoPublish"
 
+# --- publish non esegue il pre-push dell'utente (reportIdea C-20) ------------------
+make_repo PA
+cd "$TRASH/PA" || exit 1
+put p.h v1
+git shared set -c p.h >/dev/null
+make_repo PB
+cd "$TRASH/PB" || exit 1
+put o.txt o
+git shared link -c ../PA/p.h >/dev/null
+cd "$TRASH/PA" || exit 1
+printf '#!/bin/sh\necho RUN >>"%s/prepush.log"\nexit 1\n' "$TRASH" >.git/hooks/pre-push
+put p.h v2
+run git shared publish
+expect_rc "pre-push dell'utente: publish riuscito" 0
+expect_out "pre-push dell'utente: inviata" "sent to 1 of 1 peers"
+expect_fail "pre-push dell'utente: non eseguito" test -f "$TRASH/prepush.log"
+run git -C ../PB shared status
+expect_out "pre-push dell'utente: il peer la riceve" "new version to apply"
+
 done_testing
