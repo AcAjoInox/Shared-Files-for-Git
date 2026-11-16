@@ -36,9 +36,12 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
  */
 int cmd_open(Repo_t *r, GitBatch_t *b);
 
-/* Operazione in attesa in .git/config (REQ-F-023): op = "set" | "link";
- * src = radice della sorgente per link, NULL altrimenti. */
-eGsErr_t cmd_set_pending(const char *id, const char *op, const char *src);
+/* Operazione in attesa in .git/config (REQ-F-023, D-077): op = "set" |
+ * "link"; path = path del file (per i messaggi); src = radice della
+ * sorgente per link, NULL altrimenti. Registra anche il branch corrente,
+ * su cui si cerchera' il commit di conferma. */
+eGsErr_t cmd_set_pending(const Repo_t *r, const char *id, const char *op,
+                         const char *path, const char *src);
 
 /*
  * Sezione [shared "<name>"] in .gitshared (id, path, branch corrente come

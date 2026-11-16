@@ -87,24 +87,36 @@ int cmd_open(Repo_t *r, GitBatch_t *b)
     return rc;
 }
 
-eGsErr_t cmd_set_pending(const char *id, const char *op, const char *src)
+/* "git config shared.<id>.<field> <value>" */
+static eGsErr_t set_key(const char *id, const char *field, const char *value)
 {
-    const char *args[] = { "config", NULL, NULL, NULL };
+    const char *args[] = { "config", NULL, value, NULL };
     Str_t key = STR_INIT;
     eGsErr_t err;
 
-    str_addf(&key, "shared.%s.pending", id);
+    str_addf(&key, "shared.%s.%s", id, field);
     args[1] = str_cstr(&key);
-    args[2] = op;
     err = git_run(args, 0U, NULL);
-    if ((err == GS_OK) && (src != NULL)) {
-        str_reset(&key);
-        str_addf(&key, "shared.%s.pendingSource", id);
-        args[1] = str_cstr(&key);
-        args[2] = src;
-        err = git_run(args, 0U, NULL);
-    }
     str_free(&key);
+    return err;
+}
+
+eGsErr_t cmd_set_pending(const Repo_t *r, const char *id, const char *op,
+                         const char *path, const char *src)
+{
+    /* "pending" per ultima: senza di lei le altre chiavi sono ignorate,
+     * quindi un'interruzione non lascia un'attesa senza branch (D-077). */
+    eGsErr_t err = set_key(id, "pendingPath", path);
+
+    if ((err == GS_OK) && (r->branch.len > 0U)) {
+        err = set_key(id, "pendingBranch", str_cstr(&r->branch));
+    }
+    if ((err == GS_OK) && (src != NULL)) {
+        err = set_key(id, "pendingSource", src);
+    }
+    if (err == GS_OK) {
+        err = set_key(id, "pending", op);
+    }
     return err;
 }
 

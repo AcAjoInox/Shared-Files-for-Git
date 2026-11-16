@@ -121,7 +121,7 @@ int cmd_set(int argc, char **argv)
     }
 
     /* 1. Attesa (locale): per prima, vedi intestazione. */
-    if (cmd_set_pending(id, "set", NULL) != GS_OK) {
+    if (cmd_set_pending(&repo, id, "set", str_cstr(&full), NULL) != GS_OK) {
         msg_error(MSG_ERR_PENDING);
         goto exit;
     }
@@ -139,6 +139,8 @@ int cmd_set(int argc, char **argv)
     e = repo_add(&repo);
     str_add(&e->name, name);
     str_add(&e->path, str_cstr(&full));
+    str_add(&e->pending_path, str_cstr(&full));
+    str_add(&e->pending_branch, str_cstr(&repo.branch));
     memcpy(e->id, id, sizeof id);
     e->in_gitshared = 1U;
     e->in_config = 1U;

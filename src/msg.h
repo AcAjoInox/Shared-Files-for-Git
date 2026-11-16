@@ -60,7 +60,8 @@ typedef enum {
     MSG_WARN_BAD_ENTRY,      /* nome della sezione */
     MSG_WARN_NOT_IN_HEAD,    /* path */
     MSG_WARN_NO_BRANCH,      /* nome, id */
-    MSG_WARN_DISCARDED,      /* id */
+    MSG_WARN_DISCARDED,      /* path (o id) */
+    MSG_WARN_PENDING_NO_BRANCH, /* path (o id), branch, id */
     MSG_WARN_PEER_UNREACHABLE, /* file, peer */
     MSG_WARN_SUSPENDED,      /* file */
     MSG_WARN_HOOK,           /* path dell'hook */
@@ -94,6 +95,7 @@ typedef enum {
     MSG_STATUS_FIELD_STATE,
     MSG_STATUS_UNDECLARED,
     MSG_STATUS_SUSPENDED,    /* stato ricavato */
+    MSG_STATUS_PENDING_ON,   /* stato, branch */
 
     MSG_STATE_ALIGNED,
     MSG_STATE_TO_APPLY,

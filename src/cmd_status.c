@@ -15,11 +15,17 @@
 #include "shared.h"
 #include "state.h"
 
-static void print_entry(const SharedEntry_t *e, eState_t st, int suspended)
+static void print_entry(const Repo_t *r, const SharedEntry_t *e, eState_t st,
+                        int suspended)
 {
     if (e->in_gitshared) {
         printf("%s\n", str_cstr(&e->name));
         printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_PATH), str_cstr(&e->path));
+    } else if ((st == STATE_PENDING) && (e->pending_path.len > 0U)) {
+        /* attesa nata su un altro branch: qui .gitshared non la dichiara */
+        printf("%s\n", str_cstr(&e->pending_path));
+        printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_PATH),
+               str_cstr(&e->pending_path));
     } else {
         printf("%s\n", msg(MSG_STATUS_UNDECLARED));
     }
@@ -27,6 +33,11 @@ static void print_entry(const SharedEntry_t *e, eState_t st, int suspended)
     printf("    %-6s ", msg(MSG_STATUS_FIELD_STATE));
     if (suspended != 0) {
         printf(msg(MSG_STATUS_SUSPENDED), state_name(st));
+    } else if ((st == STATE_PENDING) && (e->pending_branch.len > 0U) &&
+               !str_eq(&r->branch, str_cstr(&e->pending_branch))) {
+        /* il commit di conferma si aspetta su quel branch (D-077) */
+        printf(msg(MSG_STATUS_PENDING_ON), state_name(st),
+               str_cstr(&e->pending_branch));
     } else {
         fputs(state_name(st), stdout);
     }
@@ -87,7 +98,7 @@ int cmd_status(int argc, char **argv)
             if (shown > 0U) {
                 putchar('\n');
             }
-            print_entry(e, st, suspended);
+            print_entry(&repo, e, st, suspended);
             shown++;
         } else {
             /* attesa appena scartata: niente da mostrare */

@@ -34,6 +34,8 @@ static void entry_init(SharedEntry_t *e)
     str_init(&e->branches);
     str_init(&e->peers);
     str_init(&e->pending_src);
+    str_init(&e->pending_branch);
+    str_init(&e->pending_path);
     e->id[0] = '\0';
     e->in_gitshared = 0U;
     e->in_config = 0U;
@@ -48,6 +50,8 @@ static void entry_free(SharedEntry_t *e)
     str_free(&e->branches);
     str_free(&e->peers);
     str_free(&e->pending_src);
+    str_free(&e->pending_branch);
+    str_free(&e->pending_path);
 }
 
 void repo_close(Repo_t *r)
@@ -255,12 +259,18 @@ static void parse_local_rec(Repo_t *r, const char *rec)
         if (field_is(&k, "pending")) {
             for (i = 1U; i < (sizeof pending / sizeof pending[0]); i++) {
                 if (strcmp(k.value, pending[i]) == 0) {
-                    e->pending = i;
+                    e->pending = i & 0x3U; /* bitfield di 2 bit (C-17) */
                 }
             }
         } else if (field_is(&k, "pendingsource")) {
             str_reset(&e->pending_src);
             str_add(&e->pending_src, k.value);
+        } else if (field_is(&k, "pendingbranch")) {
+            str_reset(&e->pending_branch);
+            str_add(&e->pending_branch, k.value);
+        } else if (field_is(&k, "pendingpath")) {
+            str_reset(&e->pending_path);
+            str_add(&e->pending_path, k.value);
         } else if (field_is(&k, "branch")) {
             str_addz(&e->branches, k.value);
         } else if (field_is(&k, "peer")) {
@@ -462,12 +472,20 @@ static eGsErr_t config_run(const char *a1, const char *a2, const char *a3)
     return git_run(args, 0U, NULL);
 }
 
-/* Branch attivi: copia del default (D-057); se manca, il corrente. */
+/* Branch del comando in attesa (D-077); se non registrato, il corrente. */
+static const Str_t *pending_branch(const Repo_t *r, const SharedEntry_t *e)
+{
+    return (e->pending_branch.len > 0U) ? &e->pending_branch : &r->branch;
+}
+
+/* Branch attivi: copia del default (D-057); se manca, il branch del
+ * comando (D-077). */
 static eGsErr_t copy_branches(const Repo_t *r, SharedEntry_t *e,
                               const SharedEntry_t *committed)
 {
     const char *unset_args[] = { "config", "--unset-all", NULL, NULL };
     const Str_t *list = &committed->branches;
+    const Str_t *fallback = pending_branch(r, e);
     Str_t current = STR_INIT;
     Str_t key = STR_INIT;
     Str_t ignored = STR_INIT;
@@ -476,8 +494,8 @@ static eGsErr_t copy_branches(const Repo_t *r, SharedEntry_t *e,
     eGsErr_t err;
 
     if (list->len == 0U) {
-        if (r->branch.len > 0U) {
-            str_addz(&current, str_cstr(&r->branch));
+        if (fallback->len > 0U) {
+            str_addz(&current, str_cstr(fallback));
         } else {
             msg_warning(MSG_WARN_NO_BRANCH, str_cstr(&committed->name), e->id);
         }
@@ -522,15 +540,26 @@ static eGsErr_t config_unset(const char *id, const char *field)
 /* Fine dell'attesa: per ultima, cosi' un'interruzione si puo' ripetere. */
 static eGsErr_t end_pending(SharedEntry_t *e)
 {
+    /* "pending" per prima: se ci si ferma dopo, restano solo chiavi
+     * accessorie, ignorate senza "pending". Il contrario lascerebbe
+     * un'attesa senza il suo branch (D-077). */
     eGsErr_t err = config_unset(e->id, "pending");
 
     if ((err == GS_OK) && (e->pending_src.len > 0U)) {
         err = config_unset(e->id, "pendingsource");
     }
+    if ((err == GS_OK) && (e->pending_path.len > 0U)) {
+        err = config_unset(e->id, "pendingpath");
+    }
+    if ((err == GS_OK) && (e->pending_branch.len > 0U)) {
+        err = config_unset(e->id, "pendingbranch");
+    }
     if (err == GS_OK) {
         e->pending = SHARED_PENDING_NONE;
         e->in_config = 1U;
         str_reset(&e->pending_src);
+        str_reset(&e->pending_path);
+        str_reset(&e->pending_branch);
     }
     return err;
 }
@@ -651,6 +680,12 @@ exit:
     return err;
 }
 
+/* Nome da mostrare per un'attesa: path, altrimenti ID. */
+static const char *pending_label(const SharedEntry_t *e)
+{
+    return (e->pending_path.len > 0U) ? str_cstr(&e->pending_path) : e->id;
+}
+
 /* Attesa non committata e sparita dal working tree: annullata. */
 static eGsErr_t discard_pending(SharedEntry_t *e, GitBatch_t *b)
 {
@@ -670,7 +705,7 @@ static eGsErr_t discard_pending(SharedEntry_t *e, GitBatch_t *b)
                 (void)git_delete_refs(&del);
             }
         }
-        msg_warning(MSG_WARN_DISCARDED, e->id);
+        msg_warning(MSG_WARN_DISCARDED, pending_label(e));
         e->in_config = 0U;
         e->pending = SHARED_PENDING_NONE;
     }
@@ -680,45 +715,88 @@ static eGsErr_t discard_pending(SharedEntry_t *e, GitBatch_t *b)
     return err;
 }
 
+/* Un'attesa (set o link): completa, scarta o lascia com'e' (D-077). */
+static eGsErr_t settle_pending(Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
+{
+    Repo_t declared = REPO_INIT; /* .gitshared committato */
+    Str_t revs = STR_INIT;       /* dove cercare, elenco compatto */
+    Str_t name = STR_INIT;
+    const SharedEntry_t *committed = NULL;
+    const char *rev = NULL;
+    Oid_t oid;
+    int on_branch = 1;
+    int exists = 1;
+    eGsErr_t err = GS_OK;
+
+    /* 1. Dove cercare il commit di conferma: prima il branch del comando,
+     * poi HEAD (l'utente puo' aver portato .gitshared in staging su un
+     * altro branch e committato li'). Senza branch registrato, solo HEAD. */
+    if (e->pending_branch.len > 0U) {
+        str_addf(&name, "refs/heads/%s", str_cstr(&e->pending_branch));
+        on_branch = str_eq(&r->branch, str_cstr(&e->pending_branch));
+        exists = (git_batch_query(b, str_cstr(&name), &oid) == GIT_OBJ_COMMIT);
+        if (exists) {
+            str_addz(&revs, str_cstr(&name));
+        }
+    }
+    if ((e->pending_branch.len == 0U) || !on_branch || !exists) {
+        str_addz(&revs, "HEAD"); /* sul branch del comando HEAD e' gia' li' */
+    }
+
+    /* 2. Sezione committata. Un branch ancora senza commit (set prima del
+     * primo commit) non ha .gitshared: si aspetta. */
+    rev = str_znext(&revs, NULL);
+    while ((rev != NULL) && (committed == NULL) && (err == GS_OK)) {
+        repo_close(&declared);
+        str_reset(&name);
+        str_addf(&name, "%s:.gitshared", rev);
+        err = repo_load_gitshared(&declared, str_cstr(&name), 1, 1);
+        committed = (err == GS_OK) ? repo_find_id(&declared, e->id) : NULL;
+        if (committed == NULL) {
+            rev = str_znext(&revs, rev);
+        }
+    }
+
+    /* 3. Completamento, da qualunque branch. */
+    if (committed != NULL) {
+        str_reset(&name);
+        str_addf(&name, "%s:%s", rev, str_cstr(&committed->path));
+        if (git_batch_blob(b, str_cstr(&name), &oid) == 0) {
+            /* .gitshared committato ma il file no: si aspetta */
+            msg_warning(MSG_WARN_NOT_IN_HEAD, str_cstr(&committed->path));
+        } else if (e->pending == SHARED_PENDING_SET) {
+            err = complete_set(r, e, committed, &oid, b);
+        } else {
+            err = complete_link(r, e, committed, b);
+        }
+    } else if ((err == GS_OK) && on_branch && !e->in_gitshared) {
+        /* 4. Sul branch del comando la sezione non c'e' piu' ne' nel
+         * commit ne' nel working tree: annullata (git restore). */
+        err = discard_pending(e, b);
+    } else if ((err == GS_OK) && !exists && !on_branch) {
+        /* branch cancellato o rinominato: decide l'utente */
+        msg_warning(MSG_WARN_PENDING_NO_BRANCH, pending_label(e),
+                    str_cstr(&e->pending_branch), e->id);
+    } else {
+        /* ancora in attesa di commit, o su un altro branch: resta */
+    }
+
+    repo_close(&declared);
+    str_free(&name);
+    str_free(&revs);
+    return err;
+}
+
 eGsErr_t repo_complete_pending(Repo_t *r, GitBatch_t *b)
 {
-    Repo_t head = REPO_INIT;
-    Str_t name = STR_INIT;
-    SharedEntry_t *committed;
-    SharedEntry_t *e;
-    Oid_t blob;
     size_t i;
-    int loaded = 0;
     eGsErr_t err = GS_OK;
 
     for (i = 0U; (i < r->n) && (err == GS_OK); i++) {
-        e = &r->v[i];
-        if ((e->pending == SHARED_PENDING_SET) || (e->pending == SHARED_PENDING_LINK)) {
-            if (loaded == 0) {
-                /* Letto una sola volta, e solo se c'e' qualcosa in attesa. */
-                err = repo_load_gitshared(&head, "HEAD:.gitshared", 1, 1);
-                loaded = 1;
-            }
-            committed = (err == GS_OK) ? repo_find_id(&head, e->id) : NULL;
-            if (committed != NULL) {
-                str_reset(&name);
-                str_addf(&name, "HEAD:%s", str_cstr(&committed->path));
-                if (git_batch_blob(b, str_cstr(&name), &blob) == 0) {
-                    /* .gitshared committato ma il file no: si aspetta */
-                    msg_warning(MSG_WARN_NOT_IN_HEAD, str_cstr(&committed->path));
-                } else if (e->pending == SHARED_PENDING_SET) {
-                    err = complete_set(r, e, committed, &blob, b);
-                } else {
-                    err = complete_link(r, e, committed, b);
-                }
-            } else if ((err == GS_OK) && !e->in_gitshared) {
-                err = discard_pending(e, b);
-            } else {
-                /* ancora in attesa di commit */
-            }
+        if ((r->v[i].pending == SHARED_PENDING_SET) ||
+            (r->v[i].pending == SHARED_PENDING_LINK)) {
+            err = settle_pending(r, &r->v[i], b);
         }
     }
-    str_free(&name);
-    repo_close(&head);
     return err;
 }

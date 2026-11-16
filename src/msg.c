@@ -106,7 +106,10 @@ static const char *const msg_en[] = {
         "HEAD is detached: '%s' has no active branch "
         "(add one with: git config --add shared.%s.branch <branch>)",
     [MSG_WARN_DISCARDED] =
-        "discarded pending operation on %s: .gitshared was restored",
+        "discarded pending operation on '%s': .gitshared was restored",
+    [MSG_WARN_PENDING_NO_BRANCH] =
+        "'%s' is waiting for a commit on branch '%s', which no longer "
+        "exists (to drop it: git config --remove-section shared.%s)",
     [MSG_WARN_PEER_UNREACHABLE] = "%s: peer %s not reachable",
     [MSG_WARN_SUSPENDED] = "%s: suspended on this branch",
     [MSG_WARN_HOOK] = "cannot install the hook '%s'",
@@ -147,6 +150,7 @@ static const char *const msg_en[] = {
     [MSG_STATUS_FIELD_STATE] = "state",
     [MSG_STATUS_UNDECLARED] = "(not declared in .gitshared)",
     [MSG_STATUS_SUSPENDED] = "suspended on this branch (%s)",
+    [MSG_STATUS_PENDING_ON] = "%s (on branch %s)",
 
     [MSG_STATE_ALIGNED] = "aligned",
     [MSG_STATE_TO_APPLY] = "new version to apply",

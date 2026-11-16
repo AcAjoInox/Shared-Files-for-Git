@@ -29,6 +29,8 @@ typedef struct {
     Str_t branches;    /* branch attivi (o default), elenco compatto */
     Str_t peers;       /* radici dei peer, elenco compatto */
     Str_t pending_src; /* link in attesa: radice della repo sorgente */
+    Str_t pending_branch; /* attesa: branch del comando ("" = HEAD staccata, D-077) */
+    Str_t pending_path;   /* attesa: path del file, solo per i messaggi (D-077) */
     char id[GS_ID_HEX_LEN + 1U]; /* "" se in .gitshared non e' valido */
     unsigned in_gitshared : 1U; /* sezione in .gitshared (working tree) */
     unsigned in_config : 1U;    /* sezione [shared "<id>"] in .git/config */
@@ -84,9 +86,14 @@ int shared_is_active(const SharedEntry_t *e, const char *branch);
 eGsErr_t shared_new_id(char id[GS_ID_HEX_LEN + 1U]);
 
 /*
- * Completa o scarta le operazioni in attesa (REQ-F-023): completa quelle
- * gia' committate (la sezione e' in HEAD:.gitshared), scarta quelle la cui
- * sezione non c'e' piu' nemmeno nel working tree. Nella v0: set e link.
+ * Completa o scarta le operazioni in attesa (REQ-F-023, D-077). Conta il
+ * branch su cui e' stato lanciato il comando, non quello corrente:
+ *   - sezione committata su quel branch -> si completa, da qualunque branch;
+ *   - sezione assente, si e' su quel branch e manca anche nel working tree
+ *     -> annullata dall'utente (git restore): si scarta;
+ *   - altrimenti l'attesa resta.
+ * Senza branch registrato (HEAD staccata al comando) vale HEAD.
+ * Nella v0: set e link.
  */
 eGsErr_t repo_complete_pending(Repo_t *r, GitBatch_t *b);
 

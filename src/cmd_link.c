@@ -186,7 +186,8 @@ int cmd_link(int argc, char **argv)
     }
 
     /* --- scrittura: attesa per prima (come set) ------------------------- */
-    if (cmd_set_pending(str_cstr(&id), "link", str_cstr(&src.top)) != GS_OK) {
+    if (cmd_set_pending(&repo, str_cstr(&id), "link", str_cstr(&dest),
+                        str_cstr(&src.top)) != GS_OK) {
         msg_error(MSG_ERR_PENDING);
         goto exit;
     }
@@ -209,6 +210,8 @@ int cmd_link(int argc, char **argv)
     str_add(&e->name, str_cstr(&name));
     str_add(&e->path, str_cstr(&dest));
     str_add(&e->pending_src, str_cstr(&src.top));
+    str_add(&e->pending_path, str_cstr(&dest));
+    str_add(&e->pending_branch, str_cstr(&repo.branch));
     memcpy(e->id, str_cstr(&id), GS_ID_HEX_LEN + 1U);
     e->in_gitshared = 1U;
     e->in_config = 1U;
