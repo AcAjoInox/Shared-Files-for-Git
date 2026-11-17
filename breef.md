@@ -13,6 +13,17 @@ Si può usare in due modi:
 
 Regole e comandi sono gli stessi. Cambiano come le repo si raggiungono, dove si scrive l'elenco dei peer e il momento in cui le versioni vengono inviate: il confronto è nella tabella in fondo a «Uso in remoto».
 
+## Installazione
+Serve: git, `make` e `gcc` (su Windows MinGW-w64). Dalla cartella del progetto:
+
+```bash
+make            # compila
+make install    # copia git-shared in ~/bin (Windows: %USERPROFILE%\bin)
+git shared -h   # verifica
+```
+
+Se `git shared` non viene trovato, aggiungi quella cartella al `PATH`. Su Windows, per avere anche `git shared --help`, lancia `make install` da amministratore.
+
 ## I concetti di base
 
 **File shared.** Un file che hai dichiarato condiviso. Ogni repo che lo usa ne ha una copia vera, tracciata come ogni altro file. Il path può essere diverso da una repo all'altra.
