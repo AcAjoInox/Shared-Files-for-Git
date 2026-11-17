@@ -90,7 +90,11 @@ static const char *const msg_en[] = {
         "    -c, --commit      commit the applied files right away\n"
         "    -m <message>      commit right away with <message>\n",
     [MSG_USAGE_STATUS] =
-        "usage: git shared status\n",
+        "usage: git shared status [--peers]\n"
+        "\n"
+        "Show the state of each shared file.\n"
+        "\n"
+        "    --peers    also show whether each peer has the same version\n",
     [MSG_USAGE_HOOK] =
         "usage: git shared hook install\n"
         "   or: git shared hook <event> [<args>]\n"
@@ -290,6 +294,14 @@ static const char *const msg_en[] = {
     [MSG_STATUS_SUSPENDED] = "suspended on this branch (%s)",
     [MSG_STATUS_PENDING_ON] = "%s (on branch %s)",
     [MSG_STATUS_FIELD_NOTE] = "note",
+    [MSG_STATUS_FIELD_PEERS] = "peers",
+    [MSG_PEER_SAME] = "same version",
+    [MSG_PEER_BEHIND] = "older version: run 'git shared publish'",
+    [MSG_PEER_NEWER] = "newer or different version: run 'git shared update'",
+    [MSG_PEER_NO_VERSION] = "no version yet: run 'git shared publish'",
+    [MSG_PEER_LEFT] = "no longer shares the file: run 'git shared prune'",
+    [MSG_PEER_GONE] = "not found: if it was deleted, run 'git shared prune'",
+    [MSG_PEER_UNREACHABLE] = "cannot be read now",
     [MSG_STATUS_BRANCHES_GONE] =
         "none of its active branches exists (%s): "
         "git shared branch %s -a <branch>",

@@ -1,6 +1,6 @@
 # Report sull'uso locale — git shared
 
-> **2026-11-16.** Baseline `project.md` v2.23 (D-001…D-085). Codice v0 con unione delle divergenze, ri-aggancio e comandi di manutenzione completi: 696 test su 696, Windows, git 2.43. Riguarda solo la fase 1 (repo sulla stessa macchina). I bug sono in `reportIdea.md`; qui ci sono due giudizi: l'impatto atteso e la facilità d'uso.
+> **2026-11-16.** Baseline `project.md` v2.24 (D-001…D-086). Codice v0 con unione delle divergenze, ri-aggancio, comandi di manutenzione completi e `status --peers`: 718 test su 718, Windows, git 2.43. Riguarda solo la fase 1 (repo sulla stessa macchina). I bug sono in `reportIdea.md`; qui ci sono due giudizi: l'impatto atteso e la facilità d'uso.
 >
 > **Da dove vengono i giudizi.** Dalla lettura del codice, dai test e dalle prove fatte a mano con l'eseguibile durante la ricerca dei bug. Nessuno, a parte l'autore, lo ha ancora usato: la parte sull'uso è una valutazione ragionata, non una misura.
 
@@ -18,7 +18,7 @@
 |---|---|---|---|
 | Uso personale, più repo sulla stessa macchina | Funziona finché nessuno modifica da una versione vecchia; poi "merging is not implemented yet" | Ciclo completo: modifica, pubblicazione, applicazione, unione, conflitto | **Sì, molto** |
 | Robustezza | 1 dato salvato fragile previsto (merge in `.git/`), vicoli ciechi con squash e amend | Stato sempre ricavato; l'unica ref salvata vale solo se l'index la conferma; squash e amend si chiudono con un `update` | **Sì** |
-| Valore come dimostrazione ("un file condiviso con una ref e il solo trasporto git") | Idea documentata, metà realizzata | Realizzata per il locale, con 696 test e un registro di 85 decisioni | **Sì** |
+| Valore come dimostrazione ("un file condiviso con una ref e il solo trasporto git") | Idea documentata, metà realizzata | Realizzata per il locale, con 718 test e un registro di 86 decisioni | **Sì** |
 | Adozione da parte di altri | Di nicchia | Di nicchia | **No** |
 | Uso in un gruppo | Impossibile (una macchina) | Impossibile (una macchina) | **No** |
 
@@ -66,7 +66,7 @@ Con N repo, una modifica costa **N + 1 comandi**: un `publish` e un `update` in 
 - **Dieci stati**, più *sospeso* che si sovrappone agli altri. Nel caso normale se ne vedono quattro (allineato, da pubblicare, da applicare, da committare); gli altri sei si incontrano raramente e vanno capiti proprio quando qualcosa non torna.
 - **Tre posti in cui "vive" il file**: il branch (H), l'index (I) e la catena delle versioni (T). Chi conosce bene git li riconosce; chi usa git solo con add, commit e push fa fatica a capire perché un file committato è "da pubblicare".
 - **Due passi per finire**: commit e poi `publish`. Dimenticare il secondo non dà errori: gli altri restano indietro in silenzio.
-- **`status` guarda solo la repo corrente.** Dopo un'unione e il commit dice *allineato* anche se i peer non hanno ancora la versione; non c'è un modo per vedere lo stato dei peer (`--peers` è fuori dalla v0).
+- **`status` guarda solo la repo corrente**, salvo con `--peers` (D-086), che dice per ogni peer se ha la stessa versione, una più vecchia (`publish`) o una più nuova (`update`). Dopo un'unione e il commit `status` da solo dice *allineato* anche se i peer non hanno ancora la versione: bisogna sapere di chiedere `--peers`.
 - **Il completamento "al primo comando".** Dopo il commit di un `set` o `link` fatto senza `-c`, i peer non sanno nulla finché non lanci un qualunque `git shared`. È corretto ma non è intuitivo.
 - **Messaggi solo in inglese** e manuale solo incorporato (`git shared help`).
 
@@ -106,7 +106,7 @@ Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a
 - Lo stato si ricava ogni volta dal contenuto della repo: hook saltati, rebase, reset non lo corrompono.
 - Ogni avanzamento della catena è condizionato e solo in fast-forward: una versione non viene mai sovrascritta.
 - Il contenuto del file non passa mai dai buffer del programma: viaggia come blob tra comandi git.
-- 696 test di sistema, che lanciano i comandi come farebbe l'utente.
+- 718 test di sistema, che lanciano i comandi come farebbe l'utente.
 
 **Punti deboli, da sapere.**
 - **Nessun bug grave aperto**, 29 tra medi e minori (`reportIdea.md` §2).
@@ -120,7 +120,7 @@ Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a
 
 1. ~~C-20~~ e ~~ri-aggancio dopo un clone~~: fatti (D-080).
 2. ~~`unlink`~~, ~~`prune`~~, ~~`branch`~~, ~~`relocate`~~, ~~nota per i branch spariti~~: fatti (D-081…D-085).
-3. ~~B-37~~: fatto (D-085). **`status --peers`**: serve vedere se gli altri hanno la versione.
+3. ~~B-37~~, ~~`status --peers`~~: fatti (D-085, D-086).
 4. **B-16.** Toglie *inconsistent* dai branch vecchi, lo stato che confonde di più.
 5. **Un `update` che dopo il commit dell'unione pubblica da solo** (o lo propone): chiude il "due passi per finire" nel caso in cui dimenticarlo costa di più.
 6. **Usarlo davvero per qualche settimana** sugli header reali, annotando ogni volta che serve aprire `.git/config`. È la misura che manca a questo report.

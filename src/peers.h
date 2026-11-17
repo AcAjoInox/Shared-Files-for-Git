@@ -15,6 +15,7 @@
 #include <stdint.h>
 
 #include "err.h"
+#include "git.h"
 #include "str.h"
 
 /* Che cosa c'e' al path di un peer (prune, REQ-F-014). */
@@ -63,6 +64,10 @@ void peers_forget(const char *label, const char *id, const Str_t *peers,
  * solo se al path non c'e' piu' una cartella .git: un errore di git su
  * una repo che c'e' vale "irraggiungibile" (reportIdea B-07). */
 void peers_check(const char *id, const Str_t *peers, uint8_t *state);
+
+/* Ultima versione (refs/shared/<id>) di ogni peer, in parallelo e senza
+ * fetch: tips[k].len = 0 se il peer non ha la ref o non si legge. */
+void peers_tips(const char *id, const Str_t *peers, Oid_t *tips);
 
 /* 1 se <repo>/.git esiste (cartella, o file di un worktree). */
 int peers_repo_exists(const char *repo);

@@ -228,6 +228,45 @@ void peers_check(const char *id, const Str_t *peers, uint8_t *state)
     free(jobs);
 }
 
+void peers_tips(const char *id, const Str_t *peers, Oid_t *tips)
+{
+    const char *args[] = { NULL, "rev-parse", "-q", "--verify", NULL, NULL };
+    size_t n = str_zcount(peers);
+    Job_t *jobs = xmalloc(((n > 0U) ? n : 1U) * sizeof *jobs);
+    Str_t ref = STR_INIT;
+    Str_t dir = STR_INIT;
+    Str_t out = STR_INIT;
+    const char *peer;
+    size_t k;
+    int code;
+
+    str_addf(&ref, "refs/shared/%s^{commit}", id);
+    args[4] = str_cstr(&ref);
+    for (k = 0U, peer = str_znext(peers, NULL); peer != NULL;
+         k++, peer = str_znext(peers, peer)) {
+        git_dir_arg(&dir, peer);
+        args[0] = str_cstr(&dir);
+        jobs[k].started = (git_start(&jobs[k].p, args,
+                                     PROC_STDERR_NULL | PROC_CLEAN_ENV) == GS_OK);
+    }
+    for (k = 0U, peer = str_znext(peers, NULL); peer != NULL;
+         k++, peer = str_znext(peers, peer)) {
+        code = -1;
+        tips[k].len = 0U;
+        if (jobs[k].started && (proc_collect(&jobs[k].p, &out, &code) == GS_OK) &&
+            (code == 0)) {
+            str_trim_eol(&out);
+            if (!oid_from_hex(&tips[k], out.buf, out.len)) {
+                tips[k].len = 0U;
+            }
+        }
+    }
+    str_free(&out);
+    str_free(&dir);
+    str_free(&ref);
+    free(jobs);
+}
+
 void peers_value_regex(Str_t *out, const char *a, const char *b)
 {
     const char *const vals[] = { a, b };

@@ -7,11 +7,16 @@
  * solo quando H e T differiscono.
  */
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "cmd.h"
+#include "chain.h"
 #include "err.h"
 #include "git.h"
+#include "mem.h"
 #include "msg.h"
+#include "peers.h"
 #include "shared.h"
 #include "state.h"
 
@@ -44,6 +49,90 @@ static void print_entry(const Repo_t *r, const SharedEntry_t *e, eState_t st,
     putchar('\n');
 }
 
+/* 1 se il commit a e' antenato di b. */
+static int is_ancestor(const Oid_t *a, const Oid_t *b)
+{
+    const char *args[] = { "merge-base", "--is-ancestor", NULL, NULL, NULL };
+    char ha[OID_HEX_SIZE];
+    char hb[OID_HEX_SIZE];
+    Str_t out = STR_INIT;
+    int code = 1;
+
+    oid_to_hex(a, ha);
+    oid_to_hex(b, hb);
+    args[2] = ha;
+    args[3] = hb;
+    if (git_capture(args, PROC_STDERR_NULL, &out, &code) != GS_OK) {
+        code = 1;
+    }
+    str_free(&out);
+    return code == 0;
+}
+
+/*
+ * --peers (REQ-F-012, D-086): per ogni peer, se c'e', se condivide ancora
+ * il file e com'e' la sua versione rispetto a T. Nessun fetch: si legge la
+ * sua refs/shared/<id> e si confronta con la catena locale.
+ */
+static void print_peers(const SharedEntry_t *e, GitBatch_t *b)
+{
+    size_t n = str_zcount(&e->peers);
+    uint8_t *state = xmalloc((n > 0U) ? n : 1U);
+    Oid_t *tips = xmalloc(((n > 0U) ? n : 1U) * sizeof *tips);
+    Str_t ref = STR_INIT;
+    const char *p;
+    char hex[OID_HEX_SIZE];
+    Oid_t t;
+    Oid_t have;
+    eMsgId_t what;
+    size_t k;
+
+    printf("    %-6s ", msg(MSG_STATUS_FIELD_PEERS));
+    if (n == 0U) {
+        puts(msg(MSG_BRANCH_NONE));
+        goto exit;
+    }
+    peers_check(e->id, &e->peers, state);
+    peers_tips(e->id, &e->peers, tips);
+    chain_ref(&ref, e->id);
+    if (git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) {
+        t.len = 0U;
+    }
+    for (k = 0U, p = str_znext(&e->peers, NULL); p != NULL;
+         k++, p = str_znext(&e->peers, p)) {
+        if (state[k] == PEER_GONE) {
+            what = MSG_PEER_GONE;
+        } else if (state[k] == PEER_LEFT) {
+            what = MSG_PEER_LEFT;
+        } else if (state[k] == PEER_UNREACHABLE) {
+            what = MSG_PEER_UNREACHABLE;
+        } else if (tips[k].len == 0U) {
+            what = MSG_PEER_NO_VERSION;
+        } else if (oid_eq(&tips[k], &t)) {
+            what = MSG_PEER_SAME;
+        } else {
+            /* Il peer ha una versione che qui non c'e', o che non discende
+             * da quella del peer: serve update. Se e' un antenato di T, al
+             * peer manca l'ultima versione: serve publish. */
+            oid_to_hex(&tips[k], hex);
+            what = ((t.len > 0U) &&
+                    (git_batch_query(b, hex, &have) == GIT_OBJ_COMMIT) &&
+                    is_ancestor(&tips[k], &t))
+                       ? MSG_PEER_BEHIND
+                       : MSG_PEER_NEWER;
+        }
+        if (k > 0U) {
+            printf("    %-6s ", "");
+        }
+        printf("%s: %s\n", p, msg(what));
+    }
+
+exit:
+    str_free(&ref);
+    free(tips);
+    free(state);
+}
+
 int cmd_status(int argc, char **argv)
 {
     Repo_t repo = REPO_INIT;
@@ -56,15 +145,23 @@ int cmd_status(int argc, char **argv)
     size_t shown = 0U;
     int batch_open = 0;
     int suspended;
+    int with_peers = 0;
     int rc = GS_EXIT_FATAL;
     eGsErr_t err;
 
-    (void)argv;
-    if (argc > 1) {
-        msg_error(MSG_ERR_TOO_MANY_ARGS);
-        fputs(msg(MSG_USAGE_STATUS), stderr);
-        rc = GS_EXIT_USAGE;
-        goto exit;
+    for (i = 1U; i < (size_t)argc; i++) {
+        if (strcmp(argv[i], "--peers") == 0) {
+            with_peers = 1;
+        } else {
+            if (argv[i][0] == '-') {
+                msg_error(MSG_ERR_UNKNOWN_OPT, argv[i]);
+            } else {
+                msg_error(MSG_ERR_TOO_MANY_ARGS);
+            }
+            fputs(msg(MSG_USAGE_STATUS), stderr);
+            rc = GS_EXIT_USAGE;
+            goto exit;
+        }
     }
     err = repo_open(&repo);
     if (err != GS_OK) {
@@ -108,6 +205,11 @@ int cmd_status(int argc, char **argv)
                 printf(msg(MSG_STATUS_BRANCHES_GONE), str_cstr(&list),
                        e->in_gitshared ? str_cstr(&e->path) : e->id);
                 putchar('\n');
+            }
+            /* Peer: per i file collegati e non in attesa di set o link. */
+            if (with_peers && e->in_config && (e->pending != SHARED_PENDING_SET) &&
+                (e->pending != SHARED_PENDING_LINK)) {
+                print_peers(e, &batch);
             }
             shown++;
         } else {

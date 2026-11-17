@@ -162,6 +162,14 @@ typedef enum {
     MSG_STATUS_SUSPENDED,    /* stato ricavato */
     MSG_STATUS_PENDING_ON,   /* stato, branch */
     MSG_STATUS_FIELD_NOTE,
+    MSG_STATUS_FIELD_PEERS,
+    MSG_PEER_SAME,
+    MSG_PEER_BEHIND,
+    MSG_PEER_NEWER,
+    MSG_PEER_NO_VERSION,
+    MSG_PEER_LEFT,
+    MSG_PEER_GONE,
+    MSG_PEER_UNREACHABLE,
     MSG_STATUS_BRANCHES_GONE, /* branch attivi, path */
 
     MSG_STATE_ALIGNED,
