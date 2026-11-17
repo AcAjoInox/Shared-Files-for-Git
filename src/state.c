@@ -45,6 +45,7 @@ const char *state_name(eState_t st)
         [STATE_PENDING] = MSG_STATE_PENDING,
         [STATE_UNLINKED] = MSG_STATE_UNLINKED,
         [STATE_INCONSISTENT] = MSG_STATE_INCONSISTENT,
+        [STATE_ABSENT] = MSG_STATE_ABSENT,
     };
 
     return msg(names[st]);
@@ -153,6 +154,33 @@ exit:
     return err;
 }
 
+/*
+ * Sezione locale senza dichiarazione nel .gitshared del working tree
+ * (reportIdea B-16, D-095). Se HEAD la dichiara, .gitshared e' stato
+ * toccato a mano: incoerente. Se no, e un altro branch locale la dichiara,
+ * questo branch e' nato prima del set (o il set non vi e' mai arrivato):
+ * qui il file non e' shared, ed e' come sospeso. Se nessun branch la
+ * dichiara la sezione e' orfana: incoerente, si toglie con unlink <id>.
+ * Costa un for-each-ref, solo in questo caso raro.
+ */
+static eGsErr_t undeclared_state(GitBatch_t *b, const char *id, eState_t *st)
+{
+    Str_t branch = STR_INIT;
+    int declared = 0;
+    int found = 0;
+    eGsErr_t err = repo_rev_declares(b, "HEAD", id, &declared);
+
+    *st = STATE_INCONSISTENT;
+    if ((err == GS_OK) && (declared == 0)) {
+        err = repo_declaring_branch(id, b, &branch, NULL, &found);
+        if ((err == GS_OK) && (found != 0)) {
+            *st = STATE_ABSENT;
+        }
+    }
+    str_free(&branch);
+    return err;
+}
+
 eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
                       eState_t *st, StateInfo_t *info)
 {
@@ -182,6 +210,7 @@ eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     }
     *st = STATE_INCONSISTENT;
     if (!e->in_gitshared) {
+        err = undeclared_state(b, e->id, st);
         goto exit;
     }
     str_addf(&name, "HEAD:%s", str_cstr(&e->path));

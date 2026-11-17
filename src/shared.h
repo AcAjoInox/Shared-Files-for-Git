@@ -128,9 +128,10 @@ eGsErr_t repo_rev_declares(GitBatch_t *b, const char *rev, const char *id,
                            int *declared);
 
 /* Un branch locale il cui .gitshared committato dichiara l'ID (D-079):
- * *found = 1 e il nome in branch (senza "refs/heads/"). */
+ * *found = 1 e il nome in branch (senza "refs/heads/"); in path, se non
+ * e' NULL, il path del file su quel branch. */
 eGsErr_t repo_declaring_branch(const char *id, GitBatch_t *b, Str_t *branch,
-                               int *found);
+                               Str_t *path, int *found);
 
 /*
  * Toglie i dati locali di un file shared (REQ-F-003): i peer dimenticano

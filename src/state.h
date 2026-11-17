@@ -20,7 +20,9 @@ typedef enum {
     STATE_MERGING,     /* unione in corso: conflitto o risoluzione in staging */
     STATE_PENDING,     /* set/link/unlink non ancora committato */
     STATE_UNLINKED,    /* in .gitshared ma non in .git/config (es. clone) */
-    STATE_INCONSISTENT /* in config ma non in .gitshared, o file assente */
+    STATE_INCONSISTENT, /* in config ma non in .gitshared, o file assente */
+    STATE_ABSENT       /* in config, non dichiarato su questo branch ma su un
+                        * altro branch locale: qui non e' shared (B-16) */
 } eState_t;
 
 /* 1 per gli stati che dipendono dal branch (possono essere "sospesi"). */

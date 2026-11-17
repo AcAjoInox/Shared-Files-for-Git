@@ -23,13 +23,19 @@ DESCRIZIONE
                           commit, oppure restore di .gitshared per
                           annullare
     unlinked              dichiarato qui ma non collegato (un clone): link
-    inconsistent          collegato qui ma non dichiarato su questo branch,
-                          oppure il file e' stato cancellato: unlink, o
-                          controlla con branch
+    inconsistent          il file e' stato cancellato o rinominato, oppure
+                          .gitshared e' stato modificato a mano, oppure
+                          nessun branch dichiara piu' il file: unlink
+                          (con l'id, nell'ultimo caso), oppure restore di
+                          .gitshared
     suspended on this branch (...)
                           questo branch non e' tra i branch del file: qui
                           e' un file normale. Lo stato vero e' tra
                           parentesi. 'git shared branch' lo cambia.
+    suspended on this branch (not declared here)
+                          questo branch non dichiara il file (e' nato
+                          prima del set): la nota dice su quale branch e'
+                          shared. Niente da fare.
 
 OPZIONI
     --peers

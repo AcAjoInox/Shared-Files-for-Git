@@ -1,10 +1,10 @@
 # Report sull'uso locale — git shared
 
-> **Aggiornato al 2026-11-17.** Baseline `project.md` v2.32 (D-001…D-094). Codice v0 con unione delle divergenze, ri-aggancio, comandi di manutenzione completi, `status --peers`, manuale per comando in inglese e italiano, catena letta come grafo, unioni tra versioni corrette, `update --abort`, stato indipendente dalla config git: 904 test su 904 su Windows (git 2.43) e su Linux in WSL2 (git 2.34 e 2.56.1). Riguarda solo la fase 1 (repo sulla stessa macchina). I bug sono in `reportIdea.md` (file locale, non versionato); qui ci sono due giudizi: l'impatto atteso e la facilità d'uso.
+> **Aggiornato al 2026-11-17.** Baseline `project.md` v2.33 (D-001…D-095). Codice v0 con unione delle divergenze, ri-aggancio, comandi di manutenzione completi, `status --peers`, manuale per comando in inglese e italiano, catena letta come grafo, unioni tra versioni corrette, `update --abort`, stato indipendente dalla config git, branch nati prima del `set`: 916 test su 916 su Windows (git 2.43) e su Linux in WSL2 (git 2.34 e 2.56.1). Riguarda solo la fase 1 (repo sulla stessa macchina). I bug sono in `reportIdea.md` (file locale, non versionato); qui ci sono due giudizi: l'impatto atteso e la facilità d'uso.
 >
 > **Da dove vengono i giudizi.** Dalla lettura del codice, dai test e dalle prove fatte a mano con l'eseguibile durante la ricerca dei bug. Nessuno, a parte l'autore, lo ha ancora usato: la parte sull'uso è una valutazione ragionata, non una misura.
 >
-> **Storia.** 2026-11-16: prima stesura (718 test, v2.24). 2026-11-17: Linux provato e compatibilità dichiarata chiusa (C-25, D-089, D-090; non provata solo git 2.34 su Windows, ritenuta stabile); seconda ricerca di bug sul flusso logico e sulla struttura (§9: B-46…B-51, C-26, riportati anche in `reportIdea.md`); B-46, l'unico grave, chiuso (D-091); tutto il report riallineato; B-47, B-48 e B-49 chiusi (D-092), con `update --abort` per l'abbandono (D-093); B-32 chiuso (D-094).
+> **Storia.** 2026-11-16: prima stesura (718 test, v2.24). 2026-11-17: Linux provato e compatibilità dichiarata chiusa (C-25, D-089, D-090; non provata solo git 2.34 su Windows, ritenuta stabile); seconda ricerca di bug sul flusso logico e sulla struttura (§9: B-46…B-51, C-26, riportati anche in `reportIdea.md`); B-46, l'unico grave, chiuso (D-091); tutto il report riallineato; B-47, B-48 e B-49 chiusi (D-092), con `update --abort` per l'abbandono (D-093); B-32 chiuso (D-094); B-16 chiuso (D-095), con il resto staccato come B-52.
 
 ## 1. In breve
 
@@ -12,7 +12,7 @@
 - **È cambiato il valore per chi lo usa da solo.** Prima del merge una divergenza era un vicolo cieco; ora ogni stato ha un comando che ne fa uscire. Da "prototipo che funziona nei casi buoni" è diventato "strumento usabile ogni giorno da chi lo conosce".
 - **È cambiata la credibilità come dimostrazione.** La promessa che lo distingue dagli altri strumenti ("nessuna modifica si perde, le divergenze si uniscono", `project.md` §2.3 punto 5) ora è codice provato, non un requisito.
 - **L'uso quotidiano è semplice**: cinque comandi, uno o due in più rispetto al normale lavoro con git. **L'uso fuori dal caso normale è meno semplice**: dieci stati, e alcune trappole in cui si finisce senza aver sbagliato nulla (§4).
-- **Le trappole più probabili sono chiuse** (B-39, B-40, C-20, clone: D-079, D-080; manutenzione: D-081…D-085). Prima di usarlo sul lavoro vero restano da sapere quelle di §4 ancora aperte (B-16, B-41, B-51).
+- **Le trappole più probabili sono chiuse** (B-39, B-40, C-20, clone: D-079, D-080; manutenzione: D-081…D-085). Prima di usarlo sul lavoro vero restano da sapere quelle di §4 ancora aperte (B-41, B-51, B-52).
 - **Nessun bug grave aperto.** B-46, trovato dalla seconda ricerca (§9), è chiuso (D-091): la versione di un peer unita da un'altra repo ora è riconosciuta, e il suo `update` non rimette più ciò che l'altra repo aveva tolto.
 
 ## 2. È migliorata l'aspettativa di impatto?
@@ -21,7 +21,7 @@
 |---|---|---|---|
 | Uso personale, più repo sulla stessa macchina | Funziona finché nessuno modifica da una versione vecchia; poi "merging is not implemented yet" | Ciclo completo: modifica, pubblicazione, applicazione, unione, conflitto | **Sì, molto** |
 | Robustezza | 1 dato salvato fragile previsto (merge in `.git/`), vicoli ciechi con squash e amend | Stato sempre ricavato; l'unica ref salvata vale solo se l'index la conferma; squash e amend si chiudono con un `update` | **Sì** |
-| Valore come dimostrazione ("un file condiviso con una ref e il solo trasporto git") | Idea documentata, metà realizzata | Realizzata per il locale, con 904 test e un registro di 94 decisioni | **Sì** |
+| Valore come dimostrazione ("un file condiviso con una ref e il solo trasporto git") | Idea documentata, metà realizzata | Realizzata per il locale, con 916 test e un registro di 95 decisioni | **Sì** |
 | Adozione da parte di altri | Di nicchia | Di nicchia | **No** |
 | Uso in un gruppo | Impossibile (una macchina) | Impossibile (una macchina) | **No** |
 
@@ -81,7 +81,8 @@ Situazioni in cui si arriva senza aver sbagliato nulla, con l'uscita che c'è og
 |---|---|---|---|
 | `set` o `link`, poi `git stash`, poi un comando `git shared`, poi `stash pop` | "discarded pending operation", file *unlinked* | Rilanciare lo stesso `set` o `link`: riprende lo stesso ID | B-40, chiuso |
 | Repo clonata | *unlinked* | `git shared link <path del file in un peer>`: ricollega subito, senza toccare il file. Da evitare `set`, che crea una catena separata | chiuso (D-080) |
-| Branch nato prima del `set` | *inconsistent*, e il tool suggerisce `unlink` | Ignorarlo, o portare `.gitshared` sul branch. `unlink` lì non smonta nulla: rifiuta e indica il branch giusto | B-16 |
+| Branch nato prima del `set` | *suspended* (`not declared here`), con il branch su cui il file è shared | Niente: lì il file non è shared | B-16, chiuso (D-095) |
+| Branch vecchio dopo un `unlink` | *unlinked*, e `update` suggerisce `link` | Ignorarlo: `link` ricollegherebbe il file | B-52 |
 | Il file è shared solo sul branch del `set`; su `main` dopo il merge è *suspended* | Nessun avviso, finché quel branch esiste (è una scelta: potrebbe essere voluto) | `git shared branch <file> -a main` | chiuso (D-083) |
 | Branch rinominato (`git branch -m`) | *suspended*, con una riga `note` in `status` e un avviso dagli hook, da `update` e `publish` | Il comando suggerito: `git shared branch <file> -a <nuovo>` | chiuso (D-085) |
 | `publish <file>` o `update <file>` su un file in attesa o scollegato | Errore con il motivo e codice 1; senza argomento, una riga per il file saltato | Quella suggerita | chiuso (D-085) |
@@ -95,14 +96,14 @@ Situazioni in cui si arriva senza aver sbagliato nulla, con l'uscita che c'è og
 | Rinunciare a un'unione in conflitto | Il messaggio del conflitto indica `git shared update --abort` | `update --abort`: file dell'ultimo commit e unione tolta, in un passo. Con un `git restore` a mano l'unione sparisce al primo comando `git shared` (una modifica messa in staging prima varrebbe come risoluzione, come con `MERGE_HEAD` in git) | B-48, chiuso (D-092, D-093) |
 | Catena locale persa (`push --mirror` da un clone, `fetch --prune` con `+refs/*:refs/*`) | *inconsistent*, e il consiglio è sbagliato; `update` fallisce | Solo `unlink`, che smonta la condivisione | B-51 |
 
-Nessuna di queste quindici situazioni richiede di modificare `.git/config` a mano. L'unico silenzio che resta è voluto: un file sospeso su un branch che esiste ancora non avvisa, perché può essere una scelta.
+Nessuna di queste sedici situazioni richiede di modificare `.git/config` a mano. L'unico silenzio che resta è voluto: un file sospeso su un branch che esiste ancora non avvisa, perché può essere una scelta.
 
 ## 5. Giudizio per tipo di utente
 
 | Utente | Caso normale | Quando qualcosa non torna |
 |---|---|---|
 | L'autore, o chi conosce bene git (index, ref, rebase) | **Facile.** Cinque comandi, logica riconoscibile | **Gestibile.** Sa leggere `.git/config` e le ref |
-| Sviluppatore che usa git ogni giorno senza conoscerne gli interni | **Facile**, dopo aver letto il breef una volta | **Gestibile, con qualche intoppo.** Ogni stato dice il comando da lanciare (*unlinked* si risolve con `link`); confonde ancora *inconsistent* sui branch nati prima del `set` (B-16) |
+| Sviluppatore che usa git ogni giorno senza conoscerne gli interni | **Facile**, dopo aver letto il breef una volta | **Gestibile, con qualche intoppo.** Ogni stato dice il comando da lanciare (*unlinked* si risolve con `link`); su un branch vecchio dopo un `unlink` il suggerimento di `link` va ignorato (B-52) |
 | Chi usa git solo da interfaccia grafica | **Medio.** Deve aprire un terminale per `publish` e `update` | **Molto difficile** |
 
 ## 6. Robustezza: su che cosa poggia il giudizio
@@ -111,7 +112,7 @@ Nessuna di queste quindici situazioni richiede di modificare `.git/config` a man
 - Lo stato si ricava ogni volta dal contenuto della repo: hook saltati, rebase, reset non lo corrompono.
 - Ogni avanzamento della catena è condizionato e solo in fast-forward: una versione non viene mai sovrascritta.
 - Il contenuto del file non passa mai dai buffer del programma: viaggia come blob tra comandi git.
-- 904 test di sistema, che lanciano i comandi come farebbe l'utente.
+- 916 test di sistema, che lanciano i comandi come farebbe l'utente.
 
 **Punti deboli, da sapere.**
 - **Nessun bug grave aperto**: B-46, trovato dalla seconda ricerca (§9), è chiuso (D-091). Restano 30 problemi tra medi e minori (`reportIdea.md` §2). Le unioni tra versioni, la zona in cui la seconda ricerca aveva trovato più problemi, sono corrette (B-47, B-48, B-49: D-092).
@@ -127,13 +128,13 @@ Nessuna di queste quindici situazioni richiede di modificare `.git/config` a man
 2. ~~`unlink`~~, ~~`prune`~~, ~~`branch`~~, ~~`relocate`~~, ~~nota per i branch spariti~~: fatti (D-081…D-085).
 3. ~~B-37~~, ~~`status --peers`~~, ~~B-46~~: fatti (D-085, D-086, D-091).
 4. ~~Unioni tra versioni: B-47, B-48, B-49~~: fatti (D-092), con `update --abort` per l'abbandono (D-093).
-5. **B-16.** Toglie *inconsistent* dai branch vecchi, lo stato che confonde di più.
+5. ~~**B-16**~~: fatto (D-095). Resta il caso dopo un `unlink` (B-52).
 6. **Un `update` che dopo il commit dell'unione pubblica da solo** (o lo propone): chiude il "due passi per finire" nel caso in cui dimenticarlo costa di più.
 7. **Usarlo davvero per qualche settimana** sugli header reali, annotando ogni volta che serve aprire `.git/config`. È la misura che manca a questo report.
 
 ## 8. Quanto manca a una versione buona per l'uso locale
 
-> **Stima del 2026-11-17, aggiornata dopo D-094** (904 test, `project.md` v2.32). È una stima, non una misura: si basa sui bug aperti di `reportIdea.md`, sulle prove fatte con l'eseguibile e sul ritmo di lavoro degli ultimi giorni.
+> **Stima del 2026-11-17, aggiornata dopo D-095** (916 test, `project.md` v2.33). È una stima, non una misura: si basa sui bug aperti di `reportIdea.md`, sulle prove fatte con l'eseguibile e sul ritmo di lavoro degli ultimi giorni.
 
 ### 8.1 Che cosa vuol dire "buona"
 
@@ -151,7 +152,7 @@ Una versione che l'autore, e un collega che conosce git, possono usare ogni gior
 |---|---|---|
 | Funzioni | **~95%** | Ciclo completo, unione delle divergenze, manutenzione (`unlink`, `prune`, `branch`, `relocate`), `status --peers`. Mancano solo funzioni non essenziali (`mv`, `link` su un file esistente, pattern dei branch) |
 | Correttezza su Windows | **~85%** | Nessun bug grave (B-46 chiuso, D-091); unioni tra versioni corrette (D-092). Restano casi medi legati all'ambiente e alla configurazione (§8.3) |
-| Linux | **~85%** | Provato in WSL2 (Ubuntu 22.04) con git 2.34, il minimo di D-032, e con 2.56.1, l'ultima stabile: compila senza warning, tutti i test passano con entrambe (904 dopo D-094). Compatibilità chiusa (D-090). Mancano le misure (punto 9) e l'uso su una macchina Linux vera |
+| Linux | **~85%** | Provato in WSL2 (Ubuntu 22.04) con git 2.34, il minimo di D-032, e con 2.56.1, l'ultima stabile: compila senza warning, tutti i test passano con entrambe (916 dopo D-095). Compatibilità chiusa (D-090). Mancano le misure (punto 9) e l'uso su una macchina Linux vera |
 | Documentazione per l'utente | **~90%** | Pagina per comando in `help/`, anche in italiano (`git shared lang it`); `git shared -h` spiega come aprire il manuale; `git shared --help` funziona dopo `make install` (su Windows serve copiare la pagina HTML con i permessi di amministratore). Messaggi dei comandi solo in inglese |
 | Uso reale | **0%** | Solo test automatici |
 
@@ -167,16 +168,16 @@ Unità di misura: una **sessione** è un blocco di lavoro come quelli degli ulti
 |---|---|---|---|---|
 | 0 | ~~Unioni tra versioni (§9)~~: fatto. B-46 (D-091), B-47, B-48 e B-49 (D-092, D-093), con i test in `t0009` | – | – | – |
 | 1 | ~~Stato indipendente dalla config git~~: fatto (D-094). Oltre a `log.showRoot`, contavano anche `log.follow` e `diff.autoRefreshIndex` | B-32 | – | – |
-| 2 | Branch nati prima del `set`: sezione assente sul branch = file non presente qui, non *inconsistent* | B-16 | 1 | È lo stato che confonde di più e propone un comando sbagliato |
+| 2 | ~~Branch nati prima del `set`~~: fatto (D-095). Resta B-52, nei minori (punto 8) | B-16 | – | – |
 | 3 | Hook non `sh` (Python, binari): non inserire il blocco, avvisare | C-02 | 0,5 | Oggi un hook Python viene rotto da `set` |
 | 4 | Windows: git in un path con accenti, `PATH` vuoto | C-05, C-10 | 0,5 | Con `C:\Users\José` nessun comando parte |
 | 5 | ~~`git shared --help`~~: fatto (D-087), con una pagina per comando in `help/` | REQ-F-019 | – | – |
 | 6 | ~~**Linux**: compilare e far passare i test~~: fatto in WSL2. Due hook di prova senza `chmod +x` in t0006; un bug sul modo degli hook dell'utente (C-25, D-089). C-19 provato: senza effetti con git | C-19 | – | – |
 | 7 | Fine riga e bit di esecuzione: `link` confronta gli attributi `text`/`eol` con la sorgente e avvisa; il modo `100755` si conserva | B-12, C-11 | 1–1,5 | Tra repo con normalizzazioni diverse ogni versione sembra una modifica e i merge diventano conflitti sull'intero file |
-| 8 | Minori che si incontrano davvero: `set .gitshared`, cartella hook assente, `config --unset` con più valori, path assoluti, maiuscole su Windows, `link` interrotto, staging non protetto, avviso se la sorgente non è allineata, `link` da un worktree secondario | B-36, C-04, C-09, C-13, C-12, C-21, B-43, B-44, B-50 | 1,5–2 | Ognuno è raro, insieme sono la differenza tra "funziona" e "non sorprende" |
+| 8 | Minori che si incontrano davvero: `set .gitshared`, cartella hook assente, `config --unset` con più valori, path assoluti, maiuscole su Windows, `link` interrotto, staging non protetto, avviso se la sorgente non è allineata, `link` da un worktree secondario, branch vecchi dopo un `unlink` | B-36, C-04, C-09, C-13, C-12, C-21, B-43, B-44, B-50, B-52 | 1,5–2 | Ognuno è raro, insieme sono la differenza tra "funziona" e "non sorprende" |
 | 9 | Misure: `status` con molti file, `publish` verso 32 peer, costo di un'unione; su Windows e Linux | REQ-NF-007 | 0,5 | Le soglie sono requisiti; oggi misurate solo fino a 8 peer |
 | 10 | ~~Riallineare i documenti~~: fatto il 2026-11-17 (`breef.md`, `project.md`, questo report). Restano le incoerenze di `reportIdea.md` §8 che si chiudono nel codice | – | – | – |
-| | **Totale A** | | **5–6 sessioni** | |
+| | **Totale A** | | **4–5 sessioni** | |
 
 **B. Uso reale**
 
@@ -197,13 +198,13 @@ Unità di misura: una **sessione** è un blocco di lavoro come quelli degli ulti
 
 | | Sessioni | Calendario |
 |---|---|---|
-| Indispensabili (A) | 5–6 | 1–2 settimane al ritmo attuale |
+| Indispensabili (A) | 4–5 | 1–2 settimane al ritmo attuale |
 | Uso reale e correzioni (B) | 1–2 | 2–4 settimane, in parallelo al resto |
-| **Versione buona per l'uso locale** | **circa 6–8** | **circa un mese** |
+| **Versione buona per l'uso locale** | **circa 5–7** | **circa un mese** |
 
 Tappe proposte, con un tag ciascuna:
 
-- **`v0.3.0`**: punti 2–4 e 8. Stato giusto anche con hook e ambienti diversi (unioni tra versioni, config git e `--help` sono già fatti).
+- **`v0.3.0`**: punti 3, 4 e 8. Stato giusto anche con hook e ambienti diversi (unioni tra versioni, config git, branch vecchi e `--help` sono già fatti).
 - **`v0.4.0`**: punti 7 e 9. Fine riga e bit di esecuzione gestiti, prestazioni misurate (Linux è già provato).
 - **`v1.0.0-locale`**: dopo l'uso reale (punti 11–12).
 

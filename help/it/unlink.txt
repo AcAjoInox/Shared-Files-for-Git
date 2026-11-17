@@ -19,7 +19,8 @@ DESCRIZIONE
     Con un <id> al posto del path, unlink toglie i dati locali rimasti di
     un file che nessun branch dichiara piu' (status lo mostra come
     "inconsistent", "not declared in .gitshared"). Se un branch lo
-    dichiara ancora, unlink dice quale.
+    dichiara ancora, unlink dice quale: li' status mostra il file come
+    "suspended on this branch (not declared here)".
 
 OPZIONI
     -c, --commit

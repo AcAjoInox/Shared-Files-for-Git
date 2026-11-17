@@ -21,8 +21,10 @@
 #include "shared.h"
 #include "state.h"
 
+/* alt_path: path del file sul branch che lo dichiara, per un file non
+ * dichiarato su questo (STATE_ABSENT); NULL altrimenti. */
 static void print_entry(const Repo_t *r, const SharedEntry_t *e, eState_t st,
-                        int suspended)
+                        int suspended, const char *alt_path)
 {
     if (e->in_gitshared) {
         printf("%s\n", str_cstr(&e->name));
@@ -32,6 +34,9 @@ static void print_entry(const Repo_t *r, const SharedEntry_t *e, eState_t st,
         printf("%s\n", str_cstr(&e->pending_path));
         printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_PATH),
                str_cstr(&e->pending_path));
+    } else if (alt_path != NULL) {
+        printf("%s\n", alt_path);
+        printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_PATH), alt_path);
     } else {
         printf("%s\n", msg(MSG_STATUS_UNDECLARED));
     }
@@ -120,11 +125,14 @@ int cmd_status(int argc, char **argv)
     GitBatch_t batch;
     BranchNames_t names = BRANCHNAMES_INIT;
     Str_t list = STR_INIT;
+    Str_t elsewhere = STR_INIT; /* branch che dichiara il file (B-16) */
+    Str_t alt_path = STR_INIT;
     const SharedEntry_t *e;
     eState_t st;
     size_t i;
     size_t shown = 0U;
     int batch_open = 0;
+    int found;
     int suspended;
     int with_peers = 0;
     int rc = GS_EXIT_FATAL;
@@ -174,12 +182,26 @@ int cmd_status(int argc, char **argv)
                 rc = GS_EXIT_FATAL;
                 goto exit;
             }
-            suspended = state_is_derived(st) &&
-                        !shared_is_active(e, str_cstr(&repo.branch));
+            suspended = (state_is_derived(st) &&
+                         !shared_is_active(e, str_cstr(&repo.branch))) ||
+                        (st == STATE_ABSENT);
+            found = 0;
+            if ((st == STATE_ABSENT) &&
+                (repo_declaring_branch(e->id, &batch, &elsewhere, &alt_path,
+                                       &found) != GS_OK)) {
+                found = 0; /* solo per i messaggi: senza, niente nota */
+            }
             if (shown > 0U) {
                 putchar('\n');
             }
-            print_entry(&repo, e, st, suspended);
+            print_entry(&repo, e, st, suspended,
+                        (found != 0) ? str_cstr(&alt_path) : NULL);
+            /* Non dichiarato qui: dove lo e' (B-16, D-095). */
+            if (found != 0) {
+                printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+                printf(msg(MSG_STATUS_ELSEWHERE), str_cstr(&elsewhere));
+                putchar('\n');
+            }
             /* Sospeso perche' nessun suo branch esiste piu' (B-21). */
             if (suspended && shared_branches_gone(&names, e, &list)) {
                 printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
@@ -207,6 +229,8 @@ exit:
     }
     repo_close(&repo);
     branchnames_free(&names);
+    str_free(&alt_path);
+    str_free(&elsewhere);
     str_free(&list);
     return rc;
 }

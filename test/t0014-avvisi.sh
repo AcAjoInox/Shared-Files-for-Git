@@ -90,4 +90,40 @@ run git shared update
 expect_rc "scollegato, update: codice 0" 0
 expect_out "scollegato, update: riga per il file saltato" "a.h: unlinked, nothing to do"
 
+# --- B-16: branch nato prima del set -------------------------------------------
+# Sezione locale c'e', .gitshared del branch non dichiara il file: qui non e'
+# shared. Sospeso, con il branch su cui lo e', non incoerente con un unlink
+# suggerito.
+make_repo b16
+cd "$TRASH/b16" || exit 1
+put o.txt o
+git branch old
+put c.h v1
+git shared set -c c.h >/dev/null
+git switch -q old 2>"$TRASH/hook.err"
+expect_eq "B-16: nessun avviso dell'hook al checkout" "$(cat "$TRASH/hook.err")" ""
+run git shared status
+expect_out "B-16: sospeso" "suspended on this branch (not declared here)"
+expect_no_out "B-16: non incoerente" "inconsistent"
+expect_out "B-16: path dal branch che lo dichiara" "    path   c.h"
+expect_out "B-16: nota con il branch" \
+	"note   shared on branch 'main', not on this one: nothing to do here"
+run git shared update
+expect_rc "B-16: update codice 0" 0
+expect_eq "B-16: update non scrive nulla" "$ERR" ""
+run git shared publish
+expect_rc "B-16: publish codice 0" 0
+expect_fail "B-16: nessun file creato" test -e c.h
+git switch -q main 2>/dev/null
+run git shared status
+expect_out "B-16: su main allineato" "state  aligned"
+
+# .gitshared toccato a mano sul branch che dichiara il file: incoerente.
+git config -f .gitshared --remove-section shared.c.h
+run git shared status
+expect_out "B-16: sezione tolta a mano: incoerente" "inconsistent"
+git checkout -- .gitshared
+run git shared status
+expect_out "B-16: ripristinata: allineato" "state  aligned"
+
 done_testing

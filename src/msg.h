@@ -180,6 +180,7 @@ typedef enum {
     MSG_PEER_GONE,
     MSG_PEER_UNREACHABLE,
     MSG_STATUS_BRANCHES_GONE, /* branch attivi, path */
+    MSG_STATUS_ELSEWHERE,    /* branch */
 
     MSG_STATE_ALIGNED,
     MSG_STATE_TO_APPLY,
@@ -190,6 +191,7 @@ typedef enum {
     MSG_STATE_PENDING,
     MSG_STATE_UNLINKED,
     MSG_STATE_INCONSISTENT,
+    MSG_STATE_ABSENT,
 
     MSG_COUNT
 } eMsgId_t;

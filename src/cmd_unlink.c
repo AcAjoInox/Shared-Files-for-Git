@@ -61,7 +61,7 @@ static int unlink_orphan(Repo_t *r, GitBatch_t *b, SharedEntry_t *e)
     int found = 0;
     int rc = GS_EXIT_ERROR;
 
-    if (repo_declaring_branch(e->id, b, &branch, &found) != GS_OK) {
+    if (repo_declaring_branch(e->id, b, &branch, NULL, &found) != GS_OK) {
         msg_fatal(MSG_ERR_PROC, "git");
         rc = GS_EXIT_FATAL;
     } else if (found != 0) {

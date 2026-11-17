@@ -840,7 +840,7 @@ static eGsErr_t find_on_branches(const char *id, GitBatch_t *b,
 }
 
 eGsErr_t repo_declaring_branch(const char *id, GitBatch_t *b, Str_t *branch,
-                               int *found)
+                               Str_t *path, int *found)
 {
     static const char heads[] = "refs/heads/";
     Repo_t declared = REPO_INIT;
@@ -854,6 +854,10 @@ eGsErr_t repo_declaring_branch(const char *id, GitBatch_t *b, Str_t *branch,
         str_add(branch, (strncmp(str_cstr(&rev), heads, sizeof heads - 1U) == 0)
                             ? (str_cstr(&rev) + (sizeof heads - 1U))
                             : str_cstr(&rev));
+        if (path != NULL) {
+            str_reset(path);
+            str_add(path, str_cstr(&committed->path));
+        }
     }
     repo_close(&declared);
     str_free(&rev);

@@ -332,6 +332,8 @@ static const char *const msg_en[] = {
     [MSG_PEER_LEFT] = "no longer shares the file: run 'git shared prune'",
     [MSG_PEER_GONE] = "not found: if it was deleted, run 'git shared prune'",
     [MSG_PEER_UNREACHABLE] = "cannot be read now",
+    [MSG_STATUS_ELSEWHERE] =
+        "shared on branch '%s', not on this one: nothing to do here",
     [MSG_STATUS_BRANCHES_GONE] =
         "none of its active branches exists (%s): "
         "git shared branch %s -a <branch>",
@@ -345,6 +347,7 @@ static const char *const msg_en[] = {
     [MSG_STATE_PENDING] = "pending commit",
     [MSG_STATE_UNLINKED] = "unlinked",
     [MSG_STATE_INCONSISTENT] = "inconsistent",
+    [MSG_STATE_ABSENT] = "not declared here",
 };
 
 _Static_assert(sizeof msg_en / sizeof msg_en[0] == MSG_COUNT,

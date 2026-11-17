@@ -21,12 +21,18 @@ DESCRIPTION
     pending commit        set, link or unlink not committed yet: commit,
                           or restore .gitshared to cancel
     unlinked              declared here but not linked (a clone): link
-    inconsistent          linked here but not declared on this branch, or
-                          the file was deleted: unlink, or check branch
+    inconsistent          the file was deleted or renamed, or .gitshared
+                          was edited by hand, or no branch declares the
+                          file any more: unlink (with the id, for the
+                          last case), or restore .gitshared
     suspended on this branch (...)
                           this branch is not one of the file's branches:
                           it is a regular file here. The real state is
                           in brackets. 'git shared branch' changes it.
+    suspended on this branch (not declared here)
+                          this branch does not declare the file (it was
+                          created before set): the note says on which
+                          branch it is shared. Nothing to do.
 
 OPTIONS
     --peers

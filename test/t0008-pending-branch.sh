@@ -172,7 +172,7 @@ case "$ERR" in
 esac
 expect_ok "B-39: completato dal branch che lo dichiara" has_chain "$ID"
 expect_eq "B-39: attesa tolta" "$(pending_key "$ID" pending)" ""
-expect_out "B-39: su main la sezione non c'e'" "inconsistent"
+expect_out "B-39: su main la sezione non c'e' (B-16)" "suspended on this branch (not declared here)"
 git switch -q feat
 run git shared status
 expect_out "B-39: su feat collegato (attivo solo main)" \
