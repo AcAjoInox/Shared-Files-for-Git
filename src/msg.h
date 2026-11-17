@@ -99,6 +99,8 @@ typedef enum {
     MSG_WARN_PEER_UNREACHABLE, /* file, peer */
     MSG_WARN_SUSPENDED,      /* file */
     MSG_WARN_HOOK,           /* path dell'hook */
+    MSG_WARN_HOOK_NOT_SHELL, /* path dell'hook */
+    MSG_WARN_HOOK_REPAIRED,  /* path dell'hook */
     MSG_WARN_MERGE_DROPPED,  /* file */
     MSG_WARN_PRUNE_KEPT,     /* file, peer */
     MSG_WARN_BRANCH_MISSING, /* branch */

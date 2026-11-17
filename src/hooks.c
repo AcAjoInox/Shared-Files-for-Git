@@ -3,6 +3,7 @@
  */
 #include "hooks.h"
 
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -91,6 +92,82 @@ static eGsErr_t write_file(const char *path, const Str_t *text, int created)
     return err;
 }
 
+static int is_blank(char c)
+{
+    return (c == ' ') || (c == '\t') || (c == '\r');
+}
+
+/*
+ * 1 se l'hook e' uno script di shell, in cui il blocco (codice sh) si puo'
+ * inserire (reportIdea C-02, D-096). Vuoto o assente: si crea uno script
+ * sh. Con un byte nullo e' un binario: no. Senza "#!" git lo esegue con
+ * sh: si'. Con "#!" conta l'interprete, cioe' il nome finale del primo
+ * argomento; dopo "env" o "busybox" quello dell'argomento successivo, senza
+ * le opzioni ("env -S bash"). ".exe" in fondo non conta.
+ */
+static int hook_is_shell(const Str_t *old)
+{
+    static const char *const shells[] = { "sh", "bash", "dash", "zsh",
+                                          "ksh", "mksh", "ash" };
+    char word[32];
+    const char *p;
+    const char *end;
+    const char *tok;
+    size_t len;
+    size_t k;
+    int next = 1; /* si guarda ancora un argomento */
+    int shell = 0;
+
+    if (old->len == 0U) {
+        return 1;
+    }
+    if (memchr(old->buf, '\0', old->len) != NULL) {
+        return 0;
+    }
+    if (strncmp(old->buf, "#!", 2U) != 0) {
+        return 1;
+    }
+    p = old->buf + 2;
+    end = memchr(p, '\n', old->len - 2U);
+    end = (end != NULL) ? end : (old->buf + old->len);
+    while ((next != 0) && (p < end)) {
+        while ((p < end) && is_blank(*p)) {
+            p++;
+        }
+        tok = p;
+        while ((p < end) && !is_blank(*p)) {
+            p++;
+        }
+        len = (size_t)(p - tok);
+        if ((len == 0U) || (tok[0] == '-')) {
+            next = (len != 0U); /* fine riga: nessun interprete */
+            continue;           /* opzione di env: si salta */
+        }
+        for (k = len; (k > 0U) && (tok[k - 1U] != '/') && (tok[k - 1U] != '\\'); k--) {
+        }
+        tok += k;
+        len -= k;
+        if ((len > 4U) && (tok[len - 4U] == '.') &&
+            (tolower((unsigned char)tok[len - 3U]) == 'e') &&
+            (tolower((unsigned char)tok[len - 2U]) == 'x') &&
+            (tolower((unsigned char)tok[len - 1U]) == 'e')) {
+            len -= 4U;
+        }
+        next = 0;
+        if (len < sizeof word) {
+            memcpy(word, tok, len);
+            word[len] = '\0';
+            if ((strcmp(word, "env") == 0) || (strcmp(word, "busybox") == 0)) {
+                next = 1;
+            }
+            for (k = 0U; k < (sizeof shells / sizeof shells[0]); k++) {
+                shell = shell || (strcmp(word, shells[k]) == 0);
+            }
+        }
+    }
+    return shell;
+}
+
 static eGsErr_t install_one(const char *path, const Str_t *old, int exists,
                             const char *event)
 {
@@ -159,6 +236,7 @@ eGsErr_t hooks_sync(const Repo_t *r)
     int want;
     int has;
     int exists;
+    int shell;
     eGsErr_t one;
     eGsErr_t err = hooks_dir(r, &dir);
 
@@ -171,11 +249,21 @@ eGsErr_t hooks_sync(const Repo_t *r)
         exists = read_file(str_cstr(&path), &old);
         want = (hooks[i].want != 0U);
         has = (strstr(str_cstr(&old), HOOK_BEGIN) != NULL);
+        shell = hook_is_shell(&old);
         one = GS_OK;
-        if (want && !has) {
+        if (want && !has && shell) {
             one = install_one(str_cstr(&path), &old, exists, hooks[i].event);
-        } else if (!want && has) {
+        } else if (want && !has) {
+            /* Hook Python, Perl, binario...: non si tocca (C-02). Gli
+             * avvisi sono una comodita' (D-041): mancano solo loro. */
+            msg_warning(MSG_WARN_HOOK_NOT_SHELL, str_cstr(&path));
+        } else if (has && (!want || !shell)) {
+            /* Blocco non piu' usato, oppure messo in un hook non di shell
+             * da una versione precedente, che cosi' torna com'era. */
             one = remove_one(str_cstr(&path), &old);
+            if ((one == GS_OK) && !shell) {
+                msg_warning(MSG_WARN_HOOK_REPAIRED, str_cstr(&path));
+            }
         } else {
             /* gia' come deve essere */
         }

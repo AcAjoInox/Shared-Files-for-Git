@@ -232,6 +232,12 @@ static const char *const msg_en[] = {
     [MSG_WARN_PEER_UNREACHABLE] = "%s: peer %s not reachable",
     [MSG_WARN_SUSPENDED] = "%s: suspended on this branch",
     [MSG_WARN_HOOK] = "cannot install the hook '%s'",
+    [MSG_WARN_HOOK_NOT_SHELL] =
+        "%s is not a shell script: left as it is (no git shared warnings "
+        "from it: run 'git shared status' after checkout and merge)",
+    [MSG_WARN_HOOK_REPAIRED] =
+        "%s is not a shell script: removed the git shared block that an "
+        "earlier version had added",
     [MSG_WARN_MERGE_DROPPED] =
         "%s: the merge in progress was abandoned: dropped",
     [MSG_WARN_PRUNE_KEPT] =

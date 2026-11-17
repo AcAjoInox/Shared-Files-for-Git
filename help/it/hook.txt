@@ -14,7 +14,10 @@ DESCRIZIONE
             nessuno dei suoi branch attivi esiste piu'
 
     Gli hook esistenti restano: il blocco va subito dopo la loro prima
-    riga e il file tiene i suoi permessi. Un hook che hai disattivato
+    riga e il file tiene i suoi permessi. Il blocco entra solo negli
+    script di shell: un hook scritto in Python, Perl o in un'altra
+    lingua, o un binario, resta com'e', con un avviso (e un blocco che
+    una versione precedente ci aveva messo si toglie). Un hook che hai disattivato
     togliendogli il bit di esecuzione resta disattivato, blocco
     compreso. Nessun hook gira sul commit e nessun hook blocca mai
     git. Gli hook sono una comodita': 'git shared status' mostra le

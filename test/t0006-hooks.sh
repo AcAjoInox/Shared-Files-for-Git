@@ -206,4 +206,53 @@ else
 	done
 fi
 
+# --- hook non di shell: non si toccano (reportIdea C-02) --------------------------
+# Il blocco e' codice sh: in un hook Python o Perl lo renderebbe invalido,
+# in un binario lo troncherebbe al primo byte nullo.
+make_repo NS
+cd "$TRASH/NS" || exit 1
+put n.h n
+printf '#!/usr/bin/env python3\nimport sys\nsys.exit(0)\n' >.git/hooks/post-merge
+printf '#!/usr/bin/perl\nexit 0;\n' >.git/hooks/post-rewrite
+printf '\177ELF\002\001\001\000\000binario' >.git/hooks/post-checkout
+for h in post-merge post-rewrite post-checkout; do
+	cp ".git/hooks/$h" "$TRASH/NS-$h"
+done
+run git shared set -c n.h
+expect_rc "non sh: set riesce" 0
+for h in post-merge post-rewrite post-checkout; do
+	expect_ok "non sh: $h intatto" cmp -s ".git/hooks/$h" "$TRASH/NS-$h"
+	expect_err "non sh: avviso per $h" "$h is not a shell script"
+done
+run git shared hook install
+expect_ok "non sh: hook install non lo tocca" cmp -s .git/hooks/post-merge "$TRASH/NS-post-merge"
+
+# Shell scritta in modi diversi: il blocco entra.
+make_repo SH
+cd "$TRASH/SH" || exit 1
+put s.h s
+printf '#!/usr/bin/env bash\necho a\n' >.git/hooks/post-merge
+printf '#!/bin/sh -e\necho b\n' >.git/hooks/post-rewrite
+printf '#!/bin/busybox sh\necho c\n' >.git/hooks/post-checkout
+run git shared set -c s.h
+for h in post-merge post-rewrite post-checkout; do
+	expect_ok "shell: blocco in $h" has_block "$h"
+done
+expect_no_out "shell: nessun avviso" "not a shell script"
+expect_eq "shell: nessun avviso su stderr" "$ERR" ""
+
+# Hook Python rovinato da una versione precedente: il blocco si toglie.
+make_repo RP
+cd "$TRASH/RP" || exit 1
+put r.h r
+printf '#!/usr/bin/env python3\nimport sys\nsys.exit(0)\n' >"$TRASH/RP-orig"
+{
+	printf '#!/usr/bin/env python3\n'
+	printf '# >>> git shared >>>\ngit-shared hook post-merge "$@" </dev/null || :\n# <<< git shared <<<\n'
+	printf 'import sys\nsys.exit(0)\n'
+} >.git/hooks/post-merge
+run git shared set -c r.h
+expect_ok "riparato: blocco tolto dall'hook Python" cmp -s .git/hooks/post-merge "$TRASH/RP-orig"
+expect_err "riparato: avviso" "post-merge is not a shell script: removed the git shared block"
+
 done_testing

@@ -14,7 +14,10 @@ DESCRIPTION
             active branches exists any more
 
     Existing hooks are kept: the block goes right after their first
-    line, and the file keeps its permissions. A hook you disabled by
+    line, and the file keeps its permissions. Only shell scripts get the
+    block: a hook written in Python, Perl or another language, or a
+    binary, is left as it is, with a warning (and a block that an
+    earlier version put there is removed). A hook you disabled by
     removing its execute bit stays disabled, block included. No hook
     runs on commit and no hook ever blocks git. The hooks are a
     convenience: 'git shared status' shows the same information.
