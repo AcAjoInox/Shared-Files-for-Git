@@ -955,6 +955,8 @@ Non ancora decise. Ognuna diventa una decisione o viene scartata prima di entrar
 
 **Che cosa non cambia.** La catena, l'ordine per ascendenza, la regola fast-forward e "ricevere ≠ applicare" (D-013, D-014, D-015). La ref di una repo la scrive solo la repo stessa, con `update-ref` condizionato. La ricezione non tocca WT e index. In fase 2 il push della ref resta la notifica: D-051 lo descrive già così.
 
+**L'avviso vive solo in locale e non è mai versionato** (autore, 2026-11-17). Sta dentro `.git`, quindi non entra in nessun commit, non viaggia con clone, push o fetch, e non compare in `.gitshared`. Locale e remoto possono notificare in modi diversi, a una condizione: condividono tutto il modello, cioè catena `refs/shared/<id>`, ID, `.gitshared`, regola dello stato e ref avanzata solo in fast-forward dalla repo stessa. Così una repo con peer locali e remoti insieme (D-050) può ricevere una versione dall'avviso e inviarla con il push: è lo stesso oggetto della catena.
+
 **Verifica delle collisioni** (decisioni, requisiti e bug in `project.md`, `reportIdea.md`, `reportLocal.md`, `breef.md`):
 
 | Riferimento | Che cosa tocca | Come si risolve |
