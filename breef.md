@@ -11,7 +11,7 @@ Si può usare in due modi:
 - **in locale**, tra repo sulla stessa macchina. È la prima versione dell'estensione;
 - **in remoto**, tra repo ospitate su GitHub, GitLab o simili. È previsto per la seconda versione.
 
-Il meccanismo è lo stesso. Cambia solo come le repo si raggiungono e il momento in cui le versioni vengono inviate.
+Regole e comandi sono gli stessi. Cambiano come le repo si raggiungono, dove si scrive l'elenco dei peer e il momento in cui le versioni vengono inviate: il confronto è nella tabella in fondo a «Uso in remoto».
 
 ## I concetti di base
 
@@ -69,17 +69,17 @@ git shared update
 git commit -m "aggiorno common.h"
 ```
 
-**Se nel progetto c'è già una copia del file**, `link` non la sovrascrive: riusa quello che c'è. Se la copia è uguale a una versione del file shared, entra come *allineata* o *da applicare*, senza conflitti. Se è stata modificata partendo da una versione nota, entra come *divergente* e `git shared update` la unisce. Solo se le due copie non hanno niente in comune devi scegliere tu: `-f` per sovrascrivere, `--merge` per unirle a mano.
+**Se nel progetto c'è già una copia del file**, `link` non la sovrascrive: riusa quello che c'è. Se la copia è uguale a una versione del file shared, entra come *allineata* o *da applicare*, senza conflitti. Se è stata modificata partendo da una versione nota, entra come *divergente* e `git shared update` la unisce. Solo se le due copie non hanno niente in comune devi scegliere tu: `-f` per sovrascrivere, `--merge` per unirle a mano. *Non ancora nella prima versione:* per ora `link` rifiuta una destinazione che esiste già, salvo quando è lo stesso file shared rimasto scollegato (per esempio dopo un clone): allora lo ricollega senza toccarlo.
 
 **Se cambi branch** e lì il file shared è indietro, ricevi un avviso. Non viene modificato niente in automatico.
 
-**Decidi tu su quali branch il file è shared.** All'inizio lo è solo sul branch in cui hai lanciato `set` o `link`. Sugli altri branch è *sospeso*: lo modifichi come un file normale, senza blocchi, avvisi né pubblicazioni. Con `git shared branch` aggiungi o togli un branch dall'elenco; puoi indicare anche una famiglia di branch, per esempio `release/*`. L'elenco è locale alla repo. In `.gitshared` c'è un elenco di default, che viene copiato quando colleghi la repo (per esempio dopo un clone). Quando poi fai merge su un branch dove il file è shared, le tue modifiche risultano da pubblicare: non si perde niente.
+**Decidi tu su quali branch il file è shared.** All'inizio lo è solo sul branch in cui hai lanciato `set` o `link`. Sugli altri branch è *sospeso*: lo modifichi come un file normale, senza blocchi, avvisi né pubblicazioni. Con `git shared branch` aggiungi o togli un branch dall'elenco. In futuro si potrà indicare anche una famiglia di branch, per esempio `release/*`; la prima versione accetta solo nomi esatti. L'elenco è locale alla repo. In `.gitshared` c'è un elenco di default, che viene copiato quando colleghi la repo (per esempio dopo un clone). Quando poi fai merge su un branch dove il file è shared, le tue modifiche risultano da pubblicare: non si perde niente.
 
 **Se cancelli una repo**, le altre continuano a funzionare. `git shared prune` la toglie dall'elenco dei peer, in tutte le repo; una repo che in quel momento non si riesce a leggere resta. `git shared prune -n` mostra cosa toglierebbe.
 
 **Se sposti una repo**, al primo comando `git shared` l'estensione se ne accorge e ti suggerisce `git shared relocate`, che avvisa gli altri progetti. **Se la copi**, la copia lo dice allo stesso modo: `git shared relocate --copy` la fa diventare un progetto in più, e l'originale resta.
 
-**Se rinomini il file**, usa `git shared mv`. La rinomina vale solo per quella repo.
+**Se rinomini il file**, usa `git shared mv`. La rinomina vale solo per quella repo. *Non ancora nella prima versione:* per ora un file shared rinominato o cancellato risulta *incoerente*.
 
 ## Uso in remoto (seconda versione)
 Le repo stanno su un servizio di hosting. I peer non sono più path ma **URL**, scritti in `.gitshared`.
@@ -130,7 +130,7 @@ Gli stati che vedi in `git shared status`:
 | divergente | Tu e un peer avete modificato il file separatamente | `git shared update`, che unisce |
 | unione in corso | `update` ha trovato un conflitto, oppure l'hai risolto e messo in staging | Correggi il file, `git add`, poi `git shared update`; per rinunciare `git restore -s HEAD -SW <file>` |
 | in attesa di commit | Hai lanciato `set`, `link` o `unlink` ma non hai ancora committato | `git commit`, oppure `git restore` per annullare |
-| incoerente | Il file è stato rinominato o cancellato fuori da `git shared` | `git shared mv` o `git shared unlink` |
+| incoerente | Il file è stato rinominato o cancellato fuori da `git shared`. Si vede anche sui branch nati prima del `set`, dove il file non è ancora shared | `git shared unlink` (`git shared mv` non è ancora disponibile); sui branch vecchi si può ignorare |
 | sospeso | Su questo branch il file non è gestito come shared. Se nessuno dei suoi branch esiste più (es. lo hai rinominato) te lo dicono `status` e gli avvisi | Niente, oppure `git shared branch <file> -a <branch>` |
 | scollegato | La repo dichiara il file ma non conosce i peer (clone) | `git shared link` |
 
@@ -163,7 +163,4 @@ Le pagine sono file di testo nella cartella `help/` del progetto (`help/it/` per
 - Linux e Windows. Serve git 2.34 o più recente.
 - Al massimo 32 peer per file shared; path fino a 4096 caratteri. Nessun limite al numero di file shared per repo.
 - L'estensione va installata su ogni macchina che deve pubblicare o applicare versioni. Chi non ce l'ha usa comunque la repo normalmente.
-
-test shared dell'utente
-
-secondo test
+- Non ci sono ancora: `git shared mv`, `link` su una copia del file che esiste già, famiglie di branch (`release/*`), messaggi dei comandi in italiano (il manuale in italiano c'è).

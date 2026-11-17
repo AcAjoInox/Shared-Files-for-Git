@@ -7,7 +7,7 @@ L'obiettivo è realizzare un'estensione git per supportare una feature attualmen
 L'idea è quella di utilizzare file in maniera condivisa da più progetti (repo) git e, che, su ogni progetto, si possano aggiornare tali files in maniera semi-automatica (stile submodules) richiamando il comando dedicato di aggiornamento. In questo modo è sufficiente modificare un file su un singolo progetto git per riportare le modifiche su tutti i progetti che fanno uso del file condiviso.
 Uno degli esempi più eclatanti è quello degli header condivisi tra più progetti. Aggiornarli tutti ogni volta è una gran fatica ed è facile introdurre bug tra i vari aggiornamenti manuali.
 l'aggiornamento di un file shared deve produrre sempre un nuovo commit per essere in linea con la filosofia git dello snapshot. Infatti, deve essere sempre possibile il versionamento conologicamente univoco della singola repo.
-> Nota (D-007): il commit di aggiornamento è dedicato all'operazione shared ed è confermato dall'utente (o creato subito con `--commit`).
+> Nota (D-007): il commit di aggiornamento è dedicato all'operazione shared ed è confermato dall'utente (o creato subito con `--commit`). Nessun comando committa da solo: `update` prepara il file e il commit lo fa l'utente, oppure il comando stesso con `-c`/`-m` (D-075).
 
 Il progetto sarà scritto in linguaggio C. La scelta deriva dal fatto che git stesso è scritto in C e dal fatto che io, autore del programma, sono abbastanza skillato in C. Saranno usati script per lo più bash o python per i test.
 > Nota (D-063): il C non è una scelta assoluta. In architettura si deciderà come combinare programmi C e script `.sh` / `.bat`.
@@ -58,7 +58,7 @@ Nessuno degli strumenti di §2.2 offre insieme tutte queste caratteristiche:
 7. **Ogni aggiornamento è un commit** nella storia della repo, che resta cronologicamente univoca (§1).
 
 **Robustezza**
-8. **Stato sempre ricavabile.** Lo stato di un file shared si calcola dal contenuto della repo, non da dati salvati: hook saltati, merge, rebase, cloni e spostamenti non lo corrompono (D-041).
+8. **Stato sempre ricavabile.** Lo stato di un file shared si calcola dal contenuto della repo, non da dati salvati: hook saltati, merge, rebase, cloni e spostamenti non lo corrompono (D-041). Fanno eccezione due dati salvati, che valgono solo finché il contenuto della repo li conferma: l'operazione in attesa di commit (D-059) e l'unione in corso (D-078).
 9. **Resiste a repo cancellate, spostate o clonate**, con comandi dedicati per ricollegarsi (D-035, D-043, D-049).
 
 **Realizzazione**
@@ -86,7 +86,7 @@ Nessuno degli strumenti di §2.2 offre insieme tutte queste caratteristiche:
 > Lo studio degli interni di git (strutture, formati su disco, laboratori) è stato rimosso: non serve più. Restano solo i fatti a cui le decisioni rimandano.
 
 - **Le strutture interne di git non sono un'API.** `libgit.a` non è installata e cambia tra versioni: a git si accede solo tramite i suoi comandi (D-017).
-- **Plumbing e porcelain.** I comandi plumbing hanno output stabile e sono fatti per i programmi; l'output dei comandi porcelain può cambiare.
+- **Plumbing e porcelain.** I comandi plumbing hanno output stabile e sono fatti per i programmi; l'output dei comandi porcelain può cambiare. Eccezione nella v0: la storia del file, da cui si ricava la base, si legge con `git log --raw`, che è porcelain e risente della configurazione dell'utente (reportIdea B-32, aperto).
 - **I modi ammessi in un tree sono fissi** (`fsck` rifiuta gli altri): non si può introdurre un tipo "file condiviso" (T-02).
 - **Si possono creare namespace di ref propri** (`refs/shared/*`), ma non viaggiano con clone, fetch e push ordinari (D-013, D-043).
 - **`.git/config` e gli hook non sono versionati** e non passano con il clone (D-012, D-043).
@@ -277,7 +277,7 @@ Da leggere prima dei requisiti. I termini sono definiti nel glossario (§4), le 
 - macOS (D-024).
 
 ## 6. Architettura SW
-> Embrionale. Si riempie insieme alla prima implementazione minimale.
+> Descrive la v0 com'è nel codice: perimetro e avanzamento (§6.0), contesto (§6.1), moduli (§6.2), formati (§6.3), flussi (§6.4), errori (§6.5).
 
 ### 6.0 Perimetro della v0
 La v0 è il **core solo locale**: tutto ciò che serve perché due o più repo sulla stessa macchina condividano un file, senza i casi rari. Si costruisce in quattro passi, ognuno provabile da solo.
@@ -330,7 +330,7 @@ La v0 è il **core solo locale**: tutto ciò che serve perché due o più repo s
 **Fuori dalla v0**, in ordine di probabile arrivo: `link` su destinazione esistente e `--adopt` (D-062, D-064); `mv`; pattern dei branch attivi (D-056: nella v0 solo nomi esatti); seme (catena non trovata al `link`); messaggi dei comandi in italiano; hook da configurazione (git ≥ 2.54); prove con SHA-256 (il formato degli oid è già previsto).
 
 ### 6.1 Vista di contesto
-> Fatti verificati con il prototipo `hello/` (git 2.43, Windows, MinGW-w64 GCC 13.2). Su Linux, con git 2.34 e 2.56.1, li confermano i test di sistema (2026-11-17).
+> Fatti verificati con il prototipo `hello/`, poi eliminato (git 2.43, Windows, MinGW-w64 GCC 13.2). Su Linux, con git 2.34 e 2.56.1, li confermano i test di sistema (2026-11-17).
 
 ```
 utente ──> git ──(lancia git-shared)──> git-shared ──(processi figli)──> git: plumbing, fetch, push
@@ -363,7 +363,7 @@ I moduli di base non legati a git shared (`proc`, `sys`, `str`, `mem`, `err`) st
 | Livello | Modulo | Compito |
 |---|---|---|
 | Ingresso | `main` | Opzioni globali, tabella dei sottocomandi, codici di uscita |
-| Comandi | `cmd_*` | Un file per sottocomando: `set`, `link`, `unlink`, `status`, `update`, `publish`, `prune`, `branch`, `relocate`, `hook`, `help` |
+| Comandi | `cmd_*` | Un file per sottocomando: `set`, `link`, `unlink`, `status`, `update`, `publish`, `prune`, `branch`, `relocate`, `lang`, `hook`, `help` |
 | | `cmd_common` | Parti comuni: opzioni `-c`/`-m`/`-f`, apertura della repo, commit dedicato, scrittura di un blob nel file, scelta dei file su cui lavorare |
 | Modello | `shared` | La repo (`Repo_t`: radice, branch, voci) e i file shared (`.gitshared` + sezioni locali); completamento delle operazioni in attesa (REQ-F-023) |
 | | `state` | Derivazione dello stato e della base (D-054, D-065) |
@@ -374,7 +374,7 @@ I moduli di base non legati a git shared (`proc`, `sys`, `str`, `mem`, `err`) st
 | Accesso a git | `git` | Lancia comandi git; oid in binario (`Oid_t`, 33 byte); dialogo con `cat-file --batch-check` (`GitBatch_t`) |
 | Piattaforma | `proc` | Processi **senza shell**, con stdin e stdout in pipe: `proc_win.c` (`CreateProcess`), `proc_posix.c` (`fork` + `exec`) |
 | | `sys` | Argomenti in UTF-8, numeri casuali (`BCryptGenRandom`, `/dev/urandom`), file con path UTF-8 |
-| | `path` | Normalizzazione dei path (A-26) |
+| | `path` | Path come stringhe: assoluto o relativo, cartella e nome, unione con `.` e `..` risolti. I path delle repo non si normalizzano: si salvano come li restituisce `rev-parse --show-toplevel`, che su Windows dà sempre la stessa forma (reportIdea §5, A-26) |
 | Base | `str`, `mem` | Stringhe a lunghezza variabile, `xmalloc` (D-066) |
 | | `bounds`, `err` | Limiti (D-034); codici di errore interni e codici di uscita |
 | | `msg` | Tabelle dei messaggi (§8.5) |
@@ -382,7 +382,8 @@ I moduli di base non legati a git shared (`proc`, `sys`, `str`, `mem`, `err`) st
 #### Alberatura
 ```
 git-shared-file/
-├── project.md, breef.md, reportIdea.md
+├── project.md, breef.md, reportLocal.md
+├── reportIdea.md             solo locale (in .gitignore)
 ├── Makefile                  build Linux e Windows (MinGW)
 ├── src/                      il core
 │   ├── main.c
@@ -408,7 +409,6 @@ git-shared-file/
 ├── test/
 │   ├── lib.sh                funzioni comuni: repo di prova, asserzioni
 │   └── t0001-<scenario>.sh   uno scenario per file, numerati come i test di git
-├── hello/                    prototipo, da eliminare quando src/ lo sostituisce
 └── build/                    generato
 ```
 
@@ -461,7 +461,7 @@ Tutti i file in formato config di git si leggono e scrivono **solo** con `git co
 ```
 - `shared.selfPath`: radice della repo stessa, come la scrive `rev-parse --show-toplevel` (D-035, D-084). Scritto al primo comando con almeno un file collegato e da `relocate`.
 - `shared.<id>.branch`: branch attivi, nomi esatti nella v0 (D-055).
-- `shared.<id>.peer`: radice di ogni peer, normalizzata; al massimo 32 (D-034).
+- `shared.<id>.peer`: radice di ogni peer, come la scrive `rev-parse --show-toplevel` nella sua repo; al massimo 32 (D-034; nella v0 il limite si controlla solo al completamento di `link`, reportIdea B-38).
 - `shared.<id>.pending` (`set`, `link`, `unlink`) e `pendingSource` (solo `link`): operazione in attesa di commit (REQ-F-023). `pendingBranch`: branch su cui è stato lanciato il comando (assente con HEAD staccata, D-077). `pendingCommit` (solo `unlink`): HEAD al comando; la conferma è un suo discendente senza la sezione (D-081). `pendingPath`: path del file, solo per i messaggi, perché un'attesa vista da un altro branch non ha la sezione in `.gitshared`. Si scrive `pending` per ultima e si toglie per prima: senza `pending` le altre chiavi sono ignorate. Spariscono quando l'operazione si completa o viene scartata.
 - **Niente `name` né `path`** (D-068): stanno in `.gitshared`, che è per branch; duplicarli in config crea incoerenze (A-21).
 
@@ -508,7 +508,7 @@ Regola per tutti i flussi: **pochi processi git**, perché su Windows ognuno cos
 2. `config -z -f <top>/.gitshared --get-regexp ^shared\.`, mentre gli altri due finiscono.
 3. Un `cat-file --batch-check` per tutte le domande: `HEAD:<path>` (H) e `refs/shared/<id>:content` (T) di ogni file.
 4. Solo se c'è un'operazione in attesa: `config --blob HEAD:.gitshared` e il completamento.
-5. Solo se H ≠ T: blob delle versioni sullo stesso `cat-file` (due domande per versione) e un `git log --raw` sul path del file (D-065), interrotto appena possibile.
+5. Solo se H ≠ T e I ≠ T: blob di tutte le versioni, visitando il grafo della catena sullo stesso `cat-file` (tre domande per versione, D-091), e un `git log --raw` sul path del file (D-065), interrotto appena possibile. Scorciatoia: se il blob-versione più recente nella storia è quello di T, la base è T e la lettura si ferma. Quando lo stesso contenuto compare in più versioni può dare una base diversa dalla regola di D-065 (catena v1(A) v2(B) v3(A), storia A poi X: per la regola *divergente* con base v1, per la scorciatoia *da pubblicare* da v3), ma l'unione di (A, X, A) dà X: il contenuto che arriva ai peer è lo stesso.
 
 Caso comune (tutti i file allineati): **5 processi, qualunque sia il numero di file**.
 
@@ -567,6 +567,10 @@ Conferma cercata prima sul branch del comando e su HEAD; su tutti i branch local
 #### Completamento di un `set` (REQ-F-023)
 Quando la sezione con quell'ID compare in `refs/heads/<pendingBranch>:.gitshared` o, in mancanza, in `HEAD:.gitshared` (D-077; un `config --blob` per revisione, solo se c'è un'attesa): (1) branch attivi copiati dal default di `.gitshared`, o il branch del comando; (2) prima versione della catena (`mktree` dallo stdin, `commit-tree`, `update-ref` con valore vecchio vuoto: solo se la ref non esiste); (3) rimozione dell'attesa. L'ordine permette di ripetere tutto dopo un'interruzione. Il blob del file si prende dalla stessa revisione; se il file non c'è ancora, l'attesa resta e l'utente riceve un avviso. Se la sezione non è in nessuna delle due revisioni né nel working tree, e si è sul branch del comando, si cerca l'ID nel `.gitshared` degli altri branch locali (`for-each-ref refs/heads`, poi il blob di `<branch>:.gitshared` sul `cat-file` già aperto; ogni blob distinto si legge una volta sola): se un branch lo dichiara si completa da lì, altrimenti l'attesa viene scartata (D-079). Il `link` si completa allo stesso modo.
 ### 6.5 Gestione errori
+Ogni funzione che può fallire restituisce un `eGsErr_t` (`utils/err.h`: uso, fuori da una repo, processo non avviato, git con errore, formato inatteso, sistema; §8.4). Ogni comando traduce l'esito in un messaggio della tabella (§8.5) e in un codice di uscita come git (REQ-NF-008): 0 successo; 1 errore (modifiche locali, push rifiutato, conflitto aperto, file in attesa); 128 errore che impedisce di proseguire (dialogo con git interrotto, stdout chiuso); 129 uso sbagliato.
+- Gli hook escono sempre con 0: un problema diventa un avviso (§6.4).
+- Un peer irraggiungibile è un avviso, non un errore: gli altri peer ricevono comunque (REQ-F-008).
+- Le scritture si ordinano perché un errore a metà si possa ripetere: l'attesa si scrive per prima e si toglie per ultima (REQ-F-023), la catena avanza solo con `update-ref` condizionato (REQ-NF-005).
 
 ## 7. Strategia di verifica
 <!-- Matrice di tracciabilità V-cycle: REQ ↔ test di sistema / integrazione / unità. -->
@@ -636,7 +640,7 @@ Quando la sezione con quell'ID compare in `refs/heads/<pendingBranch>:.gitshared
 - Ogni funzione che può fallire restituisce un codice di errore (enum); nessun errore ignorato.
 
 ### 8.5 Testi e messaggi
-- Messaggi utente in tabelle statiche di stringhe (`const char *const msg_en[MSG_COUNT]`, `msg_it[...]`) indicizzate da un `enum`: nessuna allocazione, nessuna dipendenza (niente gettext).
+- Messaggi utente in tabelle statiche di stringhe (`const char *const msg_en[MSG_COUNT]`, `msg_it[...]`) indicizzate da un `enum`: nessuna allocazione, nessuna dipendenza (niente gettext). Nella v0 c'è solo `msg_en`: i messaggi dei comandi sono in inglese, il manuale anche in italiano (D-088).
 
 ## 9. Registro decisioni
 Le decisioni sono in ordine di ID, cioè cronologico. Il ragionamento che le lega, per argomento, è in §9.1. La colonna *Origine* cita le idee con il loro ID storico (I-xxx); la corrispondenza con i temi è in fondo a §9.1.

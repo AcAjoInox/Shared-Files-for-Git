@@ -1,12 +1,10 @@
 # Report sull'uso locale — git shared
 
-> **2026-11-16.** Baseline `project.md` v2.24 (D-001…D-086). Codice v0 con unione delle divergenze, ri-aggancio, comandi di manutenzione completi e `status --peers`: 718 test su 718, Windows, git 2.43. Riguarda solo la fase 1 (repo sulla stessa macchina). I bug sono in `reportIdea.md`; qui ci sono due giudizi: l'impatto atteso e la facilità d'uso.
+> **Aggiornato al 2026-11-17.** Baseline `project.md` v2.29 (D-001…D-091). Codice v0 con unione delle divergenze, ri-aggancio, comandi di manutenzione completi, `status --peers`, manuale per comando in inglese e italiano, catena letta come grafo: 845 test su 845 su Windows (git 2.43) e su Linux in WSL2 (git 2.34 e 2.56.1). Riguarda solo la fase 1 (repo sulla stessa macchina). I bug sono in `reportIdea.md` (file locale, non versionato); qui ci sono due giudizi: l'impatto atteso e la facilità d'uso.
 >
 > **Da dove vengono i giudizi.** Dalla lettura del codice, dai test e dalle prove fatte a mano con l'eseguibile durante la ricerca dei bug. Nessuno, a parte l'autore, lo ha ancora usato: la parte sull'uso è una valutazione ragionata, non una misura.
 >
-> **Aggiornamento 2026-11-17.** Linux provato in WSL2 (Ubuntu 22.04, GCC 11) con git 2.34 e 2.56.1, Windows anche con git 2.56.1: 832 test su 832 ovunque. Compatibilità dichiarata chiusa (D-090): non provata solo git 2.34 su Windows, ritenuta stabile; trovato e chiuso un bug sul modo degli hook (C-25, D-089). Aggiornati §2, §6 e §8; il resto è fermo al 2026-11-16.
->
-> **Seconda ricerca, 2026-11-17.** Nuova caccia ai bug sul flusso logico e sulla struttura, partendo dai bug noti: 7 problemi nuovi (B-46…B-51, C-26), di cui **uno grave** (B-46: dopo un'unione tra versioni una modifica può tornare indietro in silenzio). Sono in §9, non ancora riportati in `reportIdea.md`. Il giudizio "nessun bug grave aperto" di §6 non vale più.
+> **Storia.** 2026-11-16: prima stesura (718 test, v2.24). 2026-11-17: Linux provato e compatibilità dichiarata chiusa (C-25, D-089, D-090; non provata solo git 2.34 su Windows, ritenuta stabile); seconda ricerca di bug sul flusso logico e sulla struttura (§9: B-46…B-51, C-26, riportati anche in `reportIdea.md`); B-46, l'unico grave, chiuso (D-091); tutto il report riallineato a questo stato.
 
 ## 1. In breve
 
@@ -14,7 +12,8 @@
 - **È cambiato il valore per chi lo usa da solo.** Prima del merge una divergenza era un vicolo cieco; ora ogni stato ha un comando che ne fa uscire. Da "prototipo che funziona nei casi buoni" è diventato "strumento usabile ogni giorno da chi lo conosce".
 - **È cambiata la credibilità come dimostrazione.** La promessa che lo distingue dagli altri strumenti ("nessuna modifica si perde, le divergenze si uniscono", `project.md` §2.3 punto 5) ora è codice provato, non un requisito.
 - **L'uso quotidiano è semplice**: cinque comandi, uno o due in più rispetto al normale lavoro con git. **L'uso fuori dal caso normale è meno semplice**: dieci stati, e alcune trappole in cui si finisce senza aver sbagliato nulla (§4).
-- **Le trappole più probabili sono chiuse** (B-39, B-40, C-20, clone: D-079, D-080). Prima di usarlo sul lavoro vero restano da sapere quelle di §4, che si chiudono con i comandi di manutenzione mancanti.
+- **Le trappole più probabili sono chiuse** (B-39, B-40, C-20, clone: D-079, D-080; manutenzione: D-081…D-085). Prima di usarlo sul lavoro vero restano da sapere quelle di §4 ancora aperte, quasi tutte nelle unioni tra versioni (B-47, B-48).
+- **Nessun bug grave aperto.** B-46, trovato dalla seconda ricerca (§9), è chiuso (D-091): la versione di un peer unita da un'altra repo ora è riconosciuta, e il suo `update` non rimette più ciò che l'altra repo aveva tolto.
 
 ## 2. È migliorata l'aspettativa di impatto?
 
@@ -22,7 +21,7 @@
 |---|---|---|---|
 | Uso personale, più repo sulla stessa macchina | Funziona finché nessuno modifica da una versione vecchia; poi "merging is not implemented yet" | Ciclo completo: modifica, pubblicazione, applicazione, unione, conflitto | **Sì, molto** |
 | Robustezza | 1 dato salvato fragile previsto (merge in `.git/`), vicoli ciechi con squash e amend | Stato sempre ricavato; l'unica ref salvata vale solo se l'index la conferma; squash e amend si chiudono con un `update` | **Sì** |
-| Valore come dimostrazione ("un file condiviso con una ref e il solo trasporto git") | Idea documentata, metà realizzata | Realizzata per il locale, con 718 test e un registro di 86 decisioni | **Sì** |
+| Valore come dimostrazione ("un file condiviso con una ref e il solo trasporto git") | Idea documentata, metà realizzata | Realizzata per il locale, con 845 test e un registro di 91 decisioni | **Sì** |
 | Adozione da parte di altri | Di nicchia | Di nicchia | **No** |
 | Uso in un gruppo | Impossibile (una macchina) | Impossibile (una macchina) | **No** |
 
@@ -35,8 +34,8 @@
 **Che cosa è cambiato davvero.** Il rischio del progetto. Prima la parte più difficile, il merge senza stato salvato, era una scommessa; ora è fatta e non ha richiesto di toccare il modello. La fase 2 parte da una base che regge, e il suo dubbio principale resta uno solo: A-01, cioè se gli hosting accettano `refs/shared/*`.
 
 **Che cosa alzerebbe l'impatto, in ordine di resa.**
-1. I comandi di manutenzione sono completi (ri-aggancio, `unlink`, `prune`, `branch`, `relocate`: D-080…D-084) e i silenzi principali sono chiusi (D-085): un file sospeso perché il suo branch non esiste più viene segnalato, e un comando su un file in attesa dice perché non fa nulla.
-2. ~~Linux compilato e provato~~: fatto (WSL2, Ubuntu 22.04, git 2.34). Resta B-12 (fine riga) da decidere.
+1. ~~Comandi di manutenzione e silenzi~~: fatti. Ri-aggancio, `unlink`, `prune`, `branch` e `relocate` ci sono (D-080…D-084); un file sospeso perché il suo branch non esiste più viene segnalato, e un comando su un file in attesa dice perché non fa nulla (D-085).
+2. ~~Linux compilato e provato~~: fatto (WSL2, Ubuntu 22.04, git 2.34 e 2.56.1). Resta B-12 (fine riga) da decidere.
 3. La prova di A-01: decide se la fase 2 esiste.
 4. Un confronto pubblico e onesto con git-subrepo, Copybara e peru.
 
@@ -72,7 +71,7 @@ Con N repo, una modifica costa **N + 1 comandi**: un `publish` e un `update` in 
 - **Due passi per finire**: commit e poi `publish`. Dimenticare il secondo non dà errori: gli altri restano indietro in silenzio.
 - **`status` guarda solo la repo corrente**, salvo con `--peers` (D-086), che dice per ogni peer se ha la stessa versione, una più vecchia (`publish`) o una più nuova (`update`). Dopo un'unione e il commit `status` da solo dice *allineato* anche se i peer non hanno ancora la versione: bisogna sapere di chiedere `--peers`.
 - **Il completamento "al primo comando".** Dopo il commit di un `set` o `link` fatto senza `-c`, i peer non sanno nulla finché non lanci un qualunque `git shared`. È corretto ma non è intuitivo.
-- **Messaggi solo in inglese** e manuale solo incorporato (`git shared help`).
+- **Messaggi solo in inglese.** Il manuale invece c'è anche in italiano (`git shared lang it`): una pagina per comando, leggibile anche in `help/` (D-087, D-088).
 
 ## 4. Facilità d'uso: le trappole
 
@@ -93,15 +92,17 @@ Situazioni in cui si arriva senza aver sbagliato nulla, con l'uscita che c'è og
 | `link`, ritocco del file, commit | *diverged*, poi un conflitto sull'intero file | Risolvere il conflitto | B-41 |
 | Risolvere un conflitto tenendo esattamente la propria versione | L'unione risulta abbandonata, di nuovo *diverged* | Cambiare almeno un carattere | limite di D-078 |
 | Committare la risoluzione prima di rilanciare `update` | Di nuovo *diverged* | Rilanciare `update`: di solito unisce da solo | limite di D-078 |
+| Unione abbandonata con `git restore`, poi una modifica qualsiasi messa in staging | *merge in progress*; `update -c` prende la modifica per la risoluzione e la versione perde le righe del peer, in silenzio | Dopo l'abbandono lanciare subito `git shared update`, che toglie l'unione scaduta | B-48 |
+| Catena locale persa (`push --mirror` da un clone, `fetch --prune` con `+refs/*:refs/*`) | *inconsistent*, e il consiglio è sbagliato; `update` fallisce | Solo `unlink`, che smonta la condivisione | B-51 |
 
-Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a mano, e nessuna resta muta. Il silenzio che rimane è voluto: un file sospeso su un branch che esiste ancora non avvisa, perché può essere una scelta.
+Nessuna di queste quindici situazioni richiede di modificare `.git/config` a mano. Una sola resta muta: B-48, finché non è corretto. L'altro silenzio è voluto: un file sospeso su un branch che esiste ancora non avvisa, perché può essere una scelta.
 
 ## 5. Giudizio per tipo di utente
 
 | Utente | Caso normale | Quando qualcosa non torna |
 |---|---|---|
 | L'autore, o chi conosce bene git (index, ref, rebase) | **Facile.** Cinque comandi, logica riconoscibile | **Gestibile.** Sa leggere `.git/config` e le ref |
-| Sviluppatore che usa git ogni giorno senza conoscerne gli interni | **Facile**, dopo aver letto il breef una volta | **Difficile.** Stati come *inconsistent* o *unlinked* non hanno un comando di uscita |
+| Sviluppatore che usa git ogni giorno senza conoscerne gli interni | **Facile**, dopo aver letto il breef una volta | **Gestibile, con qualche intoppo.** Ogni stato dice il comando da lanciare (*unlinked* si risolve con `link`); confonde ancora *inconsistent* sui branch nati prima del `set` (B-16) |
 | Chi usa git solo da interfaccia grafica | **Medio.** Deve aprire un terminale per `publish` e `update` | **Molto difficile** |
 
 ## 6. Robustezza: su che cosa poggia il giudizio
@@ -110,10 +111,10 @@ Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a
 - Lo stato si ricava ogni volta dal contenuto della repo: hook saltati, rebase, reset non lo corrompono.
 - Ogni avanzamento della catena è condizionato e solo in fast-forward: una versione non viene mai sovrascritta.
 - Il contenuto del file non passa mai dai buffer del programma: viaggia come blob tra comandi git.
-- 832 test di sistema, che lanciano i comandi come farebbe l'utente.
+- 845 test di sistema, che lanciano i comandi come farebbe l'utente.
 
 **Punti deboli, da sapere.**
-- ~~**Nessun bug grave aperto**~~, 28 tra medi e minori (`reportIdea.md` §2). **Non vale più:** la seconda ricerca (§9) ha trovato B-46, grave, e altri 6 problemi, quasi tutti nelle unioni tra versioni (D-078).
+- **Nessun bug grave aperto**: B-46, trovato dalla seconda ricerca (§9), è chiuso (D-091). Restano 34 problemi tra medi e minori (`reportIdea.md` §2), tra cui tre nelle unioni tra versioni (B-47, B-48, B-49).
 - **Linux provato solo in WSL2** (Ubuntu 22.04, git 2.34 e 2.56.1, GCC 11): tutti i test passano, ma nessun uso reale su una macchina Linux.
 - **Fine riga** (B-12): tra repo con normalizzazioni diverse ogni versione risulterebbe una modifica.
 - **La base si ricava dai blob nella storia.** Uno squash la cancella: il file risulta *diverged* anche se non lo è. Con il merge si chiude da solo, ma l'utente vede comunque uno stato che non si aspetta (B-42). Il caso contrario, revert più squash, riporta in silenzio la versione che si voleva togliere.
@@ -124,23 +125,24 @@ Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a
 
 1. ~~C-20~~ e ~~ri-aggancio dopo un clone~~: fatti (D-080).
 2. ~~`unlink`~~, ~~`prune`~~, ~~`branch`~~, ~~`relocate`~~, ~~nota per i branch spariti~~: fatti (D-081…D-085).
-3. ~~B-37~~, ~~`status --peers`~~: fatti (D-085, D-086).
-4. **B-16.** Toglie *inconsistent* dai branch vecchi, lo stato che confonde di più.
-5. **Un `update` che dopo il commit dell'unione pubblica da solo** (o lo propone): chiude il "due passi per finire" nel caso in cui dimenticarlo costa di più.
-6. **Usarlo davvero per qualche settimana** sugli header reali, annotando ogni volta che serve aprire `.git/config`. È la misura che manca a questo report.
+3. ~~B-37~~, ~~`status --peers`~~, ~~B-46~~: fatti (D-085, D-086, D-091).
+4. **Unioni tra versioni: B-47, B-48, B-49** (§9). Sono gli ultimi problemi che possono far perdere o confondere una versione.
+5. **B-16.** Toglie *inconsistent* dai branch vecchi, lo stato che confonde di più.
+6. **Un `update` che dopo il commit dell'unione pubblica da solo** (o lo propone): chiude il "due passi per finire" nel caso in cui dimenticarlo costa di più.
+7. **Usarlo davvero per qualche settimana** sugli header reali, annotando ogni volta che serve aprire `.git/config`. È la misura che manca a questo report.
 
 ## 8. Quanto manca a una versione buona per l'uso locale
 
-> **Stima del 2026-11-17**, sullo stato di `v0.2.0` + `status --peers` (718 test, `project.md` v2.24). È una stima, non una misura: si basa sui bug aperti di `reportIdea.md`, sulle prove fatte con l'eseguibile e sul ritmo di lavoro degli ultimi giorni.
+> **Stima del 2026-11-17, aggiornata dopo D-091** (845 test, `project.md` v2.29). È una stima, non una misura: si basa sui bug aperti di `reportIdea.md`, sulle prove fatte con l'eseguibile e sul ritmo di lavoro degli ultimi giorni.
 
 ### 8.1 Che cosa vuol dire "buona"
 
 Una versione che l'autore, e un collega che conosce git, possono usare ogni giorno sugli header reali senza sorprese. In concreto, cinque condizioni verificabili:
 
-1. **Nessun vicolo cieco e nessun silenzio** nell'uso comune: ogni stato ha un comando che ne fa uscire, ogni comando dice cosa ha fatto. *Oggi: raggiunto* (D-078…D-086).
-2. **Nessuno stato sbagliato** dovuto alla configurazione o all'ambiente dell'utente (config git, hook esistenti, path con accenti).
-3. **Le due piattaforme dichiarate funzionano**: tutti i test passano su Windows e su Linux.
-4. **L'aiuto standard funziona**: `git shared --help` apre il manuale invece di un errore.
+1. **Nessun vicolo cieco e nessun silenzio** nell'uso comune: ogni stato ha un comando che ne fa uscire, ogni comando dice cosa ha fatto. *Oggi: raggiunto* (D-078…D-086), salvo il silenzio di B-48 (§4, §9).
+2. **Nessuno stato sbagliato** dovuto alla configurazione o all'ambiente dell'utente (config git, hook esistenti, path con accenti). *Oggi: no* (B-32, C-02, C-05).
+3. **Le due piattaforme dichiarate funzionano**: tutti i test passano su Windows e su Linux. *Oggi: raggiunto* (D-089, D-090).
+4. **L'aiuto standard funziona**: `git shared --help` apre il manuale invece di un errore. *Oggi: raggiunto* (D-087).
 5. **Provata nell'uso vero**: qualche settimana sugli header reali, senza dover aprire `.git/config` a mano.
 
 ### 8.2 A che punto siamo
@@ -148,8 +150,8 @@ Una versione che l'autore, e un collega che conosce git, possono usare ogni gior
 | Area | Stato | Commento |
 |---|---|---|
 | Funzioni | **~95%** | Ciclo completo, unione delle divergenze, manutenzione (`unlink`, `prune`, `branch`, `relocate`), `status --peers`. Mancano solo funzioni non essenziali (`mv`, `link` su un file esistente, pattern dei branch) |
-| Correttezza su Windows | **~85%** | Nessun bug grave. Restano casi medi legati all'ambiente (§8.3, gruppo B) |
-| Linux | **~85%** | Provato in WSL2 (Ubuntu 22.04) con git 2.34, il minimo di D-032, e con 2.56.1, l'ultima stabile: compila senza warning, 832 test su 832 con entrambe. Compatibilità chiusa (D-090). Mancano le misure (punto 9) e l'uso su una macchina Linux vera |
+| Correttezza su Windows | **~85%** | Nessun bug grave (B-46 chiuso, D-091). Restano le unioni tra versioni (B-47…B-49) e casi medi legati all'ambiente (§8.3) |
+| Linux | **~85%** | Provato in WSL2 (Ubuntu 22.04) con git 2.34, il minimo di D-032, e con 2.56.1, l'ultima stabile: compila senza warning, tutti i test passano con entrambe (845 dopo D-091). Compatibilità chiusa (D-090). Mancano le misure (punto 9) e l'uso su una macchina Linux vera |
 | Documentazione per l'utente | **~90%** | Pagina per comando in `help/`, anche in italiano (`git shared lang it`); `git shared -h` spiega come aprire il manuale; `git shared --help` funziona dopo `make install` (su Windows serve copiare la pagina HTML con i permessi di amministratore). Messaggi dei comandi solo in inglese |
 | Uso reale | **0%** | Solo test automatici |
 
@@ -163,6 +165,7 @@ Unità di misura: una **sessione** è un blocco di lavoro come quelli degli ulti
 
 | # | Lavoro | Bug | Stima | Perché è indispensabile |
 |---|---|---|---|---|
+| 0 | Unioni tra versioni (§9): ~~B-46~~ fatto (D-091); restano B-47 (avanzamento non fast-forward), B-48 (unione abbandonata che torna viva), B-49 (versione doppia), con i test in `t0009` | B-47…B-49 | 1–1,5 | B-48 perde in silenzio le righe di un peer; B-47 viola il solo fast-forward |
 | 1 | Stato indipendente dalla config git: `--root` e merge fissati in `find_base`, o `rev-list` + `diff-tree` | B-32 | 0,5 | Con `log.showRoot=false` un file si vede *diverged* e `publish` rifiuta: stato sbagliato da una preferenza dell'utente |
 | 2 | Branch nati prima del `set`: sezione assente sul branch = file non presente qui, non *inconsistent* | B-16 | 1 | È lo stato che confonde di più e propone un comando sbagliato |
 | 3 | Hook non `sh` (Python, binari): non inserire il blocco, avvisare | C-02 | 0,5 | Oggi un hook Python viene rotto da `set` |
@@ -170,10 +173,10 @@ Unità di misura: una **sessione** è un blocco di lavoro come quelli degli ulti
 | 5 | ~~`git shared --help`~~: fatto (D-087), con una pagina per comando in `help/` | REQ-F-019 | – | – |
 | 6 | ~~**Linux**: compilare e far passare i test~~: fatto in WSL2. Due hook di prova senza `chmod +x` in t0006; un bug sul modo degli hook dell'utente (C-25, D-089). C-19 provato: senza effetti con git | C-19 | – | – |
 | 7 | Fine riga e bit di esecuzione: `link` confronta gli attributi `text`/`eol` con la sorgente e avvisa; il modo `100755` si conserva | B-12, C-11 | 1–1,5 | Tra repo con normalizzazioni diverse ogni versione sembra una modifica e i merge diventano conflitti sull'intero file |
-| 8 | Minori che si incontrano davvero: `set .gitshared`, cartella hook assente, `config --unset` con più valori, path assoluti, maiuscole su Windows, `link` interrotto, staging non protetto, avviso se la sorgente non è allineata | B-36, C-04, C-09, C-13, C-12, C-21, B-43, B-44 | 1,5 | Ognuno è raro, insieme sono la differenza tra "funziona" e "non sorprende" |
+| 8 | Minori che si incontrano davvero: `set .gitshared`, cartella hook assente, `config --unset` con più valori, path assoluti, maiuscole su Windows, `link` interrotto, staging non protetto, avviso se la sorgente non è allineata, `link` da un worktree secondario | B-36, C-04, C-09, C-13, C-12, C-21, B-43, B-44, B-50 | 1,5–2 | Ognuno è raro, insieme sono la differenza tra "funziona" e "non sorprende" |
 | 9 | Misure: `status` con molti file, `publish` verso 32 peer, costo di un'unione; su Windows e Linux | REQ-NF-007 | 0,5 | Le soglie sono requisiti; oggi misurate solo fino a 8 peer |
-| 10 | Riallineare i documenti: `breef.md` (limiti della v0), §5 di questo report, incoerenze aperte di `reportIdea.md` §8 | – | 0,5 | Il breef è la porta d'ingresso per chi non è l'autore |
-| | **Totale A** | | **6–8 sessioni** | |
+| 10 | ~~Riallineare i documenti~~: fatto il 2026-11-17 (`breef.md`, `project.md`, questo report). Restano le incoerenze di `reportIdea.md` §8 che si chiudono nel codice | – | – | – |
+| | **Totale A** | | **6,5–8 sessioni** | |
 
 **B. Uso reale**
 
@@ -188,24 +191,24 @@ Unità di misura: una **sessione** è un blocco di lavoro come quelli degli ulti
 - `update` che dopo il commit di un'unione propone `publish`: chiude il "due passi per finire" (§3.3).
 - Messaggi in italiano, test di unità e matrice di tracciabilità completa (`reportIdea.md` §7 punto 11): importanti per un processo V-cycle, non per l'uso.
 - C-14, C-15, C-16, C-18, C-08, B-38: qualità del codice e casi limite.
+- B-51 (catena locale persa: `update` che la rifà dai peer) e C-26 (`chain_blobs` che parte dalla T già letta): casi rari, oggi senza perdita.
 
 ### 8.4 In sintesi
 
 | | Sessioni | Calendario |
 |---|---|---|
-| Indispensabili (A) | 6–8 | 1–2 settimane al ritmo attuale |
+| Indispensabili (A) | 6,5–8 | 1–2 settimane al ritmo attuale |
 | Uso reale e correzioni (B) | 1–2 | 2–4 settimane, in parallelo al resto |
 | **Versione buona per l'uso locale** | **circa 8–10** | **circa un mese** |
 
 Tappe proposte, con un tag ciascuna:
 
-- **`v0.3.0`**: punti 1–5 e 8. Corretta su Windows anche con config e ambienti diversi, `--help` funzionante.
-- **`v0.4.0`**: punti 6, 7 e 9. Linux provato, fine riga gestiti, prestazioni misurate.
-- **`v1.0.0-locale`**: dopo l'uso reale (punti 11–12) e il riallineamento dei documenti (punto 10).
+- **`v0.3.0`**: punti 0–4 e 8. Unioni tra versioni corrette, stato giusto anche con config e ambienti diversi (`--help` è già fatto).
+- **`v0.4.0`**: punti 7 e 9. Fine riga e bit di esecuzione gestiti, prestazioni misurate (Linux è già provato).
+- **`v1.0.0-locale`**: dopo l'uso reale (punti 11–12).
 
 **Il rischio maggiore era Linux** (punto 6): provato in WSL2 il 2026-11-17, non ha mostrato problemi di fondo. Ora il rischio maggiore è l'uso reale, che per definizione trova cose che i test non cercano.
 
-> **Nota:** la tabella di §5 è in parte superata. "Stati come *inconsistent* o *unlinked* non hanno un comando di uscita" non vale più: *unlinked* si risolve con `link` (D-080), *inconsistent* con `unlink <id>` o `branch` (D-081, D-083). Resta la confusione di *inconsistent* sui branch vecchi (punto 2).
 
 ## 9. Seconda ricerca di bug: flusso logico e struttura (2026-11-17)
 
@@ -215,7 +218,7 @@ Tappe proposte, con un tag ciascuna:
 
 | ID | Gr. | Problema | Verifica | Dove |
 |---|---|---|---|---|
-| B-46 | **A** | La versione di un peer unita da un'altra repo non è riconosciuta come versione: il peer la vede *divergente*, e il suo `update` reintroduce in silenzio ciò che l'altra repo aveva tolto | Provato | `chain_blobs`, `find_base`, `cmd_has_local_changes` |
+| B-46 | **A** | La versione di un peer unita da un'altra repo non è riconosciuta come versione: il peer la vede *divergente*, e il suo `update` reintroduce in silenzio ciò che l'altra repo aveva tolto | Provato; **chiuso** (D-091) | `chain_blobs`, `find_base`, `cmd_has_local_changes` |
 | B-47 | M | `update`: T avanza su una versione ricevuta che non la contiene (avanzamento non fast-forward) | Provato | `receive` in `cmd_update.c` |
 | B-48 | M | Unione abbandonata con `git restore`, poi una modifica qualsiasi in staging: `update` la prende per la risoluzione e scarta le modifiche del peer | Provato | `merge_is_live`, `settle_merge` |
 | B-49 | B | Ogni conclusione di un conflitto tra versioni crea una seconda versione di unione, ridondante | Provato | `update_entry`, `merge_step` |
@@ -226,6 +229,7 @@ Tappe proposte, con un tag ciascuna:
 ### 9.2 Schede
 
 **B-46 — La versione del peer, dopo un'unione, non è più una versione** (provato; gravità A)
+- **Chiuso il 2026-11-17 (D-091).** `chain_blobs` visita il grafo della catena con entrambi i genitori, sullo stesso `cat-file`. Il test chiesto qui sotto è in `t0009`: con l'eseguibile precedente 6 dei 13 test nuovi falliscono, tra cui la riga rimessa in silenzio.
 - *Scenario.* A e B allineati a v1. A pubblica vA mentre B non è raggiungibile. B modifica la riga 4 e pubblica: crea vB, A la rifiuta (B-35). A lancia `update`: unione pulita, versione M con genitori (vA, vB), commit, `publish`: B accetta M in fast-forward, perché M discende da vB. Poi A decide che la riga di B è sbagliata, la toglie, committa e pubblica V2.
 - *Che cosa succede in B.* H = contenuto di vB, T = V2, che discende da vB. Lo stato giusto è *da applicare*; `status` dice *diverged* e `publish` rifiuta. `update -c` fa un'unione a 3 vie con base v1: la riga 4 è cambiata solo "dalla parte di B" e torna `l4-B`. Nasce una versione nuova, B la pubblica, A la applica con `update`: **la rimozione fatta da A è annullata in silenzio in entrambe le repo** (provato, contenuto finale `l4-B` in A e in B). Viola la regola 5 del breef ("Nessuna modifica viene scartata").
 - *Anche senza la rimozione:* B vede *diverged* per una versione che contiene già la sua, e `update` stampa "merged … run 'git shared publish'" anche quando il risultato è T e non c'è niente da pubblicare. Se A, risolvendo un conflitto, ha scelto righe diverse da quelle di B, B si ritrova in conflitto su ciò che A ha già risolto.
@@ -266,5 +270,5 @@ Tappe proposte, con un tag ciascuna:
 ### 9.3 Che cosa cambia nel giudizio
 
 - **La parte da rivedere è l'unione tra versioni** (D-078). Il percorso provato dai test è "una repo unisce e pubblica"; non c'è un test sul **peer la cui versione è stata unita**, che è proprio il caso in cui nascono B-46 e B-49. B-46, B-47 e B-48 hanno la stessa radice: la catena è un grafo, ma il codice la legge come una lista (primo genitore) e decide "chi contiene chi" senza chiederlo a git.
-- **Effetto sulla stima di §8.** Va aggiunto agli indispensabili (A) un punto "Unioni tra versioni: B-46…B-49, con test del peer che riceve l'unione", stimato **1,5–2 sessioni**: il totale A passa a 7,5–10 sessioni. B-50 rientra nel punto 8 (minori che si incontrano davvero), B-51 e C-26 nei non necessari (C).
-- **Fino alla correzione di B-46**, nell'uso reale conviene evitare le divergenze tra versioni: lanciare `git shared update` prima di ogni `publish` (rende raro B-35, da cui nascono) e, dopo un'unione fatta da un'altra repo, controllare il risultato di `update` prima di pubblicarlo.
+- **Effetto sulla stima di §8**, già riportato in §8.3. Le unioni tra versioni sono il punto 0 degli indispensabili (A): B-46 è fatto, B-47…B-49 sono stimati 1–1,5 sessioni. B-50 rientra nel punto 8 (minori che si incontrano davvero), B-51 e C-26 nei non necessari (C).
+- **Cautele nell'uso reale, finché B-47 e B-48 restano aperti:** lanciare `git shared update` prima di ogni `publish` (rende raro B-35, da cui nascono le divergenze tra versioni) e, dopo aver abbandonato un'unione con `git restore`, lanciare subito `git shared update`, che toglie l'unione scaduta.
