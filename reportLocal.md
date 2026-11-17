@@ -4,7 +4,7 @@
 >
 > **Da dove vengono i giudizi.** Dalla lettura del codice, dai test e dalle prove fatte a mano con l'eseguibile durante la ricerca dei bug. Nessuno, a parte l'autore, lo ha ancora usato: la parte sull'uso è una valutazione ragionata, non una misura.
 >
-> **Aggiornamento 2026-11-17.** Linux provato in WSL2 (Ubuntu 22.04, GCC 11) con git 2.34 e 2.56.1, Windows anche con git 2.56.1: 832 test su 832, come su Windows; trovato e chiuso un bug sul modo degli hook (C-25, D-089). Aggiornati §2, §6 e §8; il resto è fermo al 2026-11-16.
+> **Aggiornamento 2026-11-17.** Linux provato in WSL2 (Ubuntu 22.04, GCC 11) con git 2.34 e 2.56.1, Windows anche con git 2.56.1: 832 test su 832 ovunque. Compatibilità dichiarata chiusa (D-090): non provata solo git 2.34 su Windows, ritenuta stabile; trovato e chiuso un bug sul modo degli hook (C-25, D-089). Aggiornati §2, §6 e §8; il resto è fermo al 2026-11-16.
 
 ## 1. In breve
 
@@ -147,7 +147,7 @@ Una versione che l'autore, e un collega che conosce git, possono usare ogni gior
 |---|---|---|
 | Funzioni | **~95%** | Ciclo completo, unione delle divergenze, manutenzione (`unlink`, `prune`, `branch`, `relocate`), `status --peers`. Mancano solo funzioni non essenziali (`mv`, `link` su un file esistente, pattern dei branch) |
 | Correttezza su Windows | **~85%** | Nessun bug grave. Restano casi medi legati all'ambiente (§8.3, gruppo B) |
-| Linux | **~85%** | Provato in WSL2 (Ubuntu 22.04) con git 2.34, il minimo di D-032, e con 2.56.1, l'ultima stabile: compila senza warning, 832 test su 832 con entrambe. Mancano le misure (punto 9) e l'uso su una macchina Linux vera |
+| Linux | **~85%** | Provato in WSL2 (Ubuntu 22.04) con git 2.34, il minimo di D-032, e con 2.56.1, l'ultima stabile: compila senza warning, 832 test su 832 con entrambe. Compatibilità chiusa (D-090). Mancano le misure (punto 9) e l'uso su una macchina Linux vera |
 | Documentazione per l'utente | **~90%** | Pagina per comando in `help/`, anche in italiano (`git shared lang it`); `git shared -h` spiega come aprire il manuale; `git shared --help` funziona dopo `make install` (su Windows serve copiare la pagina HTML con i permessi di amministratore). Messaggi dei comandi solo in inglese |
 | Uso reale | **0%** | Solo test automatici |
 
