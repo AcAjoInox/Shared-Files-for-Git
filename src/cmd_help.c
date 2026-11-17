@@ -12,7 +12,9 @@
 #include "err.h"
 #include "msg.h"
 
-static const char manual[] =
+/* In parti: una stringa letterale oltre 4095 caratteri non e' garantita
+ * da C99/C11 (-Woverlength-strings). */
+static const char *const manual[] = {
     "GIT-SHARED(1)\n"
     "\n"
     "NAME\n"
@@ -26,6 +28,7 @@ static const char manual[] =
     "    git shared status\n"
     "    git shared publish [<path>]\n"
     "    git shared update [-f] [-c | -m <message>] [<path>]\n"
+    "    git shared prune [-n] [<path>]\n"
     "    git shared hook install\n"
     "    git shared help [<command>]\n"
     "\n"
@@ -34,6 +37,7 @@ static const char manual[] =
     "    Each repository keeps a real copy of it; git shared tells every\n"
     "    repository when a new version exists and applies it on request.\n"
     "\n"
+    ,
     "COMMANDS\n"
     "    set [-c | -m <message>] [--] <path>\n"
     "        Declare a tracked file of this repository as shared. The\n"
@@ -74,6 +78,11 @@ static const char manual[] =
     "        earlier update and not committed yet is not a local change.\n"
     "        Nothing is committed by default.\n"
     "\n"
+    "    prune [-n] [<path>]\n"
+    "        Forget the peers that were deleted, or that no longer share\n"
+    "        the file, here and in the other peers. A peer that cannot be\n"
+    "        read right now is kept. -n only shows what would be removed.\n"
+    "\n"
     "    status\n"
     "        Show each shared file with its state: aligned, new version to\n"
     "        apply, applied (to commit), to publish, diverged, merge in\n"
@@ -90,6 +99,7 @@ static const char manual[] =
     "    help [<command>]\n"
     "        Show this manual, or the usage of a command.\n"
     "\n"
+    ,
     "HOOKS\n"
     "    set and link add a block to some hooks. Existing hooks are kept:\n"
     "    the block goes right after their first line.\n"
@@ -105,7 +115,8 @@ static const char manual[] =
     "        the shared files. Managed by git shared: do not edit by hand.\n"
     "\n"
     "EXIT STATUS\n"
-    "    0 on success, 1 on error, 128 on fatal error, 129 on wrong usage.\n";
+    "    0 on success, 1 on error, 128 on fatal error, 129 on wrong usage.\n"
+};
 
 /* Uso di un sottocomando, per "git shared help <command>". */
 static const struct {
@@ -115,6 +126,7 @@ static const struct {
     { "help", MSG_USAGE_HELP },
     { "hook", MSG_USAGE_HOOK },
     { "link", MSG_USAGE_LINK },
+    { "prune", MSG_USAGE_PRUNE },
     { "publish", MSG_USAGE_PUBLISH },
     { "set", MSG_USAGE_SET },
     { "status", MSG_USAGE_STATUS },
@@ -128,7 +140,9 @@ int cmd_help(int argc, char **argv)
     int rc = GS_EXIT_USAGE;
 
     if (argc < 2) {
-        fputs(manual, stdout);
+        for (i = 0U; i < (sizeof manual / sizeof manual[0]); i++) {
+            fputs(manual[i], stdout);
+        }
         rc = GS_EXIT_OK;
         goto exit;
     }

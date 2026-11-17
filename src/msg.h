@@ -16,6 +16,7 @@ typedef enum {
     MSG_USAGE_SET,
     MSG_USAGE_LINK,
     MSG_USAGE_UNLINK,
+    MSG_USAGE_PRUNE,
     MSG_USAGE_PUBLISH,
     MSG_USAGE_UPDATE,
     MSG_USAGE_STATUS,
@@ -55,6 +56,7 @@ typedef enum {
     MSG_ERR_PENDING_OP,      /* path */
     MSG_ERR_UNLINK_UNCOMMITTED, /* path */
     MSG_ERR_UNLINK_ELSEWHERE, /* id, branch */
+    MSG_ERR_PRUNE,           /* file, peer */
     MSG_ERR_WRITE_FILE,      /* path */
     MSG_ERR_NOT_SHARED_PATH, /* path */
     MSG_ERR_LOCAL_CHANGES,   /* path */
@@ -73,6 +75,7 @@ typedef enum {
     MSG_WARN_SUSPENDED,      /* file */
     MSG_WARN_HOOK,           /* path dell'hook */
     MSG_WARN_MERGE_DROPPED,  /* file */
+    MSG_WARN_PRUNE_KEPT,     /* file, peer */
     MSG_HOOK_NOT_ALIGNED,    /* file, stato, comando */
     MSG_HOOKS_INSTALLED,
 
@@ -86,6 +89,13 @@ typedef enum {
     MSG_UNLINK_DONE,         /* path */
     MSG_UNLINK_COMMIT_MSG,   /* path */
     MSG_UNLINK_ORPHAN,       /* id */
+    MSG_PRUNE_GONE,          /* file, peer */
+    MSG_PRUNE_LEFT,          /* file, peer */
+    MSG_PRUNE_REF,           /* ref */
+    MSG_PRUNE_WOULD_GONE,    /* file, peer */
+    MSG_PRUNE_WOULD_LEFT,    /* file, peer */
+    MSG_PRUNE_WOULD_REF,     /* ref */
+    MSG_PRUNE_NOTHING,
     MSG_PUB_CREATED,         /* file */
     MSG_PUB_PUSHED,          /* file, peer raggiunti (unsigned), peer (unsigned) */
     MSG_PUB_NO_PEERS,        /* file */

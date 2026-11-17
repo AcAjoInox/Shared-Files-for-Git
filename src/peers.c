@@ -9,6 +9,7 @@
 #include "git.h"
 #include "mem.h"
 #include "msg.h"
+#include "sys.h"
 
 typedef struct {
     Proc_t p;
@@ -157,6 +158,74 @@ void peers_fetch(const char *label, const char *id, const Str_t *peers,
     str_free(&out);
     str_free(&ref);
     str_free(&spec);
+    free(jobs);
+}
+
+/* 1 se <repo>/.git esiste (cartella, o file di un worktree). */
+static int has_git_dir(const char *repo)
+{
+    Str_t path = STR_INIT;
+    FILE *f;
+    int found;
+
+    str_addf(&path, "%s/.git", repo);
+    found = sys_is_dir(str_cstr(&path));
+    if (!found) {
+        f = sys_fopen(str_cstr(&path), "rb");
+        found = (f != NULL);
+        if (f != NULL) {
+            (void)fclose(f);
+        }
+    }
+    str_free(&path);
+    return found;
+}
+
+void peers_check(const char *id, const Str_t *peers, uint8_t *state)
+{
+    /* config --local --get-regexp sulla sezione: 0 = c'e', 1 = non c'e'.
+     * Senza --local, con --git-dir verso una cartella che non esiste git
+     * legge solo la configurazione globale e risponde 1 (provato con git
+     * 2.43): un peer cancellato sembrerebbe "uscito". */
+    const char *args[] = { NULL, "config", "--local", "--get-regexp", NULL,
+                           NULL };
+    size_t n = str_zcount(peers);
+    Job_t *jobs = xmalloc(((n > 0U) ? n : 1U) * sizeof *jobs);
+    Str_t regex = STR_INIT;
+    Str_t dir = STR_INIT;
+    Str_t out = STR_INIT;
+    const char *peer;
+    size_t k;
+    int code;
+
+    str_addf(&regex, "^shared\\.%s\\.", id);
+    args[4] = str_cstr(&regex);
+    for (k = 0U, peer = str_znext(peers, NULL); peer != NULL;
+         k++, peer = str_znext(peers, peer)) {
+        git_dir_arg(&dir, peer);
+        args[0] = str_cstr(&dir);
+        jobs[k].started = (git_start(&jobs[k].p, args,
+                                     PROC_STDERR_NULL | PROC_CLEAN_ENV) == GS_OK);
+    }
+    for (k = 0U, peer = str_znext(peers, NULL); peer != NULL;
+         k++, peer = str_znext(peers, peer)) {
+        code = -1;
+        if (jobs[k].started && (proc_collect(&jobs[k].p, &out, &code) != GS_OK)) {
+            code = -1;
+        }
+        if (code == 0) {
+            state[k] = (uint8_t)PEER_MEMBER;
+        } else if ((code == 1) && has_git_dir(peer)) {
+            state[k] = (uint8_t)PEER_LEFT;
+        } else if (!has_git_dir(peer)) {
+            state[k] = (uint8_t)PEER_GONE;
+        } else {
+            state[k] = (uint8_t)PEER_UNREACHABLE;
+        }
+    }
+    str_free(&out);
+    str_free(&dir);
+    str_free(&regex);
     free(jobs);
 }
 

@@ -17,6 +17,14 @@
 #include "err.h"
 #include "str.h"
 
+/* Che cosa c'e' al path di un peer (prune, REQ-F-014). */
+typedef enum {
+    PEER_MEMBER = 0,  /* repo con la sezione [shared "<id>"] */
+    PEER_LEFT,        /* repo che non condivide piu' il file */
+    PEER_GONE,        /* nessuna repo a quel path */
+    PEER_UNREACHABLE  /* la repo c'e' ma git non la legge (lock, permessi) */
+} ePeerState_t;
+
 typedef struct {
     unsigned ok;
     unsigned rejected;    /* push rifiutato: il peer ha una versione nuova */
@@ -50,5 +58,10 @@ void peers_announce(const char *id, const Str_t *peers, const char *self,
  * non lo conosceva gia' piu' non e' un errore. */
 void peers_forget(const char *label, const char *id, const Str_t *peers,
                   const char *self, PeerTally_t *t);
+
+/* Stato di ogni peer (state[k], ePeerState_t), in parallelo. "Sparito"
+ * solo se al path non c'e' piu' una cartella .git: un errore di git su
+ * una repo che c'e' vale "irraggiungibile" (reportIdea B-07). */
+void peers_check(const char *id, const Str_t *peers, uint8_t *state);
 
 #endif /* GS_PEERS_H */

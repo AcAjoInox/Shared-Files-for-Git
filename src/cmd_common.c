@@ -28,6 +28,7 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
     o->message = NULL;
     o->commit = 0U;
     o->force = 0U;
+    o->dry_run = 0U;
     while ((i < argc) && (end_opts == 0) && (argv[i][0] == '-') &&
            (argv[i][1] != '\0')) {
         if (strcmp(argv[i], "--") == 0) {
@@ -49,6 +50,10 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
                    ((strcmp(argv[i], "-f") == 0) ||
                     (strcmp(argv[i], "--force") == 0))) {
             o->force = 1U;
+        } else if (((allowed & CMD_OPT_DRY_RUN) != 0U) &&
+                   ((strcmp(argv[i], "-n") == 0) ||
+                    (strcmp(argv[i], "--dry-run") == 0))) {
+            o->dry_run = 1U;
         } else {
             msg_error(MSG_ERR_UNKNOWN_OPT, argv[i]);
             goto exit;

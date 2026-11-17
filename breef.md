@@ -75,7 +75,7 @@ git commit -m "aggiorno common.h"
 
 **Decidi tu su quali branch il file è shared.** All'inizio lo è solo sul branch in cui hai lanciato `set` o `link`. Sugli altri branch è *sospeso*: lo modifichi come un file normale, senza blocchi, avvisi né pubblicazioni. Con `git shared branch` aggiungi o togli un branch dall'elenco; puoi indicare anche una famiglia di branch, per esempio `release/*`. L'elenco è locale alla repo. In `.gitshared` c'è un elenco di default, che viene copiato quando colleghi la repo (per esempio dopo un clone). Quando poi fai merge su un branch dove il file è shared, le tue modifiche risultano da pubblicare: non si perde niente.
 
-**Se cancelli una repo**, le altre continuano a funzionare. `git shared prune` la toglie dall'elenco dei peer.
+**Se cancelli una repo**, le altre continuano a funzionare. `git shared prune` la toglie dall'elenco dei peer, in tutte le repo; una repo che in quel momento non si riesce a leggere resta. `git shared prune -n` mostra cosa toglierebbe.
 
 **Se sposti una repo**, al primo comando `git shared` l'estensione se ne accorge e ti suggerisce il comando `relocate` già pronto.
 
@@ -114,7 +114,7 @@ Le repo stanno su un servizio di hosting. I peer non sono più path ma **URL**, 
 | `git shared hook install` | Installa gli hook di avviso, per esempio in una repo i cui file shared non li hanno ancora |
 | `git shared mv <vecchio> <nuovo>` | Rinomina un file shared |
 | `git shared branch <file> [--add\|--remove <branch>]` | Mostra o modifica i branch su cui il file è shared; con `--default` modifica l'elenco di default in `.gitshared`, con `--reset` lo ricopia in locale |
-| `git shared prune` | Toglie dall'elenco i peer che non esistono più |
+| `git shared prune [-n]` | Toglie dall'elenco i peer cancellati o che non condividono più il file |
 | `git shared relocate <vecchio-path>` | Avvisa i peer che questa repo è stata spostata |
 | `git shared lang <en\|it>` | Sceglie la lingua dei messaggi |
 | `git shared -h`, `git shared help` | Aiuto rapido e manuale |

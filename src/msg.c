@@ -16,6 +16,7 @@ static const char *const msg_en[] = {
         "    status    show the shared files of this repository\n"
         "    publish   send new versions to the peers\n"
         "    update    get the new versions and apply them\n"
+        "    prune     forget the peers that no longer exist\n"
         "    help      show the manual\n"
         "\n"
         "'git shared <command> -h' shows the options of a command.\n",
@@ -42,6 +43,12 @@ static const char *const msg_en[] = {
         "\n"
         "    -c, --commit      commit .gitshared right away\n"
         "    -m <message>      commit .gitshared right away with <message>\n",
+    [MSG_USAGE_PRUNE] =
+        "usage: git shared prune [-n] [<path>]\n"
+        "\n"
+        "Forget the peers that no longer exist or no longer share the file.\n"
+        "\n"
+        "    -n, --dry-run     only show what would be removed\n",
     [MSG_USAGE_PUBLISH] =
         "usage: git shared publish [<path>]\n",
     [MSG_USAGE_UPDATE] =
@@ -106,6 +113,7 @@ static const char *const msg_en[] = {
         "'%s' is not committed in .gitshared on this branch: commit it first",
     [MSG_ERR_UNLINK_ELSEWHERE] =
         "%s is still shared on branch '%s': run unlink there",
+    [MSG_ERR_PRUNE] = "%s: cannot remove peer %s",
     [MSG_ERR_RELINK_PATH] =
         "'%s' is declared here at '%s': run link without <destination>",
     [MSG_ERR_WRITE_FILE] = "cannot write '%s'",
@@ -138,6 +146,8 @@ static const char *const msg_en[] = {
     [MSG_WARN_HOOK] = "cannot install the hook '%s'",
     [MSG_WARN_MERGE_DROPPED] =
         "%s: the merge in progress was abandoned: dropped",
+    [MSG_WARN_PRUNE_KEPT] =
+        "%s: peer %s cannot be read now: kept",
     [MSG_HOOK_NOT_ALIGNED] = "%s: %s (run 'git shared %s')",
     [MSG_HOOKS_INSTALLED] = "Hooks installed.",
 
@@ -154,6 +164,14 @@ static const char *const msg_en[] = {
     [MSG_UNLINK_DONE] = "'%s' is no longer shared: it is now a regular file.",
     [MSG_UNLINK_COMMIT_MSG] = "Unshare %s",
     [MSG_UNLINK_ORPHAN] = "Removed the leftover local data of %s.",
+    [MSG_PRUNE_GONE] = "%s: removed peer %s (it no longer exists)",
+    [MSG_PRUNE_LEFT] = "%s: removed peer %s (it no longer shares the file)",
+    [MSG_PRUNE_REF] = "removed leftover %s",
+    [MSG_PRUNE_WOULD_GONE] = "%s: would remove peer %s (it no longer exists)",
+    [MSG_PRUNE_WOULD_LEFT] =
+        "%s: would remove peer %s (it no longer shares the file)",
+    [MSG_PRUNE_WOULD_REF] = "would remove leftover %s",
+    [MSG_PRUNE_NOTHING] = "Nothing to prune.",
     [MSG_PUB_CREATED] = "%s: new version created",
     [MSG_PUB_PUSHED] = "%s: sent to %u of %u peers",
     [MSG_PUB_NO_PEERS] = "%s: no peers to send it to",
