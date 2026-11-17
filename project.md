@@ -959,7 +959,7 @@ Non ancora decise. Ognuna diventa una decisione o viene scartata prima di entrar
 
 | Riferimento | Che cosa tocca | Come si risolve |
 |---|---|---|
-| §2.3 p. 3, D-001, D-040 ("stesso meccanismo in fase 2") | In locale la pubblicazione non usa più il push | Il modello è lo stesso; cambia solo il canale della notifica, che in fase 2 è il push stesso (D-051). Va riscritta la frase: "stesso modello, notifica diversa" |
+| §2.3 p. 3, D-001, D-040 ("stesso meccanismo in fase 2") | In locale la pubblicazione non usa più il push | Il modello è lo stesso; cambia solo il canale della notifica, che in fase 2 è il push stesso (D-051). Va riscritta la frase: "stesso modello, notifica diversa". **Accettato dall'autore** (2026-11-17): locale e remoto possono seguire strade separate, perché non sono correlati |
 | §2.3 p. 8, D-041 (stato sempre ricavabile) | Terzo dato salvato, dopo l'attesa (D-059) e l'unione in corso (D-078) | L'avviso non entra nello stato: dice solo dove fare il fetch. Se si perde, il peer riceve al suo prossimo `update`, come oggi un peer irraggiungibile. Va aggiunto all'elenco delle eccezioni come "suggerimento eliminabile" |
 | §5.0 p. 4–5, D-015, REQ-F-007 (a) | Il peer riceve con il proprio fetch, non con il push di chi pubblica | Ricevere resta separato da applicare. Tra la notifica e il primo comando nel peer la sua ref resta indietro, ma l'avviso è già lì |
 | REQ-F-006, D-009 | Chi pubblica non riceve più il rifiuto "non-fast-forward" o "fetch first" | Il fast-forward lo verifica chi riceve (`receive`, D-092). Due pubblicazioni contemporanee arrivano entrambe e la divergenza la unisce `update` nel peer, senza perdite (REQ-F-011). Il breef ("ne passa una sola") parla della fase 2, D-053: non cambia |
