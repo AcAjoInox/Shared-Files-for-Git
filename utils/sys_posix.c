@@ -6,6 +6,9 @@
 #include "sys.h"
 
 #include <errno.h>
+#include <limits.h>
+#include <stdlib.h>
+#include <string.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <sys/stat.h>
@@ -68,6 +71,47 @@ int sys_make_executable(const char *path)
         rc = chmod(path, st.st_mode | S_IXUSR | S_IXGRP | S_IXOTH);
     }
     return rc;
+}
+
+eGsErr_t sys_abs_path(const char *path, Str_t *out)
+{
+    const char *slash = strrchr(path, '/');
+    const char *name = (slash != NULL) ? (slash + 1) : path;
+    Str_t dir = STR_INIT;
+    char cwd[PATH_MAX];
+    char *real;
+    eGsErr_t err = GS_OK;
+
+    if ((*name == '\0') || (strcmp(name, ".") == 0) || (strcmp(name, "..") == 0)) {
+        str_add(&dir, path);
+        name = "";
+    } else if (slash == NULL) {
+        str_add(&dir, ".");
+    } else if (slash == path) {
+        str_add(&dir, "/");
+    } else {
+        str_addn(&dir, path, (size_t)(slash - path));
+    }
+    str_reset(out);
+    real = realpath(str_cstr(&dir), NULL);
+    if (real != NULL) {
+        str_add(out, real);
+        free(real);
+    } else if (str_cstr(&dir)[0] == '/') {
+        str_add(out, str_cstr(&dir));
+    } else if (getcwd(cwd, sizeof cwd) != NULL) {
+        str_addf(out, "%s/%s", cwd, str_cstr(&dir));
+    } else {
+        err = GS_ERR_SYS;
+    }
+    if ((err == GS_OK) && (*name != '\0')) {
+        if ((out->len == 0U) || (out->buf[out->len - 1U] != '/')) {
+            str_addch(out, '/');
+        }
+        str_add(out, name);
+    }
+    str_free(&dir);
+    return err;
 }
 
 int sys_is_dir(const char *path)

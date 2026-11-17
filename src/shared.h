@@ -44,12 +44,13 @@ typedef struct {
     Str_t prefix; /* cartella corrente relativa a top: "" oppure "dir/" */
     Str_t branch; /* branch corrente senza "refs/heads/"; "" se HEAD staccata */
     Str_t objfmt; /* algoritmo degli oid: "sha1" o "sha256" (D-033) */
+    Str_t self_path; /* shared.selfPath: dove la repo ricorda di essere */
     SharedEntry_t *v;
     size_t n;
     size_t cap;
 } Repo_t;
 
-#define REPO_INIT { STR_INIT, STR_INIT, STR_INIT, STR_INIT, NULL, 0U, 0U }
+#define REPO_INIT { STR_INIT, STR_INIT, STR_INIT, STR_INIT, STR_INIT, NULL, 0U, 0U }
 
 /*
  * Apre la repo della cartella corrente e carica i file shared.
@@ -117,5 +118,16 @@ eGsErr_t repo_declaring_branch(const char *id, GitBatch_t *b, Str_t *branch,
  * [shared "<id>"] spariscono. Un peer irraggiungibile e' un avviso.
  */
 eGsErr_t repo_forget(const Repo_t *r, SharedEntry_t *e, GitBatch_t *b);
+
+/* Scrive shared.selfPath (REQ-F-017). */
+eGsErr_t repo_set_self(Repo_t *r, const char *path);
+
+/*
+ * REQ-F-017, D-084: con almeno un file collegato, la repo ricorda dove
+ * sta. Se non lo ricorda ancora lo scrive; se ricorda un altro path avvisa
+ * di lanciare relocate. Non in un worktree secondario (.git e' un file):
+ * config e ref sono quelli della repo principale.
+ */
+void repo_check_self(Repo_t *r);
 
 #endif /* GS_SHARED_H */

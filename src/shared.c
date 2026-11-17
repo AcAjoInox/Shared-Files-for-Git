@@ -72,6 +72,7 @@ void repo_close(Repo_t *r)
     str_free(&r->prefix);
     str_free(&r->branch);
     str_free(&r->objfmt);
+    str_free(&r->self_path);
 }
 
 SharedEntry_t *repo_add(Repo_t *r)
@@ -444,7 +445,11 @@ eGsErr_t repo_open(Repo_t *r)
         scope = rec;
         rec += strlen(rec) + 1U;
         if (rec < end) {
-            if (strcmp(scope, "local") == 0) {
+            if ((strcmp(scope, "local") == 0) &&
+                (strncmp(rec, "shared.selfpath\n", 16U) == 0)) {
+                str_reset(&r->self_path);
+                str_add(&r->self_path, rec + 16U);
+            } else if (strcmp(scope, "local") == 0) {
                 parse_local_rec(r, rec);
             } else {
                 /* chiavi fuori dal livello locale: ignorate */
@@ -869,6 +874,40 @@ eGsErr_t repo_forget(const Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
     str_free(&name);
     str_free(&refs);
     return err;
+}
+
+eGsErr_t repo_set_self(Repo_t *r, const char *path)
+{
+    const char *args[] = { "config", "shared.selfPath", path, NULL };
+    eGsErr_t err = git_run(args, 0U, NULL);
+
+    if (err == GS_OK) {
+        str_reset(&r->self_path);
+        str_add(&r->self_path, path);
+    }
+    return err;
+}
+
+void repo_check_self(Repo_t *r)
+{
+    Str_t dotgit = STR_INIT;
+    size_t i;
+    int linked = 0;
+
+    for (i = 0U; (i < r->n) && !linked; i++) {
+        linked = r->v[i].in_config;
+    }
+    str_addf(&dotgit, "%s/.git", str_cstr(&r->top));
+    if (!linked || !sys_is_dir(str_cstr(&dotgit))) {
+        /* nessun file collegato, o worktree secondario */
+    } else if (r->self_path.len == 0U) {
+        (void)repo_set_self(r, str_cstr(&r->top));
+    } else if (!str_eq(&r->top, str_cstr(&r->self_path))) {
+        msg_warning(MSG_WARN_MOVED, str_cstr(&r->self_path));
+    } else {
+        /* al suo posto */
+    }
+    str_free(&dotgit);
 }
 
 /* 1 se a e' antenato di b (o uguale). */

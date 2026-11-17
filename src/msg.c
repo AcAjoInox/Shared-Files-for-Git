@@ -18,6 +18,7 @@ static const char *const msg_en[] = {
         "    update    get the new versions and apply them\n"
         "    prune     forget the peers that no longer exist\n"
         "    branch    choose the branches where a file is shared\n"
+        "    relocate  tell the peers that this repository was moved\n"
         "    help      show the manual\n"
         "\n"
         "'git shared <command> -h' shows the options of a command.\n",
@@ -67,6 +68,16 @@ static const char *const msg_en[] = {
         "                             the one copied by set, link and clones\n"
         "    -c, -m <message>         with --default: commit .gitshared\n"
         "                             right away\n",
+    [MSG_USAGE_RELOCATE] =
+        "usage: git shared relocate [<old-path>]\n"
+        "   or: git shared relocate --copy [<old-path>]\n"
+        "   or: git shared relocate --peer <old-path> <new-path>\n"
+        "\n"
+        "Tell the peers that this repository was moved or copied.\n"
+        "\n"
+        "    <old-path>   where it was (default: the path it remembers)\n"
+        "    --copy       it is a copy of <old-path>: share from both\n"
+        "    --peer       a peer was moved: update its path here\n",
     [MSG_USAGE_PUBLISH] =
         "usage: git shared publish [<path>]\n",
     [MSG_USAGE_UPDATE] =
@@ -146,6 +157,18 @@ static const char *const msg_en[] = {
     [MSG_ERR_BRANCH_LAST] =
         "%s: it must stay active on at least one branch "
         "(to stop sharing it: git shared unlink)",
+    [MSG_ERR_RELOCATE_NOTHING] = "no file is linked here: nothing to relocate",
+    [MSG_ERR_RELOCATE_WHERE] =
+        "this repository does not remember where it was: give <old-path>",
+    [MSG_ERR_RELOCATE_SAME] = "this repository is still at %s",
+    [MSG_ERR_RELOCATE_EXISTS] =
+        "%s still contains a repository: if this one is a copy, "
+        "run 'git shared relocate --copy %s'",
+    [MSG_ERR_RELOCATE_GONE] =
+        "no repository at %s anymore: if this one was moved from there, "
+        "run 'git shared relocate %s'",
+    [MSG_ERR_RELOCATE_NOT_MOVED] = "%s still contains a repository: it was not moved",
+    [MSG_ERR_RELOCATE_NO_PEER] = "no shared file here has %s as a peer",
     [MSG_ERR_BRANCH_DETACHED] =
         "%s: no default in .gitshared and HEAD is detached: "
         "use --add <branch>",
@@ -184,6 +207,10 @@ static const char *const msg_en[] = {
     [MSG_WARN_PRUNE_KEPT] =
         "%s: peer %s cannot be read now: kept",
     [MSG_WARN_BRANCH_MISSING] = "no branch named '%s' yet",
+    [MSG_WARN_MOVED] =
+        "this repository was at %s: if it was moved, run 'git shared "
+        "relocate'; if it is a copy, 'git shared relocate --copy'",
+    [MSG_WARN_RELOCATE_NOT_MEMBER] = "%s: %s does not share this file: skipped",
     [MSG_HOOK_NOT_ALIGNED] = "%s: %s (run 'git shared %s')",
     [MSG_HOOKS_INSTALLED] = "Hooks installed.",
 
@@ -221,6 +248,10 @@ static const char *const msg_en[] = {
     [MSG_BRANCH_DEFAULT_STAGED] = "Commit .gitshared to confirm.",
     [MSG_BRANCH_RESET] = "%s: active branches reset to the default",
     [MSG_BRANCH_COMMIT_MSG] = "Change the default branches of %s",
+    [MSG_RELOCATE_DONE] = "%s: %u of %u peers know the new path",
+    [MSG_RELOCATE_COPY] = "%s: shared from here too (%u of %u peers told)",
+    [MSG_RELOCATE_PEER] = "%s: peer %s is now %s",
+    [MSG_RELOCATE_SELF] = "This repository is now known at %s.",
     [MSG_PUB_CREATED] = "%s: new version created",
     [MSG_PUB_PUSHED] = "%s: sent to %u of %u peers",
     [MSG_PUB_NO_PEERS] = "%s: no peers to send it to",

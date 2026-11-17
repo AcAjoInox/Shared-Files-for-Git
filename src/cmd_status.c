@@ -82,6 +82,7 @@ int cmd_status(int argc, char **argv)
         msg_error(MSG_ERR_PENDING);
         rc = GS_EXIT_ERROR; /* si mostra comunque lo stato */
     }
+    repo_check_self(&repo);
 
     for (i = 0U; i < repo.n; i++) {
         e = &repo.v[i];

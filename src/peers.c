@@ -161,8 +161,7 @@ void peers_fetch(const char *label, const char *id, const Str_t *peers,
     free(jobs);
 }
 
-/* 1 se <repo>/.git esiste (cartella, o file di un worktree). */
-static int has_git_dir(const char *repo)
+int peers_repo_exists(const char *repo)
 {
     Str_t path = STR_INIT;
     FILE *f;
@@ -215,9 +214,9 @@ void peers_check(const char *id, const Str_t *peers, uint8_t *state)
         }
         if (code == 0) {
             state[k] = (uint8_t)PEER_MEMBER;
-        } else if ((code == 1) && has_git_dir(peer)) {
+        } else if ((code == 1) && peers_repo_exists(peer)) {
             state[k] = (uint8_t)PEER_LEFT;
-        } else if (!has_git_dir(peer)) {
+        } else if (!peers_repo_exists(peer)) {
             state[k] = (uint8_t)PEER_GONE;
         } else {
             state[k] = (uint8_t)PEER_UNREACHABLE;
@@ -226,6 +225,76 @@ void peers_check(const char *id, const Str_t *peers, uint8_t *state)
     str_free(&out);
     str_free(&dir);
     str_free(&regex);
+    free(jobs);
+}
+
+void peers_value_regex(Str_t *out, const char *a, const char *b)
+{
+    const char *const vals[] = { a, b };
+    const char *c;
+    size_t i;
+
+    str_reset(out);
+    str_add(out, "^(");
+    for (i = 0U; i < 2U; i++) {
+        if (i > 0U) {
+            str_addch(out, '|');
+        }
+        for (c = vals[i]; *c != '\0'; c++) {
+            if (strchr(".[]()*+?{}|^$\\", *c) != NULL) {
+                str_addch(out, '\\');
+            }
+            str_addch(out, *c);
+        }
+    }
+    str_add(out, ")$");
+}
+
+void peers_replace(const char *label, const char *id, const Str_t *peers,
+                   const char *old, const char *new_path, PeerTally_t *t)
+{
+    /* --replace-all con un'espressione su old|new: un solo processo per
+     * peer, nessun doppione anche se relocate si ripete. */
+    const char *args[] = { NULL, "config", "--replace-all", NULL, new_path,
+                           NULL, NULL };
+    size_t n = str_zcount(peers);
+    Job_t *jobs = xmalloc(((n > 0U) ? n : 1U) * sizeof *jobs);
+    Str_t key = STR_INIT;
+    Str_t regex = STR_INIT;
+    Str_t dir = STR_INIT;
+    Str_t out = STR_INIT;
+    const char *peer;
+    size_t k;
+    int code;
+
+    str_addf(&key, "shared.%s.peer", id);
+    peers_value_regex(&regex, old, new_path);
+    args[3] = str_cstr(&key);
+    args[5] = str_cstr(&regex);
+    for (k = 0U, peer = str_znext(peers, NULL); peer != NULL;
+         k++, peer = str_znext(peers, peer)) {
+        git_dir_arg(&dir, peer);
+        args[0] = str_cstr(&dir);
+        jobs[k].started = (git_start(&jobs[k].p, args,
+                                     PROC_STDERR_NULL | PROC_CLEAN_ENV) == GS_OK);
+    }
+    for (k = 0U, peer = str_znext(peers, NULL); peer != NULL;
+         k++, peer = str_znext(peers, peer)) {
+        code = -1;
+        if (jobs[k].started && (proc_collect(&jobs[k].p, &out, &code) != GS_OK)) {
+            code = -1;
+        }
+        if (code == 0) {
+            t->ok++;
+        } else {
+            t->unreachable++;
+            msg_warning(MSG_WARN_PEER_UNREACHABLE, label, peer);
+        }
+    }
+    str_free(&out);
+    str_free(&dir);
+    str_free(&regex);
+    str_free(&key);
     free(jobs);
 }
 

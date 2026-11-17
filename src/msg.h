@@ -18,6 +18,7 @@ typedef enum {
     MSG_USAGE_UNLINK,
     MSG_USAGE_PRUNE,
     MSG_USAGE_BRANCH,
+    MSG_USAGE_RELOCATE,
     MSG_USAGE_PUBLISH,
     MSG_USAGE_UPDATE,
     MSG_USAGE_STATUS,
@@ -68,6 +69,13 @@ typedef enum {
     MSG_ERR_BRANCH_WRITE,    /* file */
     MSG_ERR_BRANCH_DETACHED, /* file */
     MSG_ERR_BRANCH_LAST,     /* file */
+    MSG_ERR_RELOCATE_NOTHING,
+    MSG_ERR_RELOCATE_WHERE,
+    MSG_ERR_RELOCATE_SAME,   /* path */
+    MSG_ERR_RELOCATE_EXISTS, /* vecchio path, vecchio path */
+    MSG_ERR_RELOCATE_GONE,   /* vecchio path, vecchio path */
+    MSG_ERR_RELOCATE_NOT_MOVED, /* path */
+    MSG_ERR_RELOCATE_NO_PEER, /* path */
     MSG_ERR_WRITE_FILE,      /* path */
     MSG_ERR_NOT_SHARED_PATH, /* path */
     MSG_ERR_LOCAL_CHANGES,   /* path */
@@ -88,6 +96,8 @@ typedef enum {
     MSG_WARN_MERGE_DROPPED,  /* file */
     MSG_WARN_PRUNE_KEPT,     /* file, peer */
     MSG_WARN_BRANCH_MISSING, /* branch */
+    MSG_WARN_MOVED,          /* path ricordato */
+    MSG_WARN_RELOCATE_NOT_MEMBER, /* file, path */
     MSG_HOOK_NOT_ALIGNED,    /* file, stato, comando */
     MSG_HOOKS_INSTALLED,
 
@@ -121,6 +131,10 @@ typedef enum {
     MSG_BRANCH_DEFAULT_STAGED,
     MSG_BRANCH_RESET,        /* file */
     MSG_BRANCH_COMMIT_MSG,   /* path */
+    MSG_RELOCATE_DONE,       /* file, peer raggiunti, peer */
+    MSG_RELOCATE_COPY,       /* file, peer raggiunti, peer */
+    MSG_RELOCATE_PEER,       /* file, vecchio path, nuovo path */
+    MSG_RELOCATE_SELF,       /* path */
     MSG_PUB_CREATED,         /* file */
     MSG_PUB_PUSHED,          /* file, peer raggiunti (unsigned), peer (unsigned) */
     MSG_PUB_NO_PEERS,        /* file */

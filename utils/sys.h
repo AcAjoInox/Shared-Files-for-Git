@@ -12,6 +12,7 @@
 #include <stdio.h>
 
 #include "err.h"
+#include "str.h"
 
 /*
  * Da chiamare per prima in main. Windows: argomenti convertiti in UTF-8.
@@ -28,6 +29,13 @@ int sys_remove(const char *path);
 
 /* 1 se il path esiste ed e' una cartella. */
 int sys_is_dir(const char *path);
+
+/*
+ * Path assoluto con separatore '/', anche se l'ultimo elemento non esiste
+ * piu' (es. una repo spostata): si risolve la cartella che lo contiene
+ * (nomi lunghi su Windows, link simbolici su POSIX) e si aggiunge il nome.
+ */
+eGsErr_t sys_abs_path(const char *path, Str_t *out);
 
 /* Bit di esecuzione per tutti (POSIX); su Windows non serve: 0 = riuscito. */
 int sys_make_executable(const char *path);

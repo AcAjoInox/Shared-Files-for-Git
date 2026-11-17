@@ -64,4 +64,15 @@ void peers_forget(const char *label, const char *id, const Str_t *peers,
  * una repo che c'e' vale "irraggiungibile" (reportIdea B-07). */
 void peers_check(const char *id, const Str_t *peers, uint8_t *state);
 
+/* 1 se <repo>/.git esiste (cartella, o file di un worktree). */
+int peers_repo_exists(const char *repo);
+
+/* Espressione regolare (ERE) che riconosce esattamente a oppure b. */
+void peers_value_regex(Str_t *out, const char *a, const char *b);
+
+/* In ogni peer: la voce `old` (o `new`, se c'e' gia') diventa una sola
+ * voce `new`; se nessuna delle due c'e', `new` si aggiunge (relocate). */
+void peers_replace(const char *label, const char *id, const Str_t *peers,
+                   const char *old, const char *new_path, PeerTally_t *t);
+
 #endif /* GS_PEERS_H */

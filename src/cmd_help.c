@@ -29,6 +29,8 @@ static const char *const manual[] = {
     "    git shared publish [<path>]\n"
     "    git shared update [-f] [-c | -m <message>] [<path>]\n"
     "    git shared prune [-n] [<path>]\n"
+    "    git shared relocate [--copy] [<old-path>]\n"
+    "    git shared relocate --peer <old-path> <new-path>\n"
     "    git shared branch [<path>] [-a | -rm <branch>] [--reset]\n"
     "                      [--default] [-c | -m <message>]\n"
     "    git shared hook install\n"
@@ -93,6 +95,13 @@ static const char *const manual[] = {
     "        clones, and is confirmed by committing .gitshared. -a and -rm\n"
     "        are short for --add and --remove.\n"
     "\n"
+    "    relocate [--copy] [<old-path>]\n"
+    "    relocate --peer <old-path> <new-path>\n"
+    "        After moving a repository, tell its peers the new path: every\n"
+    "        git shared command warns until you do. --copy: this repository\n"
+    "        is a copy, and both keep sharing the files. --peer: a peer was\n"
+    "        moved and did not tell; update its path here.\n"
+    "\n"
     "    status\n"
     "        Show each shared file with its state: aligned, new version to\n"
     "        apply, applied (to commit), to publish, diverged, merge in\n"
@@ -139,6 +148,7 @@ static const struct {
     { "link", MSG_USAGE_LINK },
     { "prune", MSG_USAGE_PRUNE },
     { "publish", MSG_USAGE_PUBLISH },
+    { "relocate", MSG_USAGE_RELOCATE },
     { "set", MSG_USAGE_SET },
     { "status", MSG_USAGE_STATUS },
     { "unlink", MSG_USAGE_UNLINK },

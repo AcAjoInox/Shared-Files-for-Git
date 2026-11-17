@@ -77,7 +77,7 @@ git commit -m "aggiorno common.h"
 
 **Se cancelli una repo**, le altre continuano a funzionare. `git shared prune` la toglie dall'elenco dei peer, in tutte le repo; una repo che in quel momento non si riesce a leggere resta. `git shared prune -n` mostra cosa toglierebbe.
 
-**Se sposti una repo**, al primo comando `git shared` l'estensione se ne accorge e ti suggerisce il comando `relocate` già pronto.
+**Se sposti una repo**, al primo comando `git shared` l'estensione se ne accorge e ti suggerisce `git shared relocate`, che avvisa gli altri progetti. **Se la copi**, la copia lo dice allo stesso modo: `git shared relocate --copy` la fa diventare un progetto in più, e l'originale resta.
 
 **Se rinomini il file**, usa `git shared mv`. La rinomina vale solo per quella repo.
 
@@ -115,7 +115,7 @@ Le repo stanno su un servizio di hosting. I peer non sono più path ma **URL**, 
 | `git shared mv <vecchio> <nuovo>` | Rinomina un file shared |
 | `git shared branch [<file>] [-a\|-rm <branch>]` | Mostra o modifica i branch su cui il file è shared (effetto immediato; `-a` e `-rm` sono le forme brevi di `--add` e `--remove`);\|--remove <branch>]` | Mostra o modifica i branch su cui il file è shared (effetto immediato); con `--default` modifica l'elenco di default in `.gitshared`, con `--reset` lo ricopia in locale. Solo nomi esatti |
 | `git shared prune [-n]` | Toglie dall'elenco i peer cancellati o che non condividono più il file |
-| `git shared relocate <vecchio-path>` | Avvisa i peer che questa repo è stata spostata |
+| `git shared relocate [--copy]` | Avvisa i peer che questa repo è stata spostata (o, con `--copy`, copiata); `--peer <vecchio> <nuovo>` corregge il path di un peer spostato |
 | `git shared lang <en\|it>` | Sceglie la lingua dei messaggi |
 | `git shared -h`, `git shared help` | Aiuto rapido e manuale |
 

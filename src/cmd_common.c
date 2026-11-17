@@ -88,6 +88,7 @@ int cmd_open(Repo_t *r, GitBatch_t *b)
         if (repo_complete_pending(r, b) != GS_OK) {
             msg_error(MSG_ERR_PENDING); /* si prosegue: lo stato lo mostra */
         }
+        repo_check_self(r);
     }
     return rc;
 }
@@ -325,7 +326,7 @@ int cmd_reopen(Repo_t *r, GitBatch_t *b)
     } else if (repo_complete_pending(r, b) != GS_OK) {
         msg_error(MSG_ERR_PENDING);
     } else {
-        /* completato */
+        repo_check_self(r); /* un set o link appena completato */
     }
     return rc;
 }
