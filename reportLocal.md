@@ -4,7 +4,7 @@
 >
 > **Da dove vengono i giudizi.** Dalla lettura del codice, dai test e dalle prove fatte a mano con l'eseguibile durante la ricerca dei bug. Nessuno, a parte l'autore, lo ha ancora usato: la parte sull'uso è una valutazione ragionata, non una misura.
 >
-> **Storia.** 2026-11-16: prima stesura (718 test, v2.24). 2026-11-17: Linux provato e compatibilità dichiarata chiusa (C-25, D-089, D-090; non provata solo git 2.34 su Windows, ritenuta stabile); seconda ricerca di bug sul flusso logico e sulla struttura (§9: B-46…B-51, C-26, riportati anche in `reportIdea.md`); B-46, l'unico grave, chiuso (D-091); tutto il report riallineato; B-47, B-48 e B-49 chiusi (D-092), con `update --abort` per l'abbandono (D-093); B-32 chiuso (D-094); B-16 chiuso (D-095), con il resto staccato come B-52; C-02 chiuso (D-096); C-05 chiuso (D-097); test solo con l'ultima git stabile (D-098).
+> **Storia.** 2026-11-16: prima stesura (718 test, v2.24). 2026-11-17: Linux provato e compatibilità dichiarata chiusa (C-25, D-089, D-090; non provata solo git 2.34 su Windows, ritenuta stabile); seconda ricerca di bug sul flusso logico e sulla struttura (§9: B-46…B-51, C-26, riportati anche in `reportIdea.md`); B-46, l'unico grave, chiuso (D-091); tutto il report riallineato; B-47, B-48 e B-49 chiusi (D-092), con `update --abort` per l'abbandono (D-093); B-32 chiuso (D-094); B-16 chiuso (D-095), con il resto staccato come B-52; C-02 chiuso (D-096); C-05 chiuso (D-097); test solo con l'ultima git stabile (D-098); criteri di valutazione, con il costo in spazio misurato (§10).
 
 ## 1. In breve
 
@@ -276,3 +276,36 @@ Tappe proposte, con un tag ciascuna:
 - **La parte da rivedere è l'unione tra versioni** (D-078). Il percorso provato dai test è "una repo unisce e pubblica"; non c'è un test sul **peer la cui versione è stata unita**, che è proprio il caso in cui nascono B-46 e B-49. B-46, B-47 e B-48 hanno la stessa radice: la catena è un grafo, ma il codice la legge come una lista (primo genitore) e decide "chi contiene chi" senza chiederlo a git.
 - **Effetto sulla stima di §8**, già riportato in §8.3. Le unioni tra versioni erano il punto 0 degli indispensabili (A): fatto (D-091, D-092). B-50 rientra nel punto 8 (minori che si incontrano davvero), B-51 e C-26 nei non necessari (C).
 - **Cautele nell'uso reale:** lanciare `git shared update` prima di ogni `publish` rende raro B-35, da cui nascono le divergenze tra versioni; per abbandonare un'unione usare `git shared update --abort` invece di `git restore` (B-48).
+
+## 10. Criteri di valutazione
+
+### 10.1 Costo in spazio
+
+> **Misura del 2026-11-17**, con l'eseguibile del progetto e git 2.56.1 su Windows.
+
+**In breve.** Il costo è molto basso e non cresce con il numero di peer. Il file non viene copiato una volta in più: la catena delle versioni riusa lo stesso contenuto che già sta nella storia del progetto.
+
+**Come è stato misurato.** 11 repo (1 + 10 peer) condividono un header da 15,9 KB. Sono state pubblicate 20 modifiche di una riga, e ogni peer le ha applicate e committate tutte. Poi sono stati contati gli oggetti che esistono solo per la catena `refs/shared/<id>`, cioè quelli che non stanno già nei branch. Il conteggio si fa per differenza tra l'insieme degli oggetti della catena e quello dei branch (`rev-list --objects`, poi `comm`): `rev-list <catena> --not --branches` sbaglia, perché le due storie non hanno commit in comune.
+
+**Costo in più per ogni repo, per 21 versioni (la prima + 20):**
+
+| Cosa | Numero | Byte |
+|---|---|---|
+| Commit della catena | 21 | ~2,8 KB |
+| Tree della catena (una sola voce `content`, D-042) | 21 | ~1,0 KB |
+| Contenuto del file (blob) | **0 in più** | **0**: git li riconosce per hash, sono gli stessi già committati nel branch |
+| `.gitshared` (versionato) | 1 | 222 B |
+| Sezione in `.git/config` (locale, i path dei 10 peer) | – | ~1,9 KB |
+
+In pratica sono **circa 180 byte per versione, per repo**. Con 11 repo e 20 versioni fanno circa 42 KB in tutto, meno di tre copie dell'header stesso.
+
+**Perché le "copie fisiche" non pesano:**
+- **Il file in ogni repo** c'è comunque, ed è lo scopo: resta un file normale. Costa quanto copiarlo a mano, né più né meno.
+- **La catena non duplica il contenuto.** Git salva gli oggetti per hash, quindi un blob identico è salvato una volta sola, anche se lo usano sia il branch sia la catena (D-013).
+- **Il numero di peer non conta per lo spazio.** Ogni repo ha una sola catena, sia con 2 peer sia con 32. I peer pesano solo per i path nella config (~150 B l'uno) e per il tempo di `publish`, che fa un push verso ognuno.
+
+**L'unico caso in cui i blob costano in più.** Se una repo salta delle versioni (per esempio fa `update` una volta ogni 5 versioni), quelle intermedie esistono solo nella catena. Anche così il costo resta piccolo:
+- **prima del `gc`** sono oggetti sciolti, compressi con zlib: ~2,4 KB l'uno per questo header;
+- **dopo il `gc`** git li salva come differenze: ~150 B l'uno per una modifica di una riga. Il `gc` git lo lancia da solo ogni tanto.
+
+**Il limite pratico non è lo spazio** ma il tempo di `publish` verso molti peer, non ancora misurato oltre gli 8 peer (§8.3, punto 9).
