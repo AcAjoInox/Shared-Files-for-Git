@@ -1,0 +1,38 @@
+GIT-SHARED-RELOCATE(1)
+
+NOME
+    git shared relocate - avvisa i peer che questo repository e' stato spostato
+
+SINTASSI
+    git shared relocate [<vecchio-path>]
+    git shared relocate --copy [<vecchio-path>]
+    git shared relocate --peer <vecchio-path> <nuovo-path>
+
+DESCRIZIONE
+    Un repository ricorda dove si trova. Dopo averlo spostato, ogni
+    comando git shared avvisa; lancia relocate per dare ai peer il path
+    nuovo. Senza <vecchio-path> vale quello ricordato.
+
+    Se al vecchio path c'e' ancora qualcosa, questo repository e' una
+    copia (cp -r, un backup): relocate rifiuta, cosi' l'originale non
+    viene escluso. Lancialo con --copy per condividere i file da
+    entrambi.
+
+    Lanciarlo due volte non fa danni.
+
+OPZIONI
+    --copy
+        Questo repository e' una copia di <vecchio-path>: diventa un peer
+        in piu', e l'originale resta.
+
+    --peer <vecchio-path> <nuovo-path>
+        Un peer e' stato spostato e non l'ha detto: aggiorna qui il suo
+        path.
+
+ESEMPI
+    mv ~/lavoro/firmware-a ~/progetti/firmware-a
+    cd ~/progetti/firmware-a
+    git shared relocate
+
+VEDI ANCHE
+    git shared prune --help

@@ -1,0 +1,25 @@
+GIT-SHARED-PRUNE(1)
+
+NOME
+    git shared prune - dimentica i peer che non esistono piu'
+
+SINTASSI
+    git shared prune [-n] [<path>]
+
+DESCRIZIONE
+    Toglie dai peer di ogni file shared (o di <path>) i repository che
+    sono stati cancellati, o che non condividono piu' il file. Li toglie
+    qui e negli altri peer.
+
+    Un repository che esiste ma adesso non si riesce a leggere resta, con
+    un avviso: prune non toglie mai cio' che potrebbe tornare.
+
+    Senza <path>, prune toglie anche i riferimenti rimasti di file non
+    piu' condivisi qui.
+
+OPZIONI
+    -n, --dry-run
+        Mostra soltanto cosa toglierebbe.
+
+VEDI ANCHE
+    git shared status --help (con --peers), git shared relocate --help

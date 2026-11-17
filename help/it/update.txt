@@ -1,0 +1,44 @@
+GIT-SHARED-UPDATE(1)
+
+NOME
+    git shared update - riceve le versioni nuove e le applica
+
+SINTASSI
+    git shared update [-f] [-c | -m <messaggio>] [<path>]
+
+DESCRIZIONE
+    Riceve le versioni dai peer e scrive l'ultima nel file e nell'index.
+    Non committa nulla, salvo -c o -m.
+
+    Le modifiche non committate, anche quelle in staging, non vengono mai
+    sovrascritte: update si ferma, salvo -f. Una versione applicata da un
+    update precedente e non ancora committata non e' una tua modifica.
+
+    Unione. Se hai modificato il file su una versione vecchia, o due peer
+    hanno pubblicato senza vedersi, update unisce le versioni come
+    git merge. Dopo un'unione pulita il file e' "applied, to commit":
+    committalo, poi 'git shared publish'.
+
+    In caso di conflitto il file riceve i soliti marker e git status lo
+    mostra come non unito. Correggi il file, poi:
+        git add <file>
+        git shared update -c
+        git shared publish
+    Per rinunciare all'unione:
+        git restore -s HEAD -SW -- <file>
+
+    Senza <path>, tutti i file shared; con <path>, solo quello.
+
+OPZIONI
+    -f, --force
+        Sovrascrive le modifiche non committate.
+
+    -c, --commit
+        Committa subito i file applicati o uniti. Nient'altro di cio' che
+        e' in staging entra nel commit.
+
+    -m <messaggio>
+        Come -c, con <messaggio>.
+
+VEDI ANCHE
+    git shared publish --help, git shared status --help

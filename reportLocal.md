@@ -146,7 +146,7 @@ Una versione che l'autore, e un collega che conosce git, possono usare ogni gior
 | Funzioni | **~95%** | Ciclo completo, unione delle divergenze, manutenzione (`unlink`, `prune`, `branch`, `relocate`), `status --peers`. Mancano solo funzioni non essenziali (`mv`, `link` su un file esistente, pattern dei branch) |
 | Correttezza su Windows | **~85%** | Nessun bug grave. Restano casi medi legati all'ambiente (§8.3, gruppo B) |
 | Linux | **~0% verificato** | Codice `*_posix.c` scritto ma mai compilato; anche i test usano comandi da Git Bash (`pwd -W`) |
-| Documentazione per l'utente | **~85%** | Pagina per comando in `help/` e `git shared <comando> --help` (D-087); `git shared --help` funziona dopo `make install` (su Windows serve copiare la pagina HTML con i permessi di amministratore); `breef.md` e alcune righe di questo report da riallineare |
+| Documentazione per l'utente | **~90%** | Pagina per comando in `help/`, anche in italiano (`git shared lang it`); `git shared -h` spiega come aprire il manuale; `git shared --help` funziona dopo `make install` (su Windows serve copiare la pagina HTML con i permessi di amministratore). Messaggi dei comandi solo in inglese |
 | Uso reale | **0%** | Solo test automatici |
 
 **Complessivamente: circa tre quarti della strada.** La parte più difficile (modello, merge, manutenzione) è fatta; quello che resta è soprattutto verifica, ambiente e rifinitura.

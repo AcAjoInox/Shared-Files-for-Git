@@ -36,12 +36,16 @@ COMMANDS
     branch     choose the branches where a file is shared
     prune      forget the peers that no longer exist
     relocate   tell the peers that this repository was moved or copied
+    lang       choose the language of the manual: en or it
     hook       install the hooks (set and link do it by themselves)
 
     Each command has its own page:
         git shared <command> --help
     and a short summary of its options:
         git shared <command> -h
+
+    The manual is also in Italian:
+        git shared lang it
 
 FILES
     .gitshared

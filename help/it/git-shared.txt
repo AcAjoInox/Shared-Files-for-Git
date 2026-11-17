@@ -1,0 +1,56 @@
+GIT-SHARED(1)
+
+NOME
+    git-shared - lo stesso file, allineato tra piu' repository
+
+SINTASSI
+    git shared <comando> [<opzioni>] [<argomenti>]
+
+DESCRIZIONE
+    Un file shared e' un file normale tracciato da piu' repository sulla
+    stessa macchina. Ogni repository ne tiene una copia vera, che si
+    compila e funziona anche senza git shared. Quando un repository
+    pubblica una versione nuova, gli altri lo vengono a sapere e la
+    applicano quando vogliono, con un proprio commit.
+
+    Il commit non invia mai nulla: si pubblica con 'git shared publish'
+    e si riceve con 'git shared update'.
+
+PER INIZIARE
+    Nel repository che ha il file:
+        git shared set -c include/common.h
+    In un altro repository:
+        git shared link -c ../primo/include/common.h
+    Dopo aver modificato e committato il file in uno dei due:
+        git shared publish
+    Negli altri:
+        git shared update -c
+
+COMANDI
+    set        condivide un file di questo repository
+    link       collega un file condiviso da un altro repository
+    unlink     smette di condividere un file
+    status     mostra lo stato di ogni file shared e dei suoi peer
+    publish    invia la versione nuova ai peer
+    update     riceve le versioni nuove e le applica, unendo se serve
+    branch     sceglie i branch su cui un file e' shared
+    prune      dimentica i peer che non esistono piu'
+    relocate   avvisa i peer che questo repository e' stato spostato o copiato
+    lang       sceglie la lingua del manuale: en o it
+    hook       installa gli hook (set e link lo fanno da soli)
+
+    Ogni comando ha la sua pagina:
+        git shared <comando> --help
+    e un breve riassunto delle opzioni:
+        git shared <comando> -h
+
+    Per tornare al manuale in inglese:
+        git shared lang en
+
+FILE
+    .gitshared
+        File versionato alla radice del repository che dichiara i file
+        shared. Lo gestisce git shared: non modificarlo a mano.
+
+CODICI DI USCITA
+    0 riuscito, 1 errore, 128 errore grave, 129 uso sbagliato.

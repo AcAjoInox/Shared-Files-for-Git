@@ -19,6 +19,7 @@ typedef enum {
     MSG_USAGE_PRUNE,
     MSG_USAGE_BRANCH,
     MSG_USAGE_RELOCATE,
+    MSG_USAGE_LANG,
     MSG_USAGE_PUBLISH,
     MSG_USAGE_UPDATE,
     MSG_USAGE_STATUS,
@@ -70,6 +71,8 @@ typedef enum {
     MSG_ERR_BRANCH_DETACHED, /* file */
     MSG_ERR_BRANCH_LAST,     /* file */
     MSG_ERR_RELOCATE_NOTHING,
+    MSG_ERR_LANG,            /* lingua */
+    MSG_ERR_LANG_WRITE,
     MSG_ERR_RELOCATE_WHERE,
     MSG_ERR_RELOCATE_SAME,   /* path */
     MSG_ERR_RELOCATE_EXISTS, /* vecchio path, vecchio path */
@@ -136,6 +139,8 @@ typedef enum {
     MSG_RELOCATE_COPY,       /* file, peer raggiunti, peer */
     MSG_RELOCATE_PEER,       /* file, vecchio path, nuovo path */
     MSG_RELOCATE_SELF,       /* path */
+    MSG_LANG_CURRENT,        /* lingua */
+    MSG_LANG_SET,            /* lingua */
     MSG_PUB_CREATED,         /* file */
     MSG_PUB_PUSHED,          /* file, peer raggiunti (unsigned), peer (unsigned) */
     MSG_PUB_NO_PEERS,        /* file */

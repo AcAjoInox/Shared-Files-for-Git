@@ -1,0 +1,54 @@
+GIT-SHARED-BRANCH(1)
+
+NOME
+    git shared branch - sceglie i branch su cui un file e' shared
+
+SINTASSI
+    git shared branch [<path>]
+    git shared branch <path> (-a | -rm) <branch>
+    git shared branch <path> --reset
+    git shared branch <path> --default (-a | -rm) <branch> [-c | -m <messaggio>]
+
+DESCRIZIONE
+    Un file e' shared solo sui suoi branch attivi. Sugli altri branch e'
+    un file normale: nessun avviso, nulla di pubblicato. Li' lo puoi
+    modificare liberamente; quando la modifica arriva su un branch attivo
+    con un merge, risulta "to publish" o "diverged".
+
+    Senza opzioni mostra, per ogni file (o per <path>), i branch attivi e
+    quelli di default, segnando il branch corrente e i nomi che non
+    esistono piu'.
+
+    L'elenco dei branch attivi e' locale e cambia subito. Non puo'
+    restare vuoto: per smettere di condividere il file usa
+    'git shared unlink'.
+
+    L'elenco di default sta in .gitshared: set, link e un clone
+    ricollegato lo copiano. --default lo modifica e mette .gitshared in
+    staging.
+
+    Solo nomi esatti: i pattern come release/* non sono ancora gestiti.
+
+OPZIONI
+    -a, --add <branch>
+        Condivide il file anche su <branch>. Il branch puo' non esistere
+        ancora.
+
+    -rm, --remove <branch>
+        Smette di condividere il file su <branch>.
+
+    --reset
+        Copia di nuovo l'elenco di default.
+
+    --default
+        Modifica invece l'elenco di default in .gitshared.
+
+    -c, -m <messaggio>
+        Con --default: committa subito .gitshared.
+
+ESEMPI
+    Dopo aver rinominato un branch:
+        git shared branch include/common.h -a master -rm main
+
+VEDI ANCHE
+    git shared status --help

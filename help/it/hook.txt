@@ -1,0 +1,29 @@
+GIT-SHARED-HOOK(1)
+
+NOME
+    git shared hook - installa gli hook
+
+SINTASSI
+    git shared hook install
+
+DESCRIZIONE
+    set e link aggiungono un breve blocco a tre hook del repository:
+
+        post-checkout, post-merge, post-rewrite
+            avvisano quando un file shared non e' allineato, o quando
+            nessuno dei suoi branch attivi esiste piu'
+
+    Gli hook esistenti restano: il blocco va subito dopo la loro prima
+    riga. Nessun hook gira sul commit e nessun hook blocca mai git. Gli
+    hook sono una comodita': 'git shared status' mostra le stesse
+    informazioni.
+
+    'git shared hook install' aggiunge i blocchi a un repository che ha
+    file shared ma non ancora gli hook, e toglie i blocchi che le
+    versioni precedenti mettevano in pre-commit e post-commit.
+
+    Le altre forme di 'git shared hook' le chiamano gli hook stessi, non
+    tu.
+
+VEDI ANCHE
+    git shared status --help

@@ -19,9 +19,22 @@ static const char *const msg_en[] = {
         "    prune     forget the peers that no longer exist\n"
         "    branch    choose the branches where a file is shared\n"
         "    relocate  tell the peers that this repository was moved\n"
+        "    lang      choose the language of the manual: en or it\n"
         "    help      show the manual\n"
         "\n"
-        "'git shared <command> -h' shows the options of a command.\n",
+        "'git shared <command> -h' shows the options of a command.\n"
+        "\n"
+        "The manual:\n"
+        "    git shared help                overview and list of commands\n"
+        "    git shared --help              the same overview, opened by git\n"
+        "                                   (installed by make install)\n"
+        "    git shared <command> --help    page of a command, for example\n"
+        "                                   'git shared link --help'\n"
+        "    git shared help <command>      the same page\n"
+        "\n"
+        "In English or Italian (manuale in italiano):\n"
+        "    git shared lang it\n"
+        "    git shared lang en\n",
     [MSG_USAGE_HELP] =
         "usage: git shared help [<command>]\n",
     [MSG_USAGE_SET] =
@@ -78,6 +91,11 @@ static const char *const msg_en[] = {
         "    <old-path>   where it was (default: the path it remembers)\n"
         "    --copy       it is a copy of <old-path>: share from both\n"
         "    --peer       a peer was moved: update its path here\n",
+    [MSG_USAGE_LANG] =
+        "usage: git shared lang [en | it]\n"
+        "\n"
+        "Show or choose the language of the manual, for all your\n"
+        "repositories. Messages stay in English for now.\n",
     [MSG_USAGE_PUBLISH] =
         "usage: git shared publish [<path>]\n",
     [MSG_USAGE_UPDATE] =
@@ -161,6 +179,8 @@ static const char *const msg_en[] = {
     [MSG_ERR_BRANCH_LAST] =
         "%s: it must stay active on at least one branch "
         "(to stop sharing it: git shared unlink)",
+    [MSG_ERR_LANG] = "unknown language: '%s' (use en or it)",
+    [MSG_ERR_LANG_WRITE] = "cannot write shared.lang in the global git config",
     [MSG_ERR_RELOCATE_NOTHING] = "no file is linked here: nothing to relocate",
     [MSG_ERR_RELOCATE_WHERE] =
         "this repository does not remember where it was: give <old-path>",
@@ -259,6 +279,8 @@ static const char *const msg_en[] = {
     [MSG_RELOCATE_COPY] = "%s: shared from here too (%u of %u peers told)",
     [MSG_RELOCATE_PEER] = "%s: peer %s is now %s",
     [MSG_RELOCATE_SELF] = "This repository is now known at %s.",
+    [MSG_LANG_CURRENT] = "%s",
+    [MSG_LANG_SET] = "Manual language: %s.",
     [MSG_PUB_CREATED] = "%s: new version created",
     [MSG_PUB_PUSHED] = "%s: sent to %u of %u peers",
     [MSG_PUB_NO_PEERS] = "%s: no peers to send it to",

@@ -83,6 +83,16 @@ static void close_out(FILE *f, const char *path)
     }
 }
 
+/* Lingua della pagina: "it" se il file sta in una cartella it/, se no
+ * "en" (help/<comando>.txt e' la pagina inglese). */
+static const char *page_lang(const char *path)
+{
+    return ((strstr(path, "/it/") != NULL) || (strstr(path, "\\it\\") != NULL) ||
+            (strncmp(path, "it/", 3U) == 0))
+               ? "it"
+               : "en";
+}
+
 /* Nome della pagina: il nome del file senza cartella e senza ".txt". */
 static void page_name(const char *path, char *out, size_t size)
 {
@@ -157,7 +167,7 @@ static void write_c(const char *out, int n, char **files)
     fputs("const HelpPage_t help_pages[] = {\n", f);
     for (k = 0; k < n; k++) {
         page_name(files[k], name, sizeof name);
-        fprintf(f, "    { \"%s\", page_%d },\n", name, k);
+        fprintf(f, "    { \"%s\", \"%s\", page_%d },\n", page_lang(files[k]), name, k);
     }
     fprintf(f, "};\n\nconst size_t help_page_count = %d;\n", n);
     close_out(f, out);
@@ -171,8 +181,8 @@ static void write_html(const char *out, const char *in)
     size_t i;
 
     page_name(in, name, sizeof name);
-    fprintf(f, "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\">\n"
-               "<title>%s(1)</title>\n</head>\n<body>\n<pre>\n", name);
+    fprintf(f, "<!DOCTYPE html>\n<html lang=\"%s\">\n<head>\n<meta charset=\"utf-8\">\n"
+               "<title>%s(1)</title>\n</head>\n<body>\n<pre>\n", page_lang(in), name);
     for (i = 0U; i < t.len; i++) {
         switch (t.buf[i]) {
         case '&': fputs("&amp;", f); break;

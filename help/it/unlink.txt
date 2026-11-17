@@ -1,0 +1,36 @@
+GIT-SHARED-UNLINK(1)
+
+NOME
+    git shared unlink - smette di condividere un file
+
+SINTASSI
+    git shared unlink [-c | -m <messaggio>] [--] <path>
+    git shared unlink <id>
+
+DESCRIZIONE
+    Smette di condividere un file. Il file resta, come file normale. La
+    sua sezione viene tolta da .gitshared, che viene messo in staging.
+    Quando .gitshared viene committato, gli altri repository dimenticano
+    questo.
+
+    Per annullare prima del commit:
+        git restore --staged --worktree .gitshared
+
+    Con un <id> al posto del path, unlink toglie i dati locali rimasti di
+    un file che nessun branch dichiara piu' (status lo mostra come
+    "inconsistent", "not declared in .gitshared"). Se un branch lo
+    dichiara ancora, unlink dice quale.
+
+OPZIONI
+    -c, --commit
+        Committa subito .gitshared. Nient'altro di cio' che e' in staging
+        entra nel commit.
+
+    -m <messaggio>
+        Come -c, con <messaggio>.
+
+ESEMPI
+    git shared unlink -c include/common.h
+
+VEDI ANCHE
+    git shared prune --help

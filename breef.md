@@ -112,11 +112,11 @@ Le repo stanno su un servizio di hosting. I peer non sono più path ma **URL**, 
 | `git shared update [<file>]` | Prende le versioni dai peer e applica l'ultima |
 | `git shared publish [<file>]` | Crea la nuova versione e la invia ai peer |
 | `git shared hook install` | Installa gli hook di avviso, per esempio in una repo i cui file shared non li hanno ancora |
-| `git shared mv <vecchio> <nuovo>` | Rinomina un file shared |
-| `git shared branch [<file>] [-a\|-rm <branch>]` | Mostra o modifica i branch su cui il file è shared (effetto immediato; `-a` e `-rm` sono le forme brevi di `--add` e `--remove`);\|--remove <branch>]` | Mostra o modifica i branch su cui il file è shared (effetto immediato); con `--default` modifica l'elenco di default in `.gitshared`, con `--reset` lo ricopia in locale. Solo nomi esatti |
+| `git shared mv <vecchio> <nuovo>` | Rinomina un file shared (non ancora nella prima versione) |
+| `git shared branch [<file>] [-a\|-rm <branch>]` | Mostra o modifica i branch su cui il file è shared (effetto immediato; `-a` e `-rm` sono le forme brevi di `--add` e `--remove`); con `--default` modifica l'elenco di default in `.gitshared`, con `--reset` lo ricopia in locale. Solo nomi esatti |
 | `git shared prune [-n]` | Toglie dall'elenco i peer cancellati o che non condividono più il file |
 | `git shared relocate [--copy]` | Avvisa i peer che questa repo è stata spostata (o, con `--copy`, copiata); `--peer <vecchio> <nuovo>` corregge il path di un peer spostato |
-| `git shared lang <en\|it>` | Sceglie la lingua dei messaggi |
+| `git shared lang [en\|it]` | Mostra o sceglie la lingua del manuale; per ora i messaggi restano in inglese |
 | `git shared <comando> --help` | La pagina di aiuto del comando; `git shared help` elenca i comandi, `git shared <comando> -h` riassume le opzioni |
 
 Gli stati che vedi in `git shared status`:
@@ -133,6 +133,29 @@ Gli stati che vedi in `git shared status`:
 | incoerente | Il file è stato rinominato o cancellato fuori da `git shared` | `git shared mv` o `git shared unlink` |
 | sospeso | Su questo branch il file non è gestito come shared. Se nessuno dei suoi branch esiste più (es. lo hai rinominato) te lo dicono `status` e gli avvisi | Niente, oppure `git shared branch <file> -a <branch>` |
 | scollegato | La repo dichiara il file ma non conosce i peer (clone) | `git shared link` |
+
+## Aiuto e lingua
+L'aiuto ha tre livelli, dal più breve al più completo:
+
+| Comando | Cosa mostra |
+|---|---|
+| `git shared -h` | I comandi in una riga ciascuno, e come aprire il manuale |
+| `git shared <comando> -h` | Le opzioni di un comando, in breve |
+| `git shared help` (o `git shared --help`) | La pagina generale del manuale: cos'è, come iniziare, l'elenco dei comandi |
+| `git shared <comando> --help` (o `git shared help <comando>`) | La pagina completa di un comando, con esempi. Per esempio `git shared link --help` |
+
+**`--help` e `help` mostrano le stesse pagine.** L'unica differenza è `git shared --help` senza comando: lo intercetta git, che apre la pagina installata da `make install` (nel browser su Windows, con `man` su Linux). `git shared help` invece funziona sempre, anche senza installazione.
+
+**Il manuale è in inglese o in italiano:**
+```
+git shared lang it      # manuale in italiano, per tutti i tuoi repository
+git shared link --help  # ora in italiano
+git shared lang en      # di nuovo in inglese
+git shared lang         # mostra la lingua attuale
+```
+La lingua si salva nella configurazione globale di git (`shared.lang`). Per ora vale per il manuale; i messaggi dei comandi restano in inglese. Per `git shared --help` conta la lingua scelta quando hai lanciato `make install`: dopo averla cambiata, rilancia `make install`.
+
+Le pagine sono file di testo nella cartella `help/` del progetto (`help/it/` per l'italiano), una per comando: si possono leggere anche lì, come una wiki.
 
 ## Limiti della prima versione
 - Solo uso **in locale**.

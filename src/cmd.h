@@ -11,6 +11,7 @@
 int cmd_branch(int argc, char **argv);
 int cmd_help(int argc, char **argv);
 int cmd_hook(int argc, char **argv);
+int cmd_lang(int argc, char **argv);
 int cmd_link(int argc, char **argv);
 int cmd_prune(int argc, char **argv);
 int cmd_publish(int argc, char **argv);

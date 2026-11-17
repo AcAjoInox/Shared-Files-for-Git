@@ -70,12 +70,16 @@ BIN      := $(BUILD)/git-shared$(EXE)
 vpath %.c $(SRC_DIRS)
 
 # Pagine di aiuto (D-087): help/*.txt -> build/help_text.c, generato.
-HELP_TXT := $(sort $(wildcard help/*.txt))
+HELP_TXT := $(sort $(wildcard help/*.txt)) $(sort $(wildcard help/it/*.txt))
 EMBED    := $(BUILD)/embed$(EXE)
 HELP_C   := $(BUILD)/help_text.c
 OBJ      += $(BUILD)/help_text.o
-DOC_HTML := $(BUILD)/git-shared.html
-DOC_MAN  := $(BUILD)/git-shared.1
+# Pagina di "git shared --help" nella lingua scelta (shared.lang) quando si
+# lancia make: rilanciare make install dopo "git shared lang" (D-088).
+DOC_LANG := $(if $(filter it,$(shell git config --get shared.lang)),it,en)
+DOC_SRC  := $(if $(filter it,$(DOC_LANG)),help/it/git-shared.txt,help/git-shared.txt)
+DOC_HTML := $(BUILD)/doc-$(DOC_LANG)/git-shared.html
+DOC_MAN  := $(BUILD)/doc-$(DOC_LANG)/git-shared.1
 ifeq ($(OS),Windows_NT)
 HTML_DIR := $(shell git --html-path)
 else
@@ -105,10 +109,13 @@ $(BUILD)/help_text.o: $(HELP_C)
 
 doc: $(DOC_HTML) $(DOC_MAN)
 
-$(DOC_HTML): help/git-shared.txt $(EMBED)
+$(BUILD)/doc-$(DOC_LANG):
+	$(call MKDIR,$@)
+
+$(DOC_HTML): $(DOC_SRC) $(EMBED) | $(BUILD)/doc-$(DOC_LANG)
 	$(call RUN,$(EMBED)) -html $@ $<
 
-$(DOC_MAN): help/git-shared.txt $(EMBED)
+$(DOC_MAN): $(DOC_SRC) $(EMBED) | $(BUILD)/doc-$(DOC_LANG)
 	$(call RUN,$(EMBED)) -man $@ $<
 
 -include $(OBJ:.o=.d)

@@ -1,0 +1,30 @@
+GIT-SHARED-LANG(1)
+
+NOME
+    git shared lang - sceglie la lingua del manuale
+
+SINTASSI
+    git shared lang [en | it]
+
+DESCRIZIONE
+    Senza argomenti mostra la lingua attuale. Con en o it la cambia per
+    tutti i tuoi repository (git config --global shared.lang).
+
+    La lingua vale per le pagine del manuale:
+        git shared help
+        git shared help <comando>
+        git shared <comando> --help
+
+    'git shared --help' lo gestisce git, che apre la pagina installata da
+    'make install' nella lingua scelta in quel momento: dopo aver cambiato
+    lingua, rilancia 'make install' per aggiornarla.
+
+    Per ora i messaggi dei comandi restano in inglese.
+
+ESEMPI
+    git shared lang it
+    git shared link --help
+    git shared lang en
+
+VEDI ANCHE
+    git shared --help

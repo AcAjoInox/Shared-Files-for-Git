@@ -1,0 +1,42 @@
+GIT-SHARED-STATUS(1)
+
+NOME
+    git shared status - mostra lo stato di ogni file shared
+
+SINTASSI
+    git shared status [--peers]
+
+DESCRIZIONE
+    Mostra ogni file shared con path, ID, stato e cosa fare. Gli stati
+    sono scritti in inglese, come li stampa il comando:
+
+    aligned               hai l'ultima versione: niente da fare
+    new version to apply  un peer ne ha pubblicata una nuova: update
+    applied, to commit    update l'ha applicata: commit
+    to publish            l'hai modificato sull'ultima versione: publish
+    diverged              l'hai modificato su una versione vecchia, o due
+                          peer hanno pubblicato senza vedersi: update,
+                          che unisce
+    merge in progress     update ha trovato un conflitto: correggi il
+                          file, git add, di nuovo update
+    pending commit        set, link o unlink non ancora committato:
+                          commit, oppure restore di .gitshared per
+                          annullare
+    unlinked              dichiarato qui ma non collegato (un clone): link
+    inconsistent          collegato qui ma non dichiarato su questo branch,
+                          oppure il file e' stato cancellato: unlink, o
+                          controlla con branch
+    suspended on this branch (...)
+                          questo branch non e' tra i branch del file: qui
+                          e' un file normale. Lo stato vero e' tra
+                          parentesi. 'git shared branch' lo cambia.
+
+OPZIONI
+    --peers
+        Mostra anche, per ogni peer: stessa versione; versione piu'
+        vecchia (publish); versione piu' nuova o diversa (update); nessuna
+        versione (publish); non condivide piu' il file, o non trovato
+        (prune); non leggibile adesso. Non scarica e non cambia nulla.
+
+VEDI ANCHE
+    git shared update --help, git shared publish --help
