@@ -15,6 +15,7 @@
 #include "err.h"
 #include "git.h"
 #include "mem.h"
+#include "merge.h"
 #include "msg.h"
 #include "peers.h"
 #include "shared.h"
@@ -47,26 +48,6 @@ static void print_entry(const Repo_t *r, const SharedEntry_t *e, eState_t st,
         fputs(state_name(st), stdout);
     }
     putchar('\n');
-}
-
-/* 1 se il commit a e' antenato di b. */
-static int is_ancestor(const Oid_t *a, const Oid_t *b)
-{
-    const char *args[] = { "merge-base", "--is-ancestor", NULL, NULL, NULL };
-    char ha[OID_HEX_SIZE];
-    char hb[OID_HEX_SIZE];
-    Str_t out = STR_INIT;
-    int code = 1;
-
-    oid_to_hex(a, ha);
-    oid_to_hex(b, hb);
-    args[2] = ha;
-    args[3] = hb;
-    if (git_capture(args, PROC_STDERR_NULL, &out, &code) != GS_OK) {
-        code = 1;
-    }
-    str_free(&out);
-    return code == 0;
 }
 
 /*
@@ -117,7 +98,7 @@ static void print_peers(const SharedEntry_t *e, GitBatch_t *b)
             oid_to_hex(&tips[k], hex);
             what = ((t.len > 0U) &&
                     (git_batch_query(b, hex, &have) == GIT_OBJ_COMMIT) &&
-                    is_ancestor(&tips[k], &t))
+                    merge_is_ancestor(&tips[k], &t))
                        ? MSG_PEER_BEHIND
                        : MSG_PEER_NEWER;
         }

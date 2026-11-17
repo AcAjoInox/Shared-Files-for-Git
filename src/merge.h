@@ -10,7 +10,8 @@
  * Punta a un commit provvisorio i cui genitori sono le versioni che il
  * contenuto risolto incorpora: la T di partenza e, per una divergenza tra
  * peer, la versione del peer. Vale solo finche' il path e' in conflitto
- * nell'index o l'index e' diverso da HEAD; altrimenti e' scaduta.
+ * nell'index o l'index e' diverso da HEAD; altrimenti e' scaduta, e la
+ * toglie il primo comando che ricava lo stato (state_derive, D-092).
  */
 #ifndef GS_MERGE_H
 #define GS_MERGE_H
@@ -45,6 +46,12 @@ eGsErr_t merge_index_blob(const char *top, const char *path, Oid_t *out);
  */
 eGsErr_t merge_three(const char *top, const char *path, const Oid_t *base,
                      const Oid_t *ours, const Oid_t *theirs, int *conflict);
+
+/* Toglie refs/shared-merge/<id>, che il chiamante ha visto esistere. */
+eGsErr_t merge_drop(const char *id);
+
+/* 1 se il commit a e' antenato di b (o uguale): un processo. */
+int merge_is_ancestor(const Oid_t *a, const Oid_t *b);
 
 /* Antenato comune di due versioni; out->len = 0 se non c'e'. */
 eGsErr_t merge_base(const Oid_t *a, const Oid_t *b, Oid_t *out);

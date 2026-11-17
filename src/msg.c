@@ -210,7 +210,8 @@ static const char *const msg_en[] = {
     [MSG_ERR_MERGE] = "%s: cannot merge",
     [MSG_ERR_CONFLICT_OPEN] =
         "%s: merge conflict: fix it, 'git add' it, then run "
-        "'git shared update' (to give up: git restore -s HEAD -SW -- '%s')",
+        "'git shared update' (to give up: git restore -s HEAD -SW -- '%s', "
+        "then 'git shared status')",
 
     [MSG_WARN_BAD_ENTRY] = "ignoring invalid entry '%s' in .gitshared",
     [MSG_WARN_NOT_IN_HEAD] =

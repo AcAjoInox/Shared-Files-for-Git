@@ -26,6 +26,10 @@ DESCRIPTION
         git shared publish
     To give up the merge:
         git restore -s HEAD -SW -- <file>
+        git shared status
+    Any git shared command run after the restore drops the merge.
+    Run one before staging other changes to the file: until then a
+    staged change would be taken as the resolution.
 
     Without <path>, all the shared files; with it, only that one.
 

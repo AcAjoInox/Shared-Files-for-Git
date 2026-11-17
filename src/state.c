@@ -194,12 +194,18 @@ eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         goto exit;
     }
 
-    /* Unione in corso (D-078): conta solo se l'index la conferma. */
+    /* Unione in corso (D-078): conta solo se l'index la conferma. Scaduta
+     * (abbandonata con git restore, o risoluzione gia' committata) si toglie
+     * subito, da qualunque comando la veda: una modifica messa in staging
+     * dopo non diventa la sua risoluzione (reportIdea B-48, D-092). Un
+     * errore nel toglierla non cambia lo stato: ci riprova il prossimo. */
     merge_ref(&name, e->id);
-    if ((git_batch_query(b, str_cstr(&name), &k) == GIT_OBJ_COMMIT) &&
-        merge_is_live(b, str_cstr(&e->path), &si.h, &unmerged)) {
-        *st = STATE_MERGING;
-        goto exit;
+    if (git_batch_query(b, str_cstr(&name), &k) == GIT_OBJ_COMMIT) {
+        if (merge_is_live(b, str_cstr(&e->path), &si.h, &unmerged)) {
+            *st = STATE_MERGING;
+            goto exit;
+        }
+        (void)merge_drop(e->id);
     }
 
     /* Caso comune: un confronto di oid, nessuna storia da leggere. */

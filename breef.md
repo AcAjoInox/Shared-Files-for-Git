@@ -39,7 +39,7 @@ Ricevere e applicare sono separati di proposito: nessuno ti cambia un file sotto
 2. **Decidi sempre tu.** I comandi `git shared` preparano le modifiche ma non fanno commit da soli. Se vuoi il commit immediato usa `-c` oppure `-m "messaggio"`: il commit contiene solo il file shared e `.gitshared`, e il resto che hai in staging resta lì.
 3. **Meglio aggiornarsi prima di modificare, ma nessuno ti blocca.** Se la tua copia è indietro rispetto all'ultima versione e committi una modifica al file shared, il commit passa, ma la modifica non viene pubblicata: il file risulta *divergente* (lo dicono `status` e `publish`) e `git shared update` unisce la tua versione con l'ultima.
 4. **Il tuo lavoro non si perde.** `update` si rifiuta di sovrascrivere modifiche non committate, anche quelle in staging. Per forzare serve `-f`. Una versione portata da un `update` precedente e non ancora committata non conta come modifica tua: un nuovo `update` la sostituisce con l'ultima.
-5. **Nessuna modifica viene scartata.** Se due repo hanno modificato il file ognuna per conto suo, le versioni risultano *divergenti* e `git shared update` le unisce come farebbe `git merge`. Se toccano le stesse righe trovi i soliti marker di conflitto: li risolvi, fai `git add` e rilanci `git shared update`, poi commit e `git shared publish`. Per rinunciare basta `git restore -s HEAD -SW <file>`.
+5. **Nessuna modifica viene scartata.** Se due repo hanno modificato il file ognuna per conto suo, le versioni risultano *divergenti* e `git shared update` le unisce come farebbe `git merge`. Se toccano le stesse righe trovi i soliti marker di conflitto: li risolvi, fai `git add` e rilanci `git shared update`, poi commit e `git shared publish`. Per rinunciare basta `git restore -s HEAD -SW <file>`, seguito subito da `git shared status`, che chiude l'unione.
 
 ## Uso in locale
 Le repo stanno sulla stessa macchina e si conoscono tramite il loro path.
@@ -128,7 +128,7 @@ Gli stati che vedi in `git shared status`:
 | da committare | Hai applicato l'ultima versione con `update`, ma non hai ancora fatto commit | `git commit`, oppure `git restore --staged --worktree <file>` per annullare |
 | da pubblicare | Hai una modifica che i peer non hanno | `git shared publish` |
 | divergente | Tu e un peer avete modificato il file separatamente | `git shared update`, che unisce |
-| unione in corso | `update` ha trovato un conflitto, oppure l'hai risolto e messo in staging | Correggi il file, `git add`, poi `git shared update`; per rinunciare `git restore -s HEAD -SW <file>` |
+| unione in corso | `update` ha trovato un conflitto, oppure l'hai risolto e messo in staging | Correggi il file, `git add`, poi `git shared update`; per rinunciare `git restore -s HEAD -SW <file>` e poi `git shared status` |
 | in attesa di commit | Hai lanciato `set`, `link` o `unlink` ma non hai ancora committato | `git commit`, oppure `git restore` per annullare |
 | incoerente | Il file è stato rinominato o cancellato fuori da `git shared`. Si vede anche sui branch nati prima del `set`, dove il file non è ancora shared | `git shared unlink` (`git shared mv` non è ancora disponibile); sui branch vecchi si può ignorare |
 | sospeso | Su questo branch il file non è gestito come shared. Se nessuno dei suoi branch esiste più (es. lo hai rinominato) te lo dicono `status` e gli avvisi | Niente, oppure `git shared branch <file> -a <branch>` |

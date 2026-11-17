@@ -229,6 +229,118 @@ expect_rc "B-46: versione unita in staging non e' modifica locale" 0
 expect_eq "B-46: applicata l'ultima versione" \
 	"$(git show HEAD:f.h | tr '\n' ' ')" "a b c d F5 "
 
+# --- update: T avanza solo su una versione che la contiene (B-47) ---------------
+# L ha i peer [M, N], in quest'ordine. N ha vN, che discende da vL; M ha vM,
+# nata dalla prima versione. merge-base --independent restituisce vM e vN
+# nell'ordine dei peer: T deve avanzare su vN, l'unica che contiene vL, e
+# vM si unisce dopo, con due genitori.
+pair L M
+make_repo N
+cd "$TRASH/N" || exit 1
+put o.txt o
+git shared link -c ../L/f.h >/dev/null
+cd "$TRASH" && mv M M.off
+cd "$TRASH/L" || exit 1
+change L1 b c d e
+git shared publish >/dev/null 2>&1 # arriva solo a N
+T_L=$(tip)
+cd "$TRASH" && mv L L.off
+cd "$TRASH/N" || exit 1
+git shared update -c >/dev/null 2>&1
+change L1 b N3 d e
+git shared publish >/dev/null 2>&1 # nessun peer raggiungibile
+T_N=$(tip)
+cd "$TRASH" && mv L.off L && mv M.off M
+cd "$TRASH/M" || exit 1
+change a b c d M5
+git shared publish >/dev/null 2>&1 # rifiutata da L e da N
+T_M=$(tip)
+cd "$TRASH/L" || exit 1
+expect_eq "B-47: peer di L nell'ordine M, N" \
+	"$(git config --get-all "shared.$(shared_id f.h).peer" | sed 's|.*/||' | tr '\n' ' ')" \
+	"M N "
+run git shared update
+expect_rc "B-47: codice 0" 0
+expect_out "B-47: versione ricevuta" "new version received"
+expect_ok "B-47: la T di prima e' antenata della nuova" \
+	git merge-base --is-ancestor "$T_L" "$(tip)"
+expect_eq "B-47: primo genitore la versione che contiene T" "$(tip ^1)" "$T_N"
+expect_eq "B-47: secondo genitore l'altra versione" "$(tip ^2)" "$T_M"
+expect_eq "B-47: contenuto unito" "$(tr '\n' ' ' <f.h)" "L1 b N3 d M5 "
+
+# --- unione abbandonata: il primo comando la toglie (B-48) ------------------------
+# Conflitto tra versioni, abbandono con git restore come dice il manuale.
+# Il primo comando git shared deve togliere l'unione scaduta: una modifica
+# messa in staging dopo non e' una risoluzione, e update non deve creare una
+# versione che dichiara di contenere quella del peer senza le sue righe.
+pair O P
+cd "$TRASH" && mv P P.off
+cd "$TRASH/O" || exit 1
+change O1 b c d e
+git shared publish >/dev/null 2>&1
+T_O=$(tip)
+cd "$TRASH" && mv P.off P
+cd "$TRASH/P" || exit 1
+change P1 b c d e
+git shared publish >/dev/null 2>&1 # rifiutata da O
+T_P=$(tip)
+run git shared update
+expect_rc "B-48: conflitto" 1
+expect_ok "B-48: unione registrata" has_marker
+git restore -s HEAD -SW -- f.h
+expect_eq "B-48: dopo l'abbandono allineato" "$(state)" "    state  aligned"
+expect_fail "B-48: status toglie l'unione scaduta" has_marker
+lines f.h P1 b c d P5
+git add f.h
+expect_eq "B-48: la modifica in staging non e' una risoluzione" "$(state)" \
+	"    state  aligned"
+run git shared update -c
+expect_rc "B-48: update rifiuta" 1
+expect_err "B-48: modifica locale protetta" "has local changes"
+expect_eq "B-48: nessuna versione nuova" "$(tip)" "$T_P"
+expect_eq "B-48: modifica intatta" "$(git show :f.h | tr '\n' ' ')" "P1 b c d P5 "
+git restore -s HEAD -SW -- f.h
+
+# Anche publish (e ogni comando che ricava lo stato) toglie l'unione scaduta.
+git shared update >/dev/null 2>&1
+expect_ok "B-48: di nuovo in conflitto" has_marker
+git restore -s HEAD -SW -- f.h
+git shared publish >/dev/null 2>&1
+expect_fail "B-48: publish toglie l'unione scaduta" has_marker
+
+# --- conclusione di un conflitto tra versioni: una sola versione (B-49) -----------
+# La risoluzione diventa una versione con genitori (T di partenza, versione
+# del peer); la versione del peer, gia' contenuta, non si unisce di nuovo.
+pair Q R
+cd "$TRASH" && mv R R.off
+cd "$TRASH/Q" || exit 1
+change Q1 b c d e
+git shared publish >/dev/null 2>&1
+T_Q=$(tip)
+cd "$TRASH" && mv R.off R
+cd "$TRASH/R" || exit 1
+change R1 b c d e
+git shared publish >/dev/null 2>&1 # rifiutata da Q
+T_R=$(tip)
+run git shared update
+expect_rc "B-49: conflitto" 1
+lines f.h QR1 b c d e
+git add f.h
+run git shared update -c
+expect_rc "B-49: conclusa" 0
+expect_out "B-49: unita e committata" "f.h: merged and committed"
+expect_eq "B-49: primo genitore la T di partenza" "$(tip ^1)" "$T_R"
+expect_eq "B-49: secondo genitore la versione del peer" "$(tip ^2)" "$T_Q"
+expect_eq "B-49: contenuto della risoluzione" "$(git show HEAD:f.h | tr '\n' ' ')" \
+	"QR1 b c d e "
+expect_eq "B-49: allineato" "$(state)" "    state  aligned"
+run git shared publish
+expect_out "B-49: inviata" "sent to 1 of 1 peers"
+cd "$TRASH/Q" || exit 1
+run git shared update -c
+expect_out "B-49: Q applica" "new version applied and committed"
+expect_eq "B-49: Q allineato" "$(state)" "    state  aligned"
+
 # --- squash: falso divergente, si chiude da solo (B-42) --------------------------
 pair G H
 cd "$TRASH/G" || exit 1

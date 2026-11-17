@@ -26,6 +26,11 @@ DESCRIZIONE
         git shared publish
     Per rinunciare all'unione:
         git restore -s HEAD -SW -- <file>
+        git shared status
+    Il primo comando git shared lanciato dopo il restore toglie
+    l'unione. Lancialo prima di mettere in staging altre modifiche al
+    file: fino ad allora una modifica in staging varrebbe come
+    risoluzione.
 
     Senza <path>, tutti i file shared; con <path>, solo quello.
 

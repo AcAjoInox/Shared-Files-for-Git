@@ -74,6 +74,7 @@ static eGsErr_t receive(const SharedEntry_t *e, GitBatch_t *b, int *advanced,
     Oid_t t;
     Oid_t in;
     size_t k;
+    size_t pick;
     size_t na = 0U;
     eGsErr_t err = GS_OK;
 
@@ -126,18 +127,26 @@ static eGsErr_t receive(const SharedEntry_t *e, GitBatch_t *b, int *advanced,
             oidlist_add(&tops, &in);
         }
     }
-    /* T non e' tra le versioni rimaste: una la contiene, e T avanza. */
-    k = 0U;
+    /* T non e' tra le versioni rimaste: una di loro la contiene, e T avanza
+     * su quella, in fast-forward. Non e' per forza la prima: l'ordine e'
+     * quello dei peer (reportIdea B-47). Si chiede a git per ogni rimasta
+     * tranne l'ultima, che se nessun'altra la contiene e' lei. */
     if ((tops.n > 0U) && !oidlist_has(&tops, &t)) {
-        err = git_update_ref(str_cstr(&ref), &tops.v[0], &t, "git shared: update");
+        pick = tops.n;
+        for (k = 0U; (k < tops.n) && (pick == tops.n); k++) {
+            if (((k + 1U) == tops.n) || merge_is_ancestor(&t, &tops.v[k])) {
+                pick = k;
+            }
+        }
+        err = git_update_ref(str_cstr(&ref), &tops.v[pick], &t,
+                             "git shared: update");
         if (err != GS_OK) {
             goto exit;
         }
         *advanced = 1;
-        t = tops.v[0];
-        k = 1U;
+        t = tops.v[pick];
     }
-    for (; k < tops.n; k++) {
+    for (k = 0U; k < tops.n; k++) {
         if (!oid_eq(&tops.v[k], &t)) {
             oidlist_add(heads, &tops.v[k]);
         }
@@ -192,15 +201,12 @@ static int version_blob(GitBatch_t *b, const Oid_t *commit, Oid_t *blob)
 static void drop_marker(const SharedEntry_t *e, GitBatch_t *b)
 {
     Str_t ref = STR_INIT;
-    Str_t del = STR_INIT;
     Oid_t k;
 
     merge_ref(&ref, e->id);
     if (git_batch_query(b, str_cstr(&ref), &k) == GIT_OBJ_COMMIT) {
-        str_addz(&del, str_cstr(&ref));
-        (void)git_delete_refs(&del);
+        (void)merge_drop(e->id);
     }
-    str_free(&del);
     str_free(&ref);
 }
 
@@ -527,13 +533,23 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
 
     /* --- versioni dei peer che non discendono da T: una alla volta ------- */
     for (k = 0U; (k < heads.n) && (cur.len > 0U); k++) {
+        if (merge_base(&tip, &heads.v[k], &mb) != GS_OK) {
+            msg_error(MSG_ERR_MERGE, label);
+            *rc = GS_EXIT_ERROR;
+            break;
+        }
+        /* Gia' contenuta in T: la conclusione di un'unione in corso
+         * (settle_merge) l'ha appena unita. Unirla di nuovo creerebbe una
+         * seconda versione con lo stesso contenuto (reportIdea B-49). */
+        if ((mb.len > 0U) && oid_eq(&mb, &heads.v[k])) {
+            continue;
+        }
         if ((o->force == 0U) && cmd_has_local_changes(r, e, b)) {
             msg_error(MSG_ERR_LOCAL_CHANGES, label);
             *rc = GS_EXIT_ERROR;
             break;
         }
-        if ((merge_base(&tip, &heads.v[k], &mb) != GS_OK) ||
-            !version_blob(b, &heads.v[k], &theirs) ||
+        if (!version_blob(b, &heads.v[k], &theirs) ||
             ((mb.len > 0U) && !version_blob(b, &mb, &base))) {
             msg_error(MSG_ERR_MERGE, label);
             *rc = GS_EXIT_ERROR;

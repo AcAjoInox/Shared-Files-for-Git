@@ -149,6 +149,39 @@ eGsErr_t merge_three(const char *top, const char *path, const Oid_t *base,
     return err;
 }
 
+int merge_is_ancestor(const Oid_t *a, const Oid_t *b)
+{
+    const char *args[] = { "merge-base", "--is-ancestor", NULL, NULL, NULL };
+    char hex_a[OID_HEX_SIZE];
+    char hex_b[OID_HEX_SIZE];
+    Str_t out = STR_INIT;
+    int code = 1;
+
+    oid_to_hex(a, hex_a);
+    oid_to_hex(b, hex_b);
+    args[2] = hex_a;
+    args[3] = hex_b;
+    if (git_capture(args, PROC_STDERR_NULL, &out, &code) != GS_OK) {
+        code = 1;
+    }
+    str_free(&out);
+    return code == 0;
+}
+
+eGsErr_t merge_drop(const char *id)
+{
+    Str_t ref = STR_INIT;
+    Str_t del = STR_INIT;
+    eGsErr_t err;
+
+    merge_ref(&ref, id);
+    str_addz(&del, str_cstr(&ref));
+    err = git_delete_refs(&del);
+    str_free(&del);
+    str_free(&ref);
+    return err;
+}
+
 eGsErr_t merge_base(const Oid_t *a, const Oid_t *b, Oid_t *out)
 {
     const char *args[] = { "merge-base", NULL, NULL, NULL };
