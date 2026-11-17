@@ -21,6 +21,7 @@ has_block() {
 make_repo A
 cd "$TRASH/A" || exit 1
 printf '#!/bin/sh\necho "hook-utente" >&2\nexit 0\n' >.git/hooks/pre-commit
+chmod +x .git/hooks/pre-commit
 put breef.md "$(cat "$BREEF")"
 run git shared set breef.md
 ID=$(shared_id breef.md)
@@ -105,6 +106,7 @@ git-shared hook EVENT "$@" </dev/null || :
 old_hook() {
 	printf '#!/bin/sh\n%s\n%s' "$(printf '%s' "$OLD_BLOCK" | sed "s/EVENT/$1/")" "$2" \
 		>".git/hooks/$1"
+	chmod +x ".git/hooks/$1"
 }
 
 # Il blocco rimasto nel post-commit non fa nulla al commit.

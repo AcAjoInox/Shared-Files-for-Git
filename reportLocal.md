@@ -3,6 +3,8 @@
 > **2026-11-16.** Baseline `project.md` v2.24 (D-001…D-086). Codice v0 con unione delle divergenze, ri-aggancio, comandi di manutenzione completi e `status --peers`: 718 test su 718, Windows, git 2.43. Riguarda solo la fase 1 (repo sulla stessa macchina). I bug sono in `reportIdea.md`; qui ci sono due giudizi: l'impatto atteso e la facilità d'uso.
 >
 > **Da dove vengono i giudizi.** Dalla lettura del codice, dai test e dalle prove fatte a mano con l'eseguibile durante la ricerca dei bug. Nessuno, a parte l'autore, lo ha ancora usato: la parte sull'uso è una valutazione ragionata, non una misura.
+>
+> **Aggiornamento 2026-11-17.** Linux provato in WSL2 (Ubuntu 22.04, git 2.34, GCC 11): 823 test su 823, come su Windows. Aggiornati §2, §6 e §8; il resto è fermo al 2026-11-16.
 
 ## 1. In breve
 
@@ -25,14 +27,14 @@
 **Perché l'adozione non cambia.**
 - Chi cerca "condividere un file tra repo" quasi sempre ha un collega o una CI dall'altra parte. La fase 1 non li raggiunge.
 - Ogni clone va ricollegato a mano con un `link` (ora funziona, ma va saputo): niente segue la repo da sola.
-- Va installato a mano su ogni macchina; niente macOS; Linux mai compilato; licenza non decisa.
+- Va installato a mano su ogni macchina; niente macOS; Linux provato solo in WSL2; licenza non decisa.
 - Il bisogno non è ancora stato confrontato con git-fetch-file e peru sul caso reale (`project.md` §2.4): non si sa quanta parte del problema coprono già.
 
 **Che cosa è cambiato davvero.** Il rischio del progetto. Prima la parte più difficile, il merge senza stato salvato, era una scommessa; ora è fatta e non ha richiesto di toccare il modello. La fase 2 parte da una base che regge, e il suo dubbio principale resta uno solo: A-01, cioè se gli hosting accettano `refs/shared/*`.
 
 **Che cosa alzerebbe l'impatto, in ordine di resa.**
 1. I comandi di manutenzione sono completi (ri-aggancio, `unlink`, `prune`, `branch`, `relocate`: D-080…D-084) e i silenzi principali sono chiusi (D-085): un file sospeso perché il suo branch non esiste più viene segnalato, e un comando su un file in attesa dice perché non fa nulla.
-2. Linux compilato e provato, con B-12 (fine riga) deciso.
+2. ~~Linux compilato e provato~~: fatto (WSL2, Ubuntu 22.04, git 2.34). Resta B-12 (fine riga) da decidere.
 3. La prova di A-01: decide se la fase 2 esiste.
 4. Un confronto pubblico e onesto con git-subrepo, Copybara e peru.
 
@@ -106,11 +108,11 @@ Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a
 - Lo stato si ricava ogni volta dal contenuto della repo: hook saltati, rebase, reset non lo corrompono.
 - Ogni avanzamento della catena è condizionato e solo in fast-forward: una versione non viene mai sovrascritta.
 - Il contenuto del file non passa mai dai buffer del programma: viaggia come blob tra comandi git.
-- 718 test di sistema, che lanciano i comandi come farebbe l'utente.
+- 823 test di sistema, che lanciano i comandi come farebbe l'utente.
 
 **Punti deboli, da sapere.**
 - **Nessun bug grave aperto**, 29 tra medi e minori (`reportIdea.md` §2).
-- **Solo Windows è provato.** I file `*_posix.c` non sono mai stati compilati.
+- **Linux provato solo in WSL2** (Ubuntu 22.04, git 2.34, GCC 11): tutti i test passano, ma nessun uso reale su una macchina Linux.
 - **Fine riga** (B-12): tra repo con normalizzazioni diverse ogni versione risulterebbe una modifica.
 - **La base si ricava dai blob nella storia.** Uno squash la cancella: il file risulta *diverged* anche se non lo è. Con il merge si chiude da solo, ma l'utente vede comunque uno stato che non si aspetta (B-42). Il caso contrario, revert più squash, riporta in silenzio la versione che si voleva togliere.
 - **Nessun test di unità** e nessuna prova con più di 8 peer.
@@ -145,7 +147,7 @@ Una versione che l'autore, e un collega che conosce git, possono usare ogni gior
 |---|---|---|
 | Funzioni | **~95%** | Ciclo completo, unione delle divergenze, manutenzione (`unlink`, `prune`, `branch`, `relocate`), `status --peers`. Mancano solo funzioni non essenziali (`mv`, `link` su un file esistente, pattern dei branch) |
 | Correttezza su Windows | **~85%** | Nessun bug grave. Restano casi medi legati all'ambiente (§8.3, gruppo B) |
-| Linux | **~0% verificato** | Codice `*_posix.c` scritto ma mai compilato; anche i test usano comandi da Git Bash (`pwd -W`) |
+| Linux | **~85%** | Provato in WSL2 (Ubuntu 22.04, git 2.34, cioè il minimo di D-032): compila senza warning, 823 test su 823. Mancano l'ultima git stabile su Linux (matrice di D-032) e le misure (punto 9) |
 | Documentazione per l'utente | **~90%** | Pagina per comando in `help/`, anche in italiano (`git shared lang it`); `git shared -h` spiega come aprire il manuale; `git shared --help` funziona dopo `make install` (su Windows serve copiare la pagina HTML con i permessi di amministratore). Messaggi dei comandi solo in inglese |
 | Uso reale | **0%** | Solo test automatici |
 
@@ -164,12 +166,12 @@ Unità di misura: una **sessione** è un blocco di lavoro come quelli degli ulti
 | 3 | Hook non `sh` (Python, binari): non inserire il blocco, avvisare | C-02 | 0,5 | Oggi un hook Python viene rotto da `set` |
 | 4 | Windows: git in un path con accenti, `PATH` vuoto | C-05, C-10 | 0,5 | Con `C:\Users\José` nessun comando parte |
 | 5 | ~~`git shared --help`~~: fatto (D-087), con una pagina per comando in `help/` | REQ-F-019 | – | – |
-| 6 | **Linux**: compilare, far passare i 718 test, correggere ciò che emerge (C-19, `sys_abs_path`, script di test) | C-19 | 1,5–2,5 | Piattaforma dichiarata e mai provata: è il rischio più grande della stima |
+| 6 | ~~**Linux**: compilare e far passare i test~~: fatto in WSL2. Unica correzione: due hook di prova senza `chmod +x` in t0006. C-19 provato: senza effetti con git | C-19 | – | – |
 | 7 | Fine riga e bit di esecuzione: `link` confronta gli attributi `text`/`eol` con la sorgente e avvisa; il modo `100755` si conserva | B-12, C-11 | 1–1,5 | Tra repo con normalizzazioni diverse ogni versione sembra una modifica e i merge diventano conflitti sull'intero file |
 | 8 | Minori che si incontrano davvero: `set .gitshared`, cartella hook assente, `config --unset` con più valori, path assoluti, maiuscole su Windows, `link` interrotto, staging non protetto, avviso se la sorgente non è allineata | B-36, C-04, C-09, C-13, C-12, C-21, B-43, B-44 | 1,5 | Ognuno è raro, insieme sono la differenza tra "funziona" e "non sorprende" |
 | 9 | Misure: `status` con molti file, `publish` verso 32 peer, costo di un'unione; su Windows e Linux | REQ-NF-007 | 0,5 | Le soglie sono requisiti; oggi misurate solo fino a 8 peer |
 | 10 | Riallineare i documenti: `breef.md` (limiti della v0), §5 di questo report, incoerenze aperte di `reportIdea.md` §8 | – | 0,5 | Il breef è la porta d'ingresso per chi non è l'autore |
-| | **Totale A** | | **8–10 sessioni** | |
+| | **Totale A** | | **6–8 sessioni** | |
 
 **B. Uso reale**
 
@@ -189,9 +191,9 @@ Unità di misura: una **sessione** è un blocco di lavoro come quelli degli ulti
 
 | | Sessioni | Calendario |
 |---|---|---|
-| Indispensabili (A) | 8–10 | 1–2 settimane al ritmo attuale |
+| Indispensabili (A) | 6–8 | 1–2 settimane al ritmo attuale |
 | Uso reale e correzioni (B) | 1–2 | 2–4 settimane, in parallelo al resto |
-| **Versione buona per l'uso locale** | **circa 10–12** | **circa un mese** |
+| **Versione buona per l'uso locale** | **circa 8–10** | **circa un mese** |
 
 Tappe proposte, con un tag ciascuna:
 
@@ -199,6 +201,6 @@ Tappe proposte, con un tag ciascuna:
 - **`v0.4.0`**: punti 6, 7 e 9. Linux provato, fine riga gestiti, prestazioni misurate.
 - **`v1.0.0-locale`**: dopo l'uso reale (punti 11–12) e il riallineamento dei documenti (punto 10).
 
-**Il rischio maggiore è Linux** (punto 6): non è mai stato compilato, quindi la stima può allungarsi se `proc_posix.c` ha problemi di fondo. Il secondo è l'uso reale, che per definizione trova cose che i test non cercano.
+**Il rischio maggiore era Linux** (punto 6): provato in WSL2 il 2026-11-17, non ha mostrato problemi di fondo. Ora il rischio maggiore è l'uso reale, che per definizione trova cose che i test non cercano.
 
 > **Nota:** la tabella di §5 è in parte superata. "Stati come *inconsistent* o *unlinked* non hanno un comando di uscita" non vale più: *unlinked* si risolve con `link` (D-080), *inconsistent* con `unlink <id>` o `branch` (D-081, D-083). Resta la confusione di *inconsistent* sui branch vecchi (punto 2).
