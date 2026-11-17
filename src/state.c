@@ -10,6 +10,13 @@
  *   catena v1(A) v2(B);     storia A, B, A  -> B = v2 = T: da pubblicare
  *   catena v1(A) v2(B);     storia A        -> B = v1, H = A: da applicare
  *   catena v1(A) v2(B) v3(A); storia A, B, D -> B = v2, H = D: divergente
+ *
+ * La catena comprende entrambi i genitori delle unioni (chain_blobs,
+ * reportIdea B-46): la versione di un peer unita da un'altra repo e' una
+ * versione anche per quel peer.
+ *
+ *   catena v1(A) vP(P) vQ(Q) M(PQ) V2(Z), M con genitori vP e vQ;
+ *   storia del peer Q: A, Q -> B = vQ, H = Q: da applicare
  */
 #include "state.h"
 

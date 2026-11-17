@@ -4,6 +4,9 @@
 #include "chain.h"
 
 #include <stdio.h>
+#include <stdlib.h>
+
+#include "mem.h"
 
 void chain_ref(Str_t *ref, const char *id)
 {
@@ -88,35 +91,121 @@ eGsErr_t chain_create_first(const char *id, const Oid_t *blob,
     return err;
 }
 
+/* Voce della pila della visita in profondita' di chain_blobs. */
+typedef struct {
+    Oid_t commit;
+    Oid_t blob;   /* valido se done */
+    int done;     /* genitori gia' messi in pila: alla prossima uscita e'
+                   * finita */
+} ChainFrame_t;
+
+typedef struct {
+    ChainFrame_t *v;
+    size_t n;
+    size_t cap;
+} ChainStack_t;
+
+static void stack_push(ChainStack_t *s, const Oid_t *commit,
+                       const Oid_t *blob, int done)
+{
+    if (s->n == s->cap) {
+        s->cap = (s->cap == 0U) ? 16U : (s->cap * 2U);
+        s->v = xrealloc(s->v, s->cap * sizeof *s->v);
+    }
+    s->v[s->n].commit = *commit;
+    s->v[s->n].blob = (blob != NULL) ? *blob : *commit;
+    s->v[s->n].done = done;
+    s->n++;
+}
+
+/* Mette in pila il genitore n-esimo di hex, se c'e' e non e' gia' visitato. */
+static eGsErr_t push_parent(GitBatch_t *b, ChainStack_t *s, const char *hex,
+                            unsigned n, const OidList_t *seen)
+{
+    Str_t name = STR_INIT;
+    Oid_t parent;
+    eGitObj_t type;
+    eGsErr_t err = GS_OK;
+
+    str_addf(&name, "%s^%u", hex, n);
+    type = git_batch_query(b, str_cstr(&name), &parent);
+    if (type == GIT_OBJ_ERROR) {
+        err = GS_ERR_PROC;
+    } else if ((type == GIT_OBJ_COMMIT) && !oidlist_has(seen, &parent)) {
+        stack_push(s, &parent, NULL, 0);
+    } else {
+        /* nessun genitore n-esimo, o gia' visitato */
+    }
+    str_free(&name);
+    return err;
+}
+
+/*
+ * Visita in profondita' del grafo delle versioni (reportIdea B-46): ogni
+ * versione esce dopo tutti i suoi genitori (post-ordine), quindi l'ordine
+ * rovesciato mette ogni versione prima dei suoi genitori. Si mette in pila
+ * prima il primo genitore, poi il secondo: il ramo del secondo genitore si
+ * visita e finisce per primo, e la linea dei primi genitori resta in testa,
+ * contigua, come nella lettura per primo genitore. Una versione ha al piu'
+ * due genitori (chain_commit).
+ */
 eGsErr_t chain_blobs(GitBatch_t *b, const char *id, OidList_t *out)
 {
     char hex[OID_HEX_SIZE];
+    ChainStack_t stack = { NULL, 0U, 0U };
+    OidList_t seen = OIDLIST_INIT; /* versioni gia' espanse */
+    OidList_t post = OIDLIST_INIT; /* blob in post-ordine: dalla piu' vecchia */
+    ChainFrame_t f;
     Str_t name = STR_INIT;
     Oid_t commit;
     Oid_t blob;
     eGitObj_t type;
+    size_t j;
     eGsErr_t err = GS_OK;
 
     out->n = 0U;
     chain_ref(&name, id);
     type = git_batch_query(b, str_cstr(&name), &commit);
-    while (type == GIT_OBJ_COMMIT) {
-        oid_to_hex(&commit, hex);
-        str_reset(&name);
-        str_addf(&name, "%s:content", hex);
-        if (git_batch_blob(b, str_cstr(&name), &blob) == 0) {
-            err = GS_ERR_FORMAT; /* versione senza "content" */
-            type = GIT_OBJ_MISSING;
-        } else {
-            oidlist_add(out, &blob);
+    if (type == GIT_OBJ_COMMIT) {
+        stack_push(&stack, &commit, NULL, 0);
+    } else if (type == GIT_OBJ_ERROR) {
+        err = GS_ERR_PROC;
+    } else {
+        /* catena assente: lista vuota */
+    }
+
+    while ((err == GS_OK) && (stack.n > 0U)) {
+        stack.n--;
+        f = stack.v[stack.n];
+        if (f.done != 0) {
+            oidlist_add(&post, &f.blob);
+        } else if (!oidlist_has(&seen, &f.commit)) {
+            oidlist_add(&seen, &f.commit);
+            oid_to_hex(&f.commit, hex);
             str_reset(&name);
-            str_addf(&name, "%s^", hex);
-            type = git_batch_query(b, str_cstr(&name), &commit);
+            str_addf(&name, "%s:content", hex);
+            if (git_batch_blob(b, str_cstr(&name), &blob) == 0) {
+                err = GS_ERR_FORMAT; /* versione senza "content" */
+            } else {
+                stack_push(&stack, &f.commit, &blob, 1);
+                err = push_parent(b, &stack, hex, 1U, &seen);
+                if (err == GS_OK) {
+                    err = push_parent(b, &stack, hex, 2U, &seen);
+                }
+            }
+        } else {
+            /* gia' raggiunta da un altro figlio */
         }
     }
-    if (type == GIT_OBJ_ERROR) {
-        err = GS_ERR_PROC;
+
+    if (err == GS_OK) {
+        for (j = post.n; j > 0U; j--) {
+            oidlist_add(out, &post.v[j - 1U]);
+        }
     }
+    free(stack.v);
+    oidlist_free(&seen);
+    oidlist_free(&post);
     str_free(&name);
     return err;
 }

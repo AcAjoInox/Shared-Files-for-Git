@@ -28,10 +28,13 @@ eGsErr_t chain_create_first(const char *id, const Oid_t *blob,
                             const char *name);
 
 /*
- * Blob delle versioni, dalla piu' recente (out->v[0] = T) alla piu'
- * vecchia, seguendo il primo genitore (in un'unione: la T di partenza). Due domande per versione sullo
- * stesso processo cat-file: nessun processo nuovo. Catena assente: lista
- * vuota.
+ * Blob di tutte le versioni raggiungibili da T, con entrambi i genitori
+ * delle unioni (reportIdea B-46): out->v[0] = T, e ogni versione viene prima
+ * dei suoi genitori (indici crescenti = piu' vecchie). Tra versioni nessuna
+ * delle quali discende dall'altra l'ordine e' quello della visita: la linea
+ * dei primi genitori prima di quella dei secondi. Tre domande per versione
+ * sullo stesso processo cat-file: nessun processo nuovo. Catena assente:
+ * lista vuota.
  */
 eGsErr_t chain_blobs(GitBatch_t *b, const char *id, OidList_t *out);
 

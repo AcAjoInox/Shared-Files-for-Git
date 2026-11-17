@@ -191,6 +191,44 @@ expect_rc "peer: E applica" 0
 expect_eq "peer: E ha il contenuto unito" "$(tr '\n' ' ' <f.h)" "E1 b c d F5 "
 expect_eq "peer: E allineato" "$(state)" "    state  aligned"
 
+# --- il peer la cui versione e' stata unita riceve l'unione (B-46) ---------------
+# F ha unito la versione T_E di E: la versione M ha T_E come secondo
+# genitore. F toglie la riga di E e pubblica V2. E, che ha nel branch il
+# contenuto di T_E, deve risultare da applicare (base T_E), non divergente
+# con base la prima versione, e il suo update non deve rimettere la riga.
+cd "$TRASH/F" || exit 1
+expect_eq "B-46: F allineato dopo l'unione" "$(state)" "    state  aligned"
+change a b c d F5
+run git shared publish
+expect_out "B-46: F pubblica la rimozione" "sent to 1 of 1 peers"
+T_F2=$(tip)
+cd "$TRASH/E" || exit 1
+git reset -q --hard HEAD~1 # E torna al commit della sua versione T_E
+expect_eq "B-46: H di E e' la versione T_E" "$(git rev-parse HEAD:f.h)" \
+	"$(git rev-parse "$T_E:content")"
+expect_eq "B-46: T di E e' la versione di F" "$(tip)" "$T_F2"
+expect_eq "B-46: da applicare, non divergente" "$(state)" \
+	"    state  new version to apply"
+run git shared publish
+expect_no_out "B-46: publish non invia nulla" "sent to"
+run git shared update -c
+expect_rc "B-46: update codice 0" 0
+expect_out "B-46: applicata, non unita" "new version applied and committed"
+expect_eq "B-46: la riga tolta da F resta tolta" \
+	"$(git show HEAD:f.h | tr '\n' ' ')" "a b c d F5 "
+expect_eq "B-46: T non cambia" "$(tip)" "$T_F2"
+expect_eq "B-46: allineato" "$(state)" "    state  aligned"
+
+# La versione T_E in staging, sopra un HEAD piu' vecchio, non e' lavoro
+# dell'utente: e' una versione della catena (D-076), update la sostituisce.
+git reset -q --hard HEAD~2
+git show "$T_E:content" >f.h
+git add f.h
+run git shared update -c
+expect_rc "B-46: versione unita in staging non e' modifica locale" 0
+expect_eq "B-46: applicata l'ultima versione" \
+	"$(git show HEAD:f.h | tr '\n' ' ')" "a b c d F5 "
+
 # --- squash: falso divergente, si chiude da solo (B-42) --------------------------
 pair G H
 cd "$TRASH/G" || exit 1
