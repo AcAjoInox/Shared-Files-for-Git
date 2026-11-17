@@ -101,7 +101,7 @@ cd "$TRASH/D" || exit 1
 change a b C-d d e
 run git shared update
 expect_rc "conflitto: codice 1" 1
-expect_err "conflitto: come uscirne" "git restore -s HEAD -SW -- 'f.h'"
+expect_err "conflitto: come uscirne" "git shared update --abort 'f.h'"
 expect_eq "conflitto: come in git" "$(git status --short f.h)" "UU f.h"
 expect_ok "conflitto: marker nostri" grep -q '^<<<<<<< ours' f.h
 expect_ok "conflitto: marker loro" grep -q '^>>>>>>> theirs' f.h
@@ -307,6 +307,51 @@ expect_ok "B-48: di nuovo in conflitto" has_marker
 git restore -s HEAD -SW -- f.h
 git shared publish >/dev/null 2>&1
 expect_fail "B-48: publish toglie l'unione scaduta" has_marker
+
+# --- update --abort: rinuncia in un solo comando (B-48, D-093) --------------------
+# La procedura documentata: nessun momento in cui una modifica in staging
+# possa passare per la risoluzione.
+git shared update >/dev/null 2>&1
+expect_eq "abort: conflitto aperto" "$(git status --short f.h)" "UU f.h"
+run git shared update --abort
+expect_rc "abort: codice 0" 0
+expect_out "abort: messaggio" "f.h: merge abandoned"
+expect_fail "abort: unione tolta" has_marker
+expect_eq "abort: nessun conflitto nell'index" "$(git status --short f.h)" ""
+expect_eq "abort: file di HEAD" "$(tr '\n' ' ' <f.h)" "P1 b c d e "
+expect_eq "abort: T non cambia" "$(tip)" "$T_P"
+expect_eq "abort: allineato" "$(state)" "    state  aligned"
+lines f.h P1 b c d P5
+git add f.h
+expect_eq "abort: la modifica dopo non e' una risoluzione" "$(state)" \
+	"    state  aligned"
+run git shared update -c
+expect_rc "abort: update protegge la modifica" 1
+expect_eq "abort: nessuna versione nuova" "$(tip)" "$T_P"
+git restore -s HEAD -SW -- f.h
+
+# Con la risoluzione gia' in staging, e per un file indicato.
+git shared update >/dev/null 2>&1
+lines f.h OP1 b c d e
+git add f.h
+expect_eq "abort: risoluzione in staging" "$(state)" "    state  merge in progress"
+run git shared update --abort f.h
+expect_rc "abort <file>: codice 0" 0
+expect_eq "abort <file>: file di HEAD" "$(git show :f.h | tr '\n' ' ')" "P1 b c d e "
+expect_fail "abort <file>: unione tolta" has_marker
+
+# Nessuna unione in corso; opzioni incompatibili.
+run git shared update --abort
+expect_rc "abort senza unione: codice 1" 1
+expect_err "abort senza unione: messaggio" "no merge in progress"
+run git shared update --abort f.h
+expect_rc "abort <file> senza unione: codice 1" 1
+expect_err "abort <file> senza unione: messaggio" "f.h: no merge in progress"
+run git shared update --abort -c
+expect_rc "abort con -c: uso" 129
+expect_err "abort con -c: messaggio" "--abort cannot be used with -c, -m or -f"
+run git shared update -f --abort
+expect_rc "abort con -f: uso" 129
 
 # --- conclusione di un conflitto tra versioni: una sola versione (B-49) -----------
 # La risoluzione diventa una versione con genitori (T di partenza, versione

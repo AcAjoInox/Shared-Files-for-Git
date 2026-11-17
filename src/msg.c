@@ -100,13 +100,16 @@ static const char *const msg_en[] = {
         "usage: git shared publish [<path>]\n",
     [MSG_USAGE_UPDATE] =
         "usage: git shared update [-f] [-c | -m <message>] [<path>]\n"
+        "   or: git shared update --abort [<path>]\n"
         "\n"
         "Diverged versions are merged. After a conflict: fix the file,\n"
-        "'git add' it and run 'git shared update' again.\n"
+        "'git add' it and run 'git shared update' again. To give up:\n"
+        "'git shared update --abort'.\n"
         "\n"
         "    -f, --force       overwrite local changes\n"
         "    -c, --commit      commit the applied files right away\n"
-        "    -m <message>      commit right away with <message>\n",
+        "    -m <message>      commit right away with <message>\n"
+        "    --abort           give up the merge in progress\n",
     [MSG_USAGE_STATUS] =
         "usage: git shared status [--peers]\n"
         "\n"
@@ -210,8 +213,10 @@ static const char *const msg_en[] = {
     [MSG_ERR_MERGE] = "%s: cannot merge",
     [MSG_ERR_CONFLICT_OPEN] =
         "%s: merge conflict: fix it, 'git add' it, then run "
-        "'git shared update' (to give up: git restore -s HEAD -SW -- '%s', "
-        "then 'git shared status')",
+        "'git shared update' (to give up: git shared update --abort '%s')",
+    [MSG_ERR_NO_MERGE] = "%s: no merge in progress",
+    [MSG_ERR_NO_MERGE_ANY] = "no merge in progress",
+    [MSG_ERR_ABORT_OPTS] = "--abort cannot be used with -c, -m or -f",
 
     [MSG_WARN_BAD_ENTRY] = "ignoring invalid entry '%s' in .gitshared",
     [MSG_WARN_NOT_IN_HEAD] =
@@ -293,6 +298,8 @@ static const char *const msg_en[] = {
         "%s: merge in progress: run 'git shared update' first",
     [MSG_SKIP_STATE] = "%s: %s, nothing to do",
     [MSG_UPD_RECEIVED] = "%s: new version received",
+    [MSG_UPD_ABORTED] =
+        "%s: merge abandoned, the file is back to the last commit",
     [MSG_UPD_APPLIED] = "%s: new version applied. Commit it to confirm.",
     [MSG_UPD_COMMITTED] = "%s: new version applied and committed.",
     [MSG_UPD_UP_TO_DATE] = "%s: up to date",

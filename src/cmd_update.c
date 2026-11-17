@@ -16,6 +16,9 @@
  * ferma: stage nell'index, marker nel file, refs/shared-merge/<id>.
  * Non committa, salvo -c/-m (D-007, D-075). Modifiche locali: rifiuta,
  * salvo -f; una versione applicata e non committata non lo e' (D-076).
+ *
+ * "git shared update --abort [<path>]" (D-093): rinuncia all'unione in
+ * corso, senza fetch; il file torna quello di HEAD.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -581,6 +584,55 @@ exit:
     return go_on;
 }
 
+/*
+ * --abort (D-093): rinuncia all'unione in corso del file. Il file torna
+ * quello di HEAD nell'index (gli stage di conflitto spariscono) e nel
+ * working tree, poi si toglie refs/shared-merge/<id>. T non cambia. In un
+ * solo comando: nessun momento in cui una modifica messa in staging possa
+ * passare per la risoluzione (reportIdea B-48). named = file indicato
+ * dall'utente: senza unione e' un errore; altrimenti si salta.
+ */
+static void abort_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
+                        int named, int *rc, int *found)
+{
+    const char *label = str_cstr(&e->path);
+    Str_t name = STR_INIT;
+    Oid_t k;
+    Oid_t h;
+
+    merge_ref(&name, e->id);
+    if (git_batch_query(b, str_cstr(&name), &k) != GIT_OBJ_COMMIT) {
+        if (named != 0) {
+            msg_error(MSG_ERR_NO_MERGE, label);
+            *rc = GS_EXIT_ERROR;
+        }
+        goto exit;
+    }
+    *found = 1;
+    /* Prima il file, poi la ref: se il file non si scrive l'unione resta
+     * registrata e il comando si puo' ripetere. */
+    str_reset(&name);
+    str_addf(&name, "HEAD:%s", label);
+    if ((git_batch_blob(b, str_cstr(&name), &h) == 0) ||
+        (cmd_write_file(r, label, &h) != GS_OK)) {
+        msg_error(MSG_ERR_WRITE_FILE, label);
+        *rc = GS_EXIT_ERROR;
+        goto exit;
+    }
+    if (merge_drop(e->id) != GS_OK) {
+        /* il file e' gia' quello di HEAD: la ref e' scaduta e la toglie
+         * il prossimo comando (D-092) */
+        msg_error(MSG_ERR_MERGE, label);
+        *rc = GS_EXIT_ERROR;
+        goto exit;
+    }
+    printf(msg(MSG_UPD_ABORTED), label);
+    putchar('\n');
+
+exit:
+    str_free(&name);
+}
+
 int cmd_update(int argc, char **argv)
 {
     CmdOpts_t o;
@@ -594,18 +646,25 @@ int cmd_update(int argc, char **argv)
     eMsgId_t id;
     size_t i;
     int committed = 0;
+    int aborted = 0;
     int first;
     int opened = 0;
     int batch_ok = 0;
     int rc = GS_EXIT_USAGE;
 
-    first = cmd_parse(argc, argv, CMD_OPT_COMMIT | CMD_OPT_FORCE,
+    first = cmd_parse(argc, argv,
+                      CMD_OPT_COMMIT | CMD_OPT_FORCE | CMD_OPT_ABORT,
                       MSG_USAGE_UPDATE, &o);
     if (first < 0) {
         goto exit;
     }
     if ((argc - first) > 1) {
         msg_error(MSG_ERR_TOO_MANY_ARGS);
+        fputs(msg(MSG_USAGE_UPDATE), stderr);
+        goto exit;
+    }
+    if ((o.abort != 0U) && ((o.commit != 0U) || (o.force != 0U))) {
+        msg_error(MSG_ERR_ABORT_OPTS);
         fputs(msg(MSG_USAGE_UPDATE), stderr);
         goto exit;
     }
@@ -618,6 +677,20 @@ int cmd_update(int argc, char **argv)
     sel = xmalloc((repo.n > 0U) ? repo.n : 1U);
     if (!cmd_select(&repo, (first < argc) ? argv[first] : NULL, sel)) {
         rc = GS_EXIT_ERROR;
+        goto exit;
+    }
+
+    if (o.abort != 0U) {
+        for (i = 0U; i < repo.n; i++) {
+            if (sel[i] != 0U) {
+                abort_entry(&repo, &repo.v[i], &batch, (first < argc), &rc,
+                            &aborted);
+            }
+        }
+        if ((aborted == 0) && (first >= argc)) {
+            msg_error(MSG_ERR_NO_MERGE_ANY);
+            rc = GS_EXIT_ERROR;
+        }
         goto exit;
     }
 

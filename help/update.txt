@@ -5,6 +5,7 @@ NAME
 
 SYNOPSIS
     git shared update [-f] [-c | -m <message>] [<path>]
+    git shared update --abort [<path>]
 
 DESCRIPTION
     Gets the versions from the peers and writes the latest one into the
@@ -25,11 +26,11 @@ DESCRIPTION
         git shared update -c
         git shared publish
     To give up the merge:
-        git restore -s HEAD -SW -- <file>
-        git shared status
-    Any git shared command run after the restore drops the merge.
-    Run one before staging other changes to the file: until then a
-    staged change would be taken as the resolution.
+        git shared update --abort
+    The file goes back to the last commit and the merge is dropped, in
+    one step. A plain 'git restore -s HEAD -SW -- <file>' works too, but
+    only from the next git shared command on: a change staged before
+    that would be taken as the resolution.
 
     Without <path>, all the shared files; with it, only that one.
 
@@ -43,6 +44,12 @@ OPTIONS
 
     -m <message>
         Like -c, with <message>.
+
+    --abort
+        Give up the merge in progress: the file goes back to the last
+        commit, in the index and in the working tree. Nothing is fetched
+        and the latest version does not change. Without <path>, every
+        shared file with a merge in progress.
 
 SEE ALSO
     git shared publish --help, git shared status --help

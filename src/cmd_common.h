@@ -16,12 +16,14 @@
 #define CMD_OPT_COMMIT 0x1U /* -c, --commit, -m <msg> (D-007) */
 #define CMD_OPT_FORCE  0x2U /* -f, --force */
 #define CMD_OPT_DRY_RUN 0x4U /* -n, --dry-run */
+#define CMD_OPT_ABORT  0x8U /* --abort (update, D-093) */
 
 typedef struct {
     const char *message; /* -m; NULL = messaggio standard */
     unsigned commit : 1U;
     unsigned force : 1U;
     unsigned dry_run : 1U;
+    unsigned abort : 1U;
 } CmdOpts_t;
 
 /*

@@ -5,6 +5,7 @@ NOME
 
 SINTASSI
     git shared update [-f] [-c | -m <messaggio>] [<path>]
+    git shared update --abort [<path>]
 
 DESCRIZIONE
     Riceve le versioni dai peer e scrive l'ultima nel file e nell'index.
@@ -25,11 +26,11 @@ DESCRIZIONE
         git shared update -c
         git shared publish
     Per rinunciare all'unione:
-        git restore -s HEAD -SW -- <file>
-        git shared status
-    Il primo comando git shared lanciato dopo il restore toglie
-    l'unione. Lancialo prima di mettere in staging altre modifiche al
-    file: fino ad allora una modifica in staging varrebbe come
+        git shared update --abort
+    Il file torna quello dell'ultimo commit e l'unione sparisce, in un
+    solo passo. Funziona anche un semplice
+    'git restore -s HEAD -SW -- <file>', ma solo dal comando git shared
+    successivo: una modifica messa in staging prima varrebbe come
     risoluzione.
 
     Senza <path>, tutti i file shared; con <path>, solo quello.
@@ -44,6 +45,12 @@ OPZIONI
 
     -m <messaggio>
         Come -c, con <messaggio>.
+
+    --abort
+        Rinuncia all'unione in corso: il file torna quello dell'ultimo
+        commit, nell'index e nel working tree. Nessun fetch, e l'ultima
+        versione non cambia. Senza <path>, tutti i file shared con
+        un'unione in corso.
 
 VEDI ANCHE
     git shared publish --help, git shared status --help

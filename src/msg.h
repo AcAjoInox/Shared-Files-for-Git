@@ -87,6 +87,9 @@ typedef enum {
     MSG_ERR_PUBLISH,         /* file */
     MSG_ERR_MERGE,           /* file */
     MSG_ERR_CONFLICT_OPEN,   /* file, path */
+    MSG_ERR_NO_MERGE,        /* file */
+    MSG_ERR_NO_MERGE_ANY,
+    MSG_ERR_ABORT_OPTS,
 
     MSG_WARN_BAD_ENTRY,      /* nome della sezione */
     MSG_WARN_NOT_IN_HEAD,    /* path */
@@ -158,6 +161,7 @@ typedef enum {
     MSG_UPD_MERGED_PUBLISH,  /* file */
     MSG_UPD_TO_COMMIT,       /* file */
     MSG_UPD_COMMIT_MSG,      /* path o "shared files" */
+    MSG_UPD_ABORTED,         /* file */
 
     MSG_STATUS_NONE,
     MSG_STATUS_FIELD_PATH,
