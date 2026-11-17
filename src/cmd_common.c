@@ -237,9 +237,14 @@ eGsErr_t cmd_write_file(const Repo_t *r, const char *path, const Oid_t *blob)
 int cmd_worktree_differs(const Repo_t *r, const char *path)
 {
     /* "git diff" senza revisioni confronta l'index con il working tree,
-     * normalizzando i fine riga come fa git: 0 = uguali, 1 = diversi. */
-    const char *args[] = { "-C", NULL, "--literal-pathspecs", "diff",
-                           "--quiet", "--", path, NULL };
+     * normalizzando i fine riga come fa git: 0 = uguali, 1 = diversi.
+     * E' porcelain: con diff.autoRefreshIndex=false un file solo toccato
+     * (stesso contenuto, data diversa) risulterebbe diverso, quindi la si
+     * fissa a true (reportIdea B-32, D-094). diff.external e textconv non
+     * contano con --quiet (provato). */
+    const char *args[] = { "-C", NULL, "-c", "diff.autoRefreshIndex=true",
+                           "--literal-pathspecs", "diff", "--quiet", "--",
+                           path, NULL };
     Str_t out = STR_INIT;
     int code = 1;
 

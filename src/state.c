@@ -83,9 +83,17 @@ static int raw_new_blob(const char *line, Oid_t *oid)
 static eGsErr_t find_base(const Repo_t *r, const char *path,
                           const OidList_t *chain, size_t *base, int *found)
 {
+    /* git log e' porcelain: ogni opzione che la configurazione dell'utente
+     * puo' cambiare e' fissata qui (reportIdea B-32, D-094). --root contro
+     * log.showRoot=false, --no-follow contro log.follow=true (seguirebbe le
+     * rinomine anche con --no-renames), --diff-merges=off contro
+     * log.diffMerges, --no-show-signature contro log.showSignature (un gpg
+     * per commit). Provato con git 2.34 e 2.43. */
     const char *args[] = { "--literal-pathspecs", "-C", NULL, "log",
                            "--format=", "--raw", "--no-abbrev",
-                           "--no-renames", "--", NULL, NULL };
+                           "--no-renames", "--root", "--no-follow",
+                           "--diff-merges=off", "--no-show-signature",
+                           "--", NULL, NULL };
     OidList_t occ = OIDLIST_INIT; /* blob-versione nella storia, dal recente */
     Str_t line = STR_INIT;
     Oid_t blob;
@@ -101,7 +109,7 @@ static eGsErr_t find_base(const Repo_t *r, const char *path,
 
     *found = 0;
     args[2] = str_cstr(&r->top);
-    args[9] = path;
+    args[(sizeof args / sizeof args[0]) - 2U] = path; /* dopo "--" */
     /* stderr scartato: chiudendo presto, git puo' lamentare la pipe chiusa */
     err = git_start(&p, args, PROC_STDERR_NULL);
     if (err != GS_OK) {
