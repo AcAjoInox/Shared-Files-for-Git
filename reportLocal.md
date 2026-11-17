@@ -124,3 +124,81 @@ Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a
 4. **B-16.** Toglie *inconsistent* dai branch vecchi, lo stato che confonde di più.
 5. **Un `update` che dopo il commit dell'unione pubblica da solo** (o lo propone): chiude il "due passi per finire" nel caso in cui dimenticarlo costa di più.
 6. **Usarlo davvero per qualche settimana** sugli header reali, annotando ogni volta che serve aprire `.git/config`. È la misura che manca a questo report.
+
+## 8. Quanto manca a una versione buona per l'uso locale
+
+> **Stima del 2026-11-17**, sullo stato di `v0.2.0` + `status --peers` (718 test, `project.md` v2.24). È una stima, non una misura: si basa sui bug aperti di `reportIdea.md`, sulle prove fatte con l'eseguibile e sul ritmo di lavoro degli ultimi giorni.
+
+### 8.1 Che cosa vuol dire "buona"
+
+Una versione che l'autore, e un collega che conosce git, possono usare ogni giorno sugli header reali senza sorprese. In concreto, cinque condizioni verificabili:
+
+1. **Nessun vicolo cieco e nessun silenzio** nell'uso comune: ogni stato ha un comando che ne fa uscire, ogni comando dice cosa ha fatto. *Oggi: raggiunto* (D-078…D-086).
+2. **Nessuno stato sbagliato** dovuto alla configurazione o all'ambiente dell'utente (config git, hook esistenti, path con accenti).
+3. **Le due piattaforme dichiarate funzionano**: tutti i test passano su Windows e su Linux.
+4. **L'aiuto standard funziona**: `git shared --help` apre il manuale invece di un errore.
+5. **Provata nell'uso vero**: qualche settimana sugli header reali, senza dover aprire `.git/config` a mano.
+
+### 8.2 A che punto siamo
+
+| Area | Stato | Commento |
+|---|---|---|
+| Funzioni | **~95%** | Ciclo completo, unione delle divergenze, manutenzione (`unlink`, `prune`, `branch`, `relocate`), `status --peers`. Mancano solo funzioni non essenziali (`mv`, `link` su un file esistente, pattern dei branch) |
+| Correttezza su Windows | **~85%** | Nessun bug grave. Restano casi medi legati all'ambiente (§8.3, gruppo B) |
+| Linux | **~0% verificato** | Codice `*_posix.c` scritto ma mai compilato; anche i test usano comandi da Git Bash (`pwd -W`) |
+| Documentazione per l'utente | **~70%** | Manuale incorporato e `-h` completi; `git shared --help` fallisce ("documentation file not found", provato); `breef.md` e alcune righe di questo report da riallineare |
+| Uso reale | **0%** | Solo test automatici |
+
+**Complessivamente: circa tre quarti della strada.** La parte più difficile (modello, merge, manutenzione) è fatta; quello che resta è soprattutto verifica, ambiente e rifinitura.
+
+### 8.3 Che cosa manca, in ordine
+
+Unità di misura: una **sessione** è un blocco di lavoro come quelli degli ultimi giorni (una funzione o un gruppo di correzioni, con test, documenti e commit).
+
+**A. Indispensabili**
+
+| # | Lavoro | Bug | Stima | Perché è indispensabile |
+|---|---|---|---|---|
+| 1 | Stato indipendente dalla config git: `--root` e merge fissati in `find_base`, o `rev-list` + `diff-tree` | B-32 | 0,5 | Con `log.showRoot=false` un file si vede *diverged* e `publish` rifiuta: stato sbagliato da una preferenza dell'utente |
+| 2 | Branch nati prima del `set`: sezione assente sul branch = file non presente qui, non *inconsistent* | B-16 | 1 | È lo stato che confonde di più e propone un comando sbagliato |
+| 3 | Hook non `sh` (Python, binari): non inserire il blocco, avvisare | C-02 | 0,5 | Oggi un hook Python viene rotto da `set` |
+| 4 | Windows: git in un path con accenti, `PATH` vuoto | C-05, C-10 | 0,5 | Con `C:\Users\José` nessun comando parte |
+| 5 | `git shared --help`: pagina HTML (Windows) e man page (Linux) generate dal manuale incorporato e copiate da `make install` | REQ-F-019 | 0,5 | È il primo comando che un utente prova |
+| 6 | **Linux**: compilare, far passare i 718 test, correggere ciò che emerge (C-19, `sys_abs_path`, script di test) | C-19 | 1,5–2,5 | Piattaforma dichiarata e mai provata: è il rischio più grande della stima |
+| 7 | Fine riga e bit di esecuzione: `link` confronta gli attributi `text`/`eol` con la sorgente e avvisa; il modo `100755` si conserva | B-12, C-11 | 1–1,5 | Tra repo con normalizzazioni diverse ogni versione sembra una modifica e i merge diventano conflitti sull'intero file |
+| 8 | Minori che si incontrano davvero: `set .gitshared`, cartella hook assente, `config --unset` con più valori, path assoluti, maiuscole su Windows, `link` interrotto, staging non protetto, avviso se la sorgente non è allineata | B-36, C-04, C-09, C-13, C-12, C-21, B-43, B-44 | 1,5 | Ognuno è raro, insieme sono la differenza tra "funziona" e "non sorprende" |
+| 9 | Misure: `status` con molti file, `publish` verso 32 peer, costo di un'unione; su Windows e Linux | REQ-NF-007 | 0,5 | Le soglie sono requisiti; oggi misurate solo fino a 8 peer |
+| 10 | Riallineare i documenti: `breef.md` (limiti della v0), §5 di questo report, incoerenze aperte di `reportIdea.md` §8 | – | 0,5 | Il breef è la porta d'ingresso per chi non è l'autore |
+| | **Totale A** | | **8–10 sessioni** | |
+
+**B. Uso reale**
+
+| # | Lavoro | Stima |
+|---|---|---|
+| 11 | Usarlo sugli header reali per 2–4 settimane di calendario, annotando ogni sorpresa e ogni volta che serve `.git/config` | poco impegno, ma tempo di calendario |
+| 12 | Correggere quello che emerge | 1–2 sessioni (stima prudente: l'uso vero trova sempre qualcosa) |
+
+**C. Utili ma non necessari per "buona"**
+
+- B-41 (base nota al `link`), B-35 (fetch prima di `publish`), B-09 (commit della catena deterministici): riducono merge e conflitti evitabili, ma oggi c'è sempre un'uscita.
+- `update` che dopo il commit di un'unione propone `publish`: chiude il "due passi per finire" (§3.3).
+- Messaggi in italiano, test di unità e matrice di tracciabilità completa (`reportIdea.md` §7 punto 11): importanti per un processo V-cycle, non per l'uso.
+- C-14, C-15, C-16, C-18, C-08, B-38: qualità del codice e casi limite.
+
+### 8.4 In sintesi
+
+| | Sessioni | Calendario |
+|---|---|---|
+| Indispensabili (A) | 8–10 | 1–2 settimane al ritmo attuale |
+| Uso reale e correzioni (B) | 1–2 | 2–4 settimane, in parallelo al resto |
+| **Versione buona per l'uso locale** | **circa 10–12** | **circa un mese** |
+
+Tappe proposte, con un tag ciascuna:
+
+- **`v0.3.0`**: punti 1–5 e 8. Corretta su Windows anche con config e ambienti diversi, `--help` funzionante.
+- **`v0.4.0`**: punti 6, 7 e 9. Linux provato, fine riga gestiti, prestazioni misurate.
+- **`v1.0.0-locale`**: dopo l'uso reale (punti 11–12) e il riallineamento dei documenti (punto 10).
+
+**Il rischio maggiore è Linux** (punto 6): non è mai stato compilato, quindi la stima può allungarsi se `proc_posix.c` ha problemi di fondo. Il secondo è l'uso reale, che per definizione trova cose che i test non cercano.
+
+> **Nota:** la tabella di §5 è in parte superata. "Stati come *inconsistent* o *unlinked* non hanno un comando di uscita" non vale più: *unlinked* si risolve con `link` (D-080), *inconsistent* con `unlink <id>` o `branch` (D-081, D-083). Resta la confusione di *inconsistent* sui branch vecchi (punto 2).
