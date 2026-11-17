@@ -938,3 +938,50 @@ Non ancora decise. Ognuna diventa una decisione o viene scartata prima di entrar
 | A-28 | **Fast-forward garantito solo dal client** (reportIdea B-24). `--force`, `--mirror` (verificato: cancella `refs/shared/*` sulla destinazione) e `--prune` lo scavalcano. Il rifiuto può essere "fetch first" oltre a "non-fast-forward": `publish` deve riconoscerli entrambi. Collegata ad A-01. | Da valutare per la fase 2 |
 | A-29 | **Commit dedicato non garantito** (reportIdea B-25). `-c`/`-m` devono committare solo il file shared e `.gitshared` (`git commit --only`); il commit manuale dopo `update` può contenere altro. | Deciso: D-075 |
 | A-30 | **Stato "applicato, da committare"** (reportIdea B-26). Dopo `update` senza commit, `status` dice ancora *da applicare* e un secondo `update` rifiuta per "modifiche locali" che sono la versione precedente. | Deciso: D-076 |
+| A-31 | **Notifica invece del push** (fase 1). `publish` scrive in ogni peer un file di avviso in `.git/shared/inbox/` invece di lanciare un `git push`; il peer riceve con un fetch al suo primo comando `git shared`. Toglie i processi per peer dalla pubblicazione. Scheda sotto. | Proposta dell'autore, da decidere prima di implementarla |
+
+#### A-31 – Notifica invece del push (proposta, 2026-11-17)
+
+**Problema.** Il costo di `publish` è l'avvio dei processi, non i dati. Misure del 2026-11-17 (Windows, git 2.56.1, 12 core, da Git Bash, che aggiunge il proprio costo a ogni lancio: per `git --version` §6.1 misura 30 ms, qui 65): `publish` verso 10 peer 710–820 ms, 300 ms senza niente di nuovo; un push verso un peer 116 ms (due processi, `git` e `receive-pack`); 10 push in parallelo 330 ms; 10 `update-ref` in parallelo 220 ms. Anche con un solo processo per peer il costo resta O(N); la soglia di REQ-NF-007 (32 peer < 1 s) è a rischio. Per scalare servono zero processi per peer.
+
+**Proposta.** In locale il broadcast (D-016) invia una notifica, non la catena. Il trasferimento lo fa chi riceve, quando gli serve.
+- **Invio (`publish`).** La versione nasce come oggi (`mktree`, `commit-tree`, `update-ref` condizionato). Poi, per ogni peer, senza processi: si scrive `<peer>/.git/shared/inbox/<id>/<oid di T>` in un file temporaneo nella stessa cartella e lo si rinomina (atomico). Contenuto: una riga, la radice della repo che pubblica, come la scrive `rev-parse --show-toplevel`. Se il file esiste già non si riscrive. L'esito per peer è *notificato* o *irraggiungibile* (REQ-F-008: cartella `.git` assente o non scrivibile).
+- **Ricezione.** Il primo comando `git shared` che ricava lo stato (`status`, `update`, `publish`) legge la cartella degli avvisi dei file collegati: una lettura di directory, nessun processo. Gli avvisi con un nome che non è un oid della lunghezza giusta (REQ-NF-009) o con un ID senza sezione locale si scartano.
+  - Un oid che T contiene già si cancella senza fetch.
+  - Per ogni repo annunciante che è tra i peer: un fetch, come il primo passo di `update` (D-040, `refs/shared-incoming/`), poi l'avanzamento di `receive` (D-092). Un fetch per repo, non per avviso.
+  - Una repo annunciante che non è tra i peer (spostata prima di `relocate`, path scritto in un'altra forma): fetch da tutti i peer, come `update` oggi.
+  - L'avviso si cancella quando T contiene la versione. Una versione ricevuta ma divergente lascia l'avviso al suo posto: lo stato del file lo segnala e `update` unisce (REQ-F-011). Un fetch fallito lascia l'avviso per il comando successivo.
+- **Ripiego sul push.** Se `<peer>/.git` non è una cartella (worktree secondario, `--separate-git-dir`, reportIdea B-50), si pubblica con il push come oggi.
+
+**Che cosa non cambia.** La catena, l'ordine per ascendenza, la regola fast-forward e "ricevere ≠ applicare" (D-013, D-014, D-015). La ref di una repo la scrive solo la repo stessa, con `update-ref` condizionato. La ricezione non tocca WT e index. In fase 2 il push della ref resta la notifica: D-051 lo descrive già così.
+
+**Verifica delle collisioni** (decisioni, requisiti e bug in `project.md`, `reportIdea.md`, `reportLocal.md`, `breef.md`):
+
+| Riferimento | Che cosa tocca | Come si risolve |
+|---|---|---|
+| §2.3 p. 3, D-001, D-040 ("stesso meccanismo in fase 2") | In locale la pubblicazione non usa più il push | Il modello è lo stesso; cambia solo il canale della notifica, che in fase 2 è il push stesso (D-051). Va riscritta la frase: "stesso modello, notifica diversa" |
+| §2.3 p. 8, D-041 (stato sempre ricavabile) | Terzo dato salvato, dopo l'attesa (D-059) e l'unione in corso (D-078) | L'avviso non entra nello stato: dice solo dove fare il fetch. Se si perde, il peer riceve al suo prossimo `update`, come oggi un peer irraggiungibile. Va aggiunto all'elenco delle eccezioni come "suggerimento eliminabile" |
+| §5.0 p. 4–5, D-015, REQ-F-007 (a) | Il peer riceve con il proprio fetch, non con il push di chi pubblica | Ricevere resta separato da applicare. Tra la notifica e il primo comando nel peer la sua ref resta indietro, ma l'avviso è già lì |
+| REQ-F-006, D-009 | Chi pubblica non riceve più il rifiuto "non-fast-forward" o "fetch first" | Il fast-forward lo verifica chi riceve (`receive`, D-092). Due pubblicazioni contemporanee arrivano entrambe e la divergenza la unisce `update` nel peer, senza perdite (REQ-F-011). Il breef ("ne passa una sola") parla della fase 2, D-053: non cambia |
+| REQ-F-008 | Che cosa vuol dire "irraggiungibile" | Avviso non scrivibile. Un peer con la configurazione rotta risulta notificato, e lo dirà il suo comando successivo |
+| REQ-F-012, REQ-NF-007 (`status` solo locale) | `status` fa un fetch quando trova avvisi | La soglia di `status` vale senza novità; con avvisi costa un fetch per repo annunciante. Alternativa: `status` mostra solo una nota (punti aperti) |
+| D-086 (`status --peers`) | Un peer notificato ma non ancora ricevuto risulterebbe "più vecchio: `publish`" | Se `<peer>/.git/shared/inbox/<id>/<T>` esiste: "annunciata, non ancora ricevuta", niente da fare |
+| D-082 (`prune`), reportIdea B-27 | Avvisi rimasti per ID senza sezione | Anche `prune` li toglie (non quelli di un'attesa). Effetto utile: un peer che ha fatto `unlink` non si ritrova più la ref ricreata da un push altrui (resto di B-27); gli avvisi con un ID sconosciuto si ignorano |
+| D-084 (`relocate`) | L'avviso porta il path di chi pubblica | Un path che non è tra i peer dà il fetch da tutti. Una copia (`cp -r`) copia anche gli avvisi: sono suggerimenti, senza effetti |
+| REQ-NF-005 | Atomicità | Avviso: file temporaneo e rinomina. Ref: solo `update-ref` condizionato nella repo stessa |
+| REQ-NF-006, §5.3, D-017 (solo comandi git) | Scrittura di un file dentro il `.git` di un'altra repo | Non è un file di git né un accesso a git: `.git/shared/` è dell'estensione (precedente: `.git/shared/base-cache`, §6.3). Oggetti e ref passano ancora solo da comandi git. Va scritto in REQ-NF-006 |
+| §6.3 (file config solo con `git config`) | Formato dell'avviso | Non è un file config: il nome è l'oid, il contenuto una sola riga confrontata per uguaglianza con i peer, ≤ 4096 caratteri (REQ-NF-011). Il contenuto del file shared non passa dai buffer |
+| D-069, D-071 (hook) | Gli hook dovrebbero ricevere? | No: niente fetch negli hook, che girano dentro le operazioni di git con il loro ambiente. Leggono la cartella e aggiungono "nuova versione annunciata: run 'git shared update'" |
+| D-080, reportIdea C-20 | `push --no-verify` | Resta nel ripiego |
+| reportIdea A-28, B-24 | Fast-forward garantito solo dal client | Migliora: nel percorso normale nessuno scrive più le ref di un'altra repo |
+| reportIdea B-35, B-51, C-26 | Versione creata prima del push; catena assente; lettura di T | Nessun conflitto. B-51: la ricezione può rifare la catena assente con lo stesso fetch, che è il rimedio proposto lì |
+
+**Punti aperti.**
+1. `status` che riceve (stato giusto, un fetch quando ci sono novità) oppure `status` che mostra solo una nota (sempre locale, ma *allineato* insieme a una nota). Proposta: riceve.
+2. `update` fa oggi il fetch da tutti i peer, O(N) processi anche lui. Con gli avvisi potrebbe farlo solo dalle repo annuncianti, e da tutti con un'opzione. Da decidere con il punto 1.
+3. Messaggi: `publish` dice "notified N of N peers" invece di "sent".
+4. Test nuovi: invio, ricezione da `status`/`update`/`publish`, avviso perso, avviso divergente, path sconosciuto, ID sconosciuto, ripiego con `.git` file, `status --peers`, `prune`. Misura di `publish` verso 32 peer prima e dopo (REQ-NF-007).
+
+**Stima del guadagno** (non misurata): `publish` ≈ la parte locale (tre processi) più N scritture di file piccoli, sotto il millisecondo l'una; il costo di ricezione lo paga una volta per novità chi riceve. Scartati: `publish` in background (stesso lavoro totale, rifiuti visti in ritardo) e processi git sempre vivi (servirebbe un demone per repo, contro D-012).
+
+**Se si decide**, la decisione (D-099) riscrive: §2.3 p. 3 e 8, §5.0 p. 4–5, REQ-F-004, REQ-F-007, REQ-F-008, REQ-F-012 (`--peers`), REQ-F-014, REQ-NF-006, §6.3 (riga e formato dell'avviso), §6.4 (`status`, `publish`), D-016 e D-040 (rev.), e incrementa la baseline.
