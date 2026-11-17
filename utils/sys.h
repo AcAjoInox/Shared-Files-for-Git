@@ -24,6 +24,13 @@ void sys_init(int *argc, char ***argv);
 /* n byte dal generatore casuale del sistema operativo. */
 eGsErr_t sys_random(uint8_t *buf, size_t n);
 
+/*
+ * Valore di una variabile d'ambiente in UTF-8, da liberare con free; NULL
+ * se non c'e'. Windows: letta in UTF-16, non nella code page ANSI, che
+ * non rappresenta tutti i path (reportIdea C-05).
+ */
+char *sys_getenv(const char *name);
+
 FILE *sys_fopen(const char *path, const char *mode);
 int sys_remove(const char *path);
 

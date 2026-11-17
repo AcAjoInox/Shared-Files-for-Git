@@ -76,4 +76,26 @@ run git shared status
 expect_rc "repo in un path con spazi e 'è': codice 0" 0
 expect_out "repo in un path con spazi e 'è': voce letta" "$ID_A"
 
+# git in un path non ASCII (reportIdea C-05): GIT_EXEC_PATH, che git passa
+# all'estensione, punta a una cartella "git-José". Su Windows getenv la
+# darebbe nella code page ANSI e nessun comando git partirebbe. Si lancia
+# git-shared direttamente: git imposterebbe GIT_EXEC_PATH da se'.
+EXEC_DIR=$(git --exec-path)
+EXEC_LINK="$TRASH/git-José"
+case "$(uname -s)" in
+MINGW* | MSYS* | CYGWIN*)
+	cmd //c mklink //J "$(cygpath -w "$EXEC_LINK")" "$(cygpath -w "$EXEC_DIR")" >/dev/null
+	EXEC_ENV=$(cygpath -m "$EXEC_LINK")
+	;;
+*)
+	ln -s "$EXEC_DIR" "$EXEC_LINK"
+	EXEC_ENV=$EXEC_LINK
+	;;
+esac
+expect_ok "git in 'git-José': la cartella c'e'" test -d "$EXEC_LINK"
+run env GIT_EXEC_PATH="$EXEC_ENV" git-shared status
+expect_rc "git in 'git-José': codice 0" 0
+expect_out "git in 'git-José': voce letta" "$ID_A"
+expect_eq "git in 'git-José': nessun errore" "$ERR" ""
+
 done_testing

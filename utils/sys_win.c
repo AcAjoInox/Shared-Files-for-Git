@@ -75,6 +75,16 @@ eGsErr_t sys_random(uint8_t *buf, size_t n)
     return err;
 }
 
+char *sys_getenv(const char *name)
+{
+    wchar_t *wname = win_utf8_to_wide(name);
+    const wchar_t *wvalue = _wgetenv(wname);
+    char *value = (wvalue != NULL) ? win_wide_to_utf8(wvalue) : NULL;
+
+    free(wname);
+    return value;
+}
+
 FILE *sys_fopen(const char *path, const char *mode)
 {
     wchar_t *wpath = win_utf8_to_wide(path);

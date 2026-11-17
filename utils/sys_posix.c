@@ -15,6 +15,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "mem.h"
+
+char *sys_getenv(const char *name)
+{
+    const char *value = getenv(name);
+
+    return (value != NULL) ? xstrdup(value) : NULL;
+}
+
 void sys_init(int *argc, char ***argv)
 {
     (void)argc;

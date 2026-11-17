@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "mem.h"
+#include "sys.h"
 
 #if defined(_WIN32)
 #define GIT_EXE "git.exe"
@@ -104,15 +105,19 @@ void oidlist_free(OidList_t *l)
 static const char *git_program(void)
 {
     static char *program = NULL;
-    const char *exec_path;
+    char *exec_path;
     Str_t s = STR_INIT;
     FILE *f;
 
     if (program == NULL) {
-        exec_path = getenv("GIT_EXEC_PATH");
+        /* In UTF-8 come ogni path del programma: su Windows getenv la
+         * darebbe nella code page ANSI, e con git sotto C:\Users\Jose'
+         * non partirebbe nessun comando (reportIdea C-05, D-097). */
+        exec_path = sys_getenv("GIT_EXEC_PATH");
         if (exec_path != NULL) {
             str_addf(&s, "%s/%s", exec_path, GIT_EXE);
-            f = fopen(str_cstr(&s), "rb");
+            free(exec_path);
+            f = sys_fopen(str_cstr(&s), "rb");
             if (f != NULL) {
                 (void)fclose(f);
                 program = xstrdup(str_cstr(&s));
