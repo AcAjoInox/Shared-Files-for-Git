@@ -29,8 +29,8 @@ git branch dev
 # --- argomenti ----------------------------------------------------------------------
 run git shared branch -h
 expect_out "uso: breve" "Choose the branches where <path> is shared."
-run git shared help
-expect_out "manuale: branch" "Show or change the branches where a file is shared."
+run git shared branch --help
+expect_out "manuale: branch" "A file is shared only on its active branches."
 run git shared branch --add dev
 expect_rc "--add senza path: codice 129" 129
 run git shared branch c.h --add

@@ -117,7 +117,7 @@ Le repo stanno su un servizio di hosting. I peer non sono più path ma **URL**, 
 | `git shared prune [-n]` | Toglie dall'elenco i peer cancellati o che non condividono più il file |
 | `git shared relocate [--copy]` | Avvisa i peer che questa repo è stata spostata (o, con `--copy`, copiata); `--peer <vecchio> <nuovo>` corregge il path di un peer spostato |
 | `git shared lang <en\|it>` | Sceglie la lingua dei messaggi |
-| `git shared -h`, `git shared help` | Aiuto rapido e manuale |
+| `git shared <comando> --help` | La pagina di aiuto del comando; `git shared help` elenca i comandi, `git shared <comando> -h` riassume le opzioni |
 
 Gli stati che vedi in `git shared status`:
 

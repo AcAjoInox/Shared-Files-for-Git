@@ -1,0 +1,41 @@
+GIT-SHARED-SET(1)
+
+NAME
+    git shared set - share a file of this repository
+
+SYNOPSIS
+    git shared set [-c | -m <message>] [--] <path>
+
+DESCRIPTION
+    Declares a tracked file of this repository as shared. The file gets
+    an ID and a section in .gitshared, which is staged. Nothing else
+    changes until .gitshared is committed: then the first version of the
+    file is created and other repositories can link it.
+
+    To cancel before the commit:
+        git restore --staged --worktree .gitshared
+
+    The file is shared on the current branch. 'git shared branch' adds
+    other branches.
+
+    If the file is already declared in .gitshared but not linked here
+    (for example after a 'git stash'), set takes it back with the same
+    ID. In a clone, use 'git shared link' instead: set would start a new
+    history, separate from the other repositories.
+
+OPTIONS
+    -c, --commit
+        Commit .gitshared right away, with a standard message. Nothing
+        else staged goes into the commit.
+
+    -m <message>
+        Like -c, with <message>.
+
+EXAMPLES
+    git shared set include/common.h
+    git commit -m "Share common.h"
+
+    git shared set -c include/common.h
+
+SEE ALSO
+    git shared link --help, git shared branch --help

@@ -1,0 +1,25 @@
+GIT-SHARED-PRUNE(1)
+
+NAME
+    git shared prune - forget the peers that no longer exist
+
+SYNOPSIS
+    git shared prune [-n] [<path>]
+
+DESCRIPTION
+    Removes from the peers of each shared file (or of <path>) the
+    repositories that were deleted, or that no longer share the file.
+    They are removed here and in the other peers.
+
+    A repository that exists but cannot be read right now is kept, with
+    a warning: prune never removes what may come back.
+
+    Without <path>, prune also removes the leftover references of files
+    no longer shared here.
+
+OPTIONS
+    -n, --dry-run
+        Only show what would be removed.
+
+SEE ALSO
+    git shared status --help (with --peers), git shared relocate --help

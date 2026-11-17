@@ -1,0 +1,44 @@
+GIT-SHARED-UPDATE(1)
+
+NAME
+    git shared update - get the new versions and apply them
+
+SYNOPSIS
+    git shared update [-f] [-c | -m <message>] [<path>]
+
+DESCRIPTION
+    Gets the versions from the peers and writes the latest one into the
+    file and the index. Nothing is committed unless -c or -m is given.
+
+    Changes that are not committed, even staged ones, are never
+    overwritten: update stops, unless -f is given. A version applied by
+    an earlier update and not committed yet is not a change of yours.
+
+    Merging. If you changed the file on an older version, or two peers
+    published without seeing each other, update merges the versions as
+    git merge does. After a clean merge the file is "applied, to
+    commit": commit it, then 'git shared publish'.
+
+    On a conflict the file gets the usual markers and git status shows
+    it as unmerged. Fix the file, then:
+        git add <file>
+        git shared update -c
+        git shared publish
+    To give up the merge:
+        git restore -s HEAD -SW -- <file>
+
+    Without <path>, all the shared files; with it, only that one.
+
+OPTIONS
+    -f, --force
+        Overwrite changes that are not committed.
+
+    -c, --commit
+        Commit the applied or merged files right away. Nothing else
+        staged goes into the commit.
+
+    -m <message>
+        Like -c, with <message>.
+
+SEE ALSO
+    git shared publish --help, git shared status --help

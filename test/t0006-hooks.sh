@@ -142,8 +142,8 @@ git checkout -q main 2>/dev/null
 run git merge -q e2
 expect_eq "senza .gitshared: nessun output" "$OUT$ERR" ""
 
-run git shared help
-expect_out "manuale: sezione HOOKS" "HOOKS"
+run git shared hook --help
+expect_out "manuale: pagina degli hook" "post-checkout, post-merge, post-rewrite"
 expect_no_out "manuale: niente shared.autoPublish" "autoPublish"
 
 # --- publish non esegue il pre-push dell'utente (reportIdea C-20) ------------------

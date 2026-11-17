@@ -1,0 +1,35 @@
+GIT-SHARED-UNLINK(1)
+
+NAME
+    git shared unlink - stop sharing a file
+
+SYNOPSIS
+    git shared unlink [-c | -m <message>] [--] <path>
+    git shared unlink <id>
+
+DESCRIPTION
+    Stops sharing a file. The file stays, as a regular file. Its section
+    is removed from .gitshared, which is staged. When .gitshared is
+    committed, the other repositories forget this one.
+
+    To cancel before the commit:
+        git restore --staged --worktree .gitshared
+
+    With an <id> instead of a path, unlink removes the leftover local
+    data of a file that no branch declares any more (status shows it as
+    "inconsistent", "not declared in .gitshared"). If a branch still
+    declares it, unlink says which one.
+
+OPTIONS
+    -c, --commit
+        Commit .gitshared right away. Nothing else staged goes into the
+        commit.
+
+    -m <message>
+        Like -c, with <message>.
+
+EXAMPLES
+    git shared unlink -c include/common.h
+
+SEE ALSO
+    git shared prune --help

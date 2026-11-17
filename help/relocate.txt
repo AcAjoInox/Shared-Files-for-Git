@@ -1,0 +1,36 @@
+GIT-SHARED-RELOCATE(1)
+
+NAME
+    git shared relocate - tell the peers that this repository was moved
+
+SYNOPSIS
+    git shared relocate [<old-path>]
+    git shared relocate --copy [<old-path>]
+    git shared relocate --peer <old-path> <new-path>
+
+DESCRIPTION
+    A repository remembers where it is. After you move it, every git
+    shared command warns; run relocate to give the peers the new path.
+    Without <old-path>, the remembered path is used.
+
+    If something is still at the old path, this repository is a copy
+    (cp -r, a backup): relocate refuses, so that the original is not
+    dropped. Run it with --copy to share the files from both.
+
+    Running it twice is harmless.
+
+OPTIONS
+    --copy
+        This repository is a copy of <old-path>: it becomes one more
+        peer, and the original stays.
+
+    --peer <old-path> <new-path>
+        A peer was moved and did not tell: update its path here.
+
+EXAMPLES
+    mv ~/work/firmware-a ~/projects/firmware-a
+    cd ~/projects/firmware-a
+    git shared relocate
+
+SEE ALSO
+    git shared prune --help

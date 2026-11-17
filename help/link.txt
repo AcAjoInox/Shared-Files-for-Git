@@ -1,0 +1,40 @@
+GIT-SHARED-LINK(1)
+
+NAME
+    git shared link - link a file shared by another repository
+
+SYNOPSIS
+    git shared link [-c | -m <message>] [--] <source-file> [<destination>]
+
+DESCRIPTION
+    Links to this repository a file that another repository shares.
+    <source-file> is the path of the file in the other repository, as
+    you see it on disk. The file is written from its latest version and
+    staged with .gitshared.
+
+    When they are committed the repositories become peers: each one
+    learns about the other and about the other peers. To cancel before
+    the commit:
+        git restore --staged --worktree .gitshared <destination>
+
+    The destination path is the same as in the source, unless
+    <destination> is given. It must not exist yet.
+
+    After a clone, the file is declared in .gitshared but not linked
+    (status says "unlinked"): link it again from one of its peers. The
+    file is not touched, and the link works at once, without a commit.
+
+OPTIONS
+    -c, --commit
+        Commit .gitshared and the file right away. Nothing else staged
+        goes into the commit.
+
+    -m <message>
+        Like -c, with <message>.
+
+EXAMPLES
+    git shared link -c ../firmware-a/include/common.h
+    git shared link -c ../firmware-a/include/common.h inc/common.h
+
+SEE ALSO
+    git shared set --help, git shared unlink --help

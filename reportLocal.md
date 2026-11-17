@@ -146,7 +146,7 @@ Una versione che l'autore, e un collega che conosce git, possono usare ogni gior
 | Funzioni | **~95%** | Ciclo completo, unione delle divergenze, manutenzione (`unlink`, `prune`, `branch`, `relocate`), `status --peers`. Mancano solo funzioni non essenziali (`mv`, `link` su un file esistente, pattern dei branch) |
 | Correttezza su Windows | **~85%** | Nessun bug grave. Restano casi medi legati all'ambiente (§8.3, gruppo B) |
 | Linux | **~0% verificato** | Codice `*_posix.c` scritto ma mai compilato; anche i test usano comandi da Git Bash (`pwd -W`) |
-| Documentazione per l'utente | **~70%** | Manuale incorporato e `-h` completi; `git shared --help` fallisce ("documentation file not found", provato); `breef.md` e alcune righe di questo report da riallineare |
+| Documentazione per l'utente | **~85%** | Pagina per comando in `help/` e `git shared <comando> --help` (D-087); `git shared --help` funziona dopo `make install` (su Windows serve copiare la pagina HTML con i permessi di amministratore); `breef.md` e alcune righe di questo report da riallineare |
 | Uso reale | **0%** | Solo test automatici |
 
 **Complessivamente: circa tre quarti della strada.** La parte più difficile (modello, merge, manutenzione) è fatta; quello che resta è soprattutto verifica, ambiente e rifinitura.
@@ -163,7 +163,7 @@ Unità di misura: una **sessione** è un blocco di lavoro come quelli degli ulti
 | 2 | Branch nati prima del `set`: sezione assente sul branch = file non presente qui, non *inconsistent* | B-16 | 1 | È lo stato che confonde di più e propone un comando sbagliato |
 | 3 | Hook non `sh` (Python, binari): non inserire il blocco, avvisare | C-02 | 0,5 | Oggi un hook Python viene rotto da `set` |
 | 4 | Windows: git in un path con accenti, `PATH` vuoto | C-05, C-10 | 0,5 | Con `C:\Users\José` nessun comando parte |
-| 5 | `git shared --help`: pagina HTML (Windows) e man page (Linux) generate dal manuale incorporato e copiate da `make install` | REQ-F-019 | 0,5 | È il primo comando che un utente prova |
+| 5 | ~~`git shared --help`~~: fatto (D-087), con una pagina per comando in `help/` | REQ-F-019 | – | – |
 | 6 | **Linux**: compilare, far passare i 718 test, correggere ciò che emerge (C-19, `sys_abs_path`, script di test) | C-19 | 1,5–2,5 | Piattaforma dichiarata e mai provata: è il rischio più grande della stima |
 | 7 | Fine riga e bit di esecuzione: `link` confronta gli attributi `text`/`eol` con la sorgente e avvisa; il modo `100755` si conserva | B-12, C-11 | 1–1,5 | Tra repo con normalizzazioni diverse ogni versione sembra una modifica e i merge diventano conflitti sull'intero file |
 | 8 | Minori che si incontrano davvero: `set .gitshared`, cartella hook assente, `config --unset` con più valori, path assoluti, maiuscole su Windows, `link` interrotto, staging non protetto, avviso se la sorgente non è allineata | B-36, C-04, C-09, C-13, C-12, C-21, B-43, B-44 | 1,5 | Ognuno è raro, insieme sono la differenza tra "funziona" e "non sorprende" |

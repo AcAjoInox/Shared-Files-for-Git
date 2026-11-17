@@ -44,8 +44,8 @@ run git shared prune nessuno.h
 expect_rc "file non shared: codice 1" 1
 run git shared prune -h
 expect_out "uso: breve" "Forget the peers that no longer exist or no longer share the file."
-run git shared help
-expect_out "manuale: prune" "A peer that cannot be"
+run git shared prune --help
+expect_out "manuale: prune" "prune never removes what may come back"
 
 # --- niente da togliere ----------------------------------------------------------
 run git shared prune

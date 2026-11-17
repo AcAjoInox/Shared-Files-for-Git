@@ -48,8 +48,8 @@ expect_eq "selfPath: al suo posto, nessun avviso" "$ERR" ""
 # --- argomenti ----------------------------------------------------------------------
 run git shared relocate -h
 expect_out "uso: breve" "Tell the peers that this repository was moved or copied."
-run git shared help
-expect_out "manuale: relocate" "After moving a repository, tell its peers the new path"
+run git shared relocate --help
+expect_out "manuale: relocate" "run relocate to give the peers the new path"
 run git shared relocate a b
 expect_rc "due path senza --peer: codice 129" 129
 run git shared relocate --peer a

@@ -1,0 +1,52 @@
+GIT-SHARED(1)
+
+NAME
+    git-shared - keep the same file aligned across repositories
+
+SYNOPSIS
+    git shared <command> [<options>] [<args>]
+
+DESCRIPTION
+    A shared file is a regular file tracked by several repositories on
+    the same machine. Each repository keeps a real copy, which builds and
+    works without git shared. When one repository publishes a new
+    version, the others are told and apply it when they want, with a
+    commit of their own.
+
+    Committing never sends anything: you publish with 'git shared
+    publish' and receive with 'git shared update'.
+
+GETTING STARTED
+    In the repository that has the file:
+        git shared set -c include/common.h
+    In another repository:
+        git shared link -c ../first/include/common.h
+    After changing and committing the file in either one:
+        git shared publish
+    In the others:
+        git shared update -c
+
+COMMANDS
+    set        share a file of this repository
+    link       link a file shared by another repository
+    unlink     stop sharing a file
+    status     show the state of each shared file, and of its peers
+    publish    send the new version to the peers
+    update     get the new versions and apply them, merging if needed
+    branch     choose the branches where a file is shared
+    prune      forget the peers that no longer exist
+    relocate   tell the peers that this repository was moved or copied
+    hook       install the hooks (set and link do it by themselves)
+
+    Each command has its own page:
+        git shared <command> --help
+    and a short summary of its options:
+        git shared <command> -h
+
+FILES
+    .gitshared
+        Versioned file at the root of the repository that declares the
+        shared files. Managed by git shared: do not edit by hand.
+
+EXIT STATUS
+    0 on success, 1 on error, 128 on fatal error, 129 on wrong usage.

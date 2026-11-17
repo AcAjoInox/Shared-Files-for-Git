@@ -1,0 +1,27 @@
+GIT-SHARED-PUBLISH(1)
+
+NAME
+    git shared publish - send the new version to the peers
+
+SYNOPSIS
+    git shared publish [<path>]
+
+DESCRIPTION
+    For each shared file changed and committed on top of the latest
+    version, creates a new version and sends it to every peer. A file
+    already aligned is sent again to the peers that do not have it.
+
+    Committing never publishes: this is the only way.
+
+    A peer that already has a newer version refuses it. Run
+    'git shared update' to merge the two versions, commit, and publish
+    again. A peer that cannot be reached is skipped, with a warning.
+
+    Without <path>, all the shared files; with it, only that one.
+
+EXAMPLES
+    git commit -am "Fix the timeout in common.h"
+    git shared publish
+
+SEE ALSO
+    git shared update --help, git shared status --help

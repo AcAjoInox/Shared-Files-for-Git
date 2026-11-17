@@ -36,8 +36,8 @@ expect_rc "file non shared: codice 1" 1
 expect_err "file non shared: errore" "'o.txt' is not a shared file"
 run git shared unlink -h
 expect_out "uso: breve" "Stop sharing <path>. The file stays, as a regular file."
-run git shared help
-expect_out "manuale: unlink" "Stop sharing a file. The file stays, as a regular file."
+run git shared unlink --help
+expect_out "manuale: unlink" "Stops sharing a file. The file stays, as a regular file."
 
 # --- al comando: solo la repo corrente, in attesa -------------------------------
 run git shared unlink c.h

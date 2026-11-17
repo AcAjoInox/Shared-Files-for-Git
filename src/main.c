@@ -52,7 +52,7 @@ static const CmdDef_t *find_command(const char *name)
 int main(int argc, char **argv)
 {
     static char help_name[] = "help";
-    static char *help_argv[] = { help_name, NULL };
+    static char *help_argv[] = { help_name, NULL, NULL };
     const CmdDef_t *cmd;
     int rc = GS_EXIT_USAGE;
 
@@ -72,6 +72,13 @@ int main(int argc, char **argv)
     if (cmd == NULL) {
         msg_error(MSG_ERR_UNKNOWN_CMD, argv[1]);
         fputs(msg(MSG_USAGE_MAIN), stderr);
+        goto exit;
+    }
+    /* "git shared <command> --help": git lo passa a noi, solo
+     * "git shared --help" lo intercetta (D-087). */
+    if ((argc > 2) && (strcmp(argv[2], "--help") == 0)) {
+        help_argv[1] = argv[1];
+        rc = cmd_help(2, help_argv);
         goto exit;
     }
     if ((argc > 2) && (strcmp(argv[2], "-h") == 0)) {
