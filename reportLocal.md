@@ -5,6 +5,8 @@
 > **Da dove vengono i giudizi.** Dalla lettura del codice, dai test e dalle prove fatte a mano con l'eseguibile durante la ricerca dei bug. Nessuno, a parte l'autore, lo ha ancora usato: la parte sull'uso è una valutazione ragionata, non una misura.
 >
 > **Aggiornamento 2026-11-17.** Linux provato in WSL2 (Ubuntu 22.04, GCC 11) con git 2.34 e 2.56.1, Windows anche con git 2.56.1: 832 test su 832 ovunque. Compatibilità dichiarata chiusa (D-090): non provata solo git 2.34 su Windows, ritenuta stabile; trovato e chiuso un bug sul modo degli hook (C-25, D-089). Aggiornati §2, §6 e §8; il resto è fermo al 2026-11-16.
+>
+> **Seconda ricerca, 2026-11-17.** Nuova caccia ai bug sul flusso logico e sulla struttura, partendo dai bug noti: 7 problemi nuovi (B-46…B-51, C-26), di cui **uno grave** (B-46: dopo un'unione tra versioni una modifica può tornare indietro in silenzio). Sono in §9, non ancora riportati in `reportIdea.md`. Il giudizio "nessun bug grave aperto" di §6 non vale più.
 
 ## 1. In breve
 
@@ -111,7 +113,7 @@ Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a
 - 832 test di sistema, che lanciano i comandi come farebbe l'utente.
 
 **Punti deboli, da sapere.**
-- **Nessun bug grave aperto**, 28 tra medi e minori (`reportIdea.md` §2).
+- ~~**Nessun bug grave aperto**~~, 28 tra medi e minori (`reportIdea.md` §2). **Non vale più:** la seconda ricerca (§9) ha trovato B-46, grave, e altri 6 problemi, quasi tutti nelle unioni tra versioni (D-078).
 - **Linux provato solo in WSL2** (Ubuntu 22.04, git 2.34 e 2.56.1, GCC 11): tutti i test passano, ma nessun uso reale su una macchina Linux.
 - **Fine riga** (B-12): tra repo con normalizzazioni diverse ogni versione risulterebbe una modifica.
 - **La base si ricava dai blob nella storia.** Uno squash la cancella: il file risulta *diverged* anche se non lo è. Con il merge si chiude da solo, ma l'utente vede comunque uno stato che non si aspetta (B-42). Il caso contrario, revert più squash, riporta in silenzio la versione che si voleva togliere.
@@ -204,3 +206,65 @@ Tappe proposte, con un tag ciascuna:
 **Il rischio maggiore era Linux** (punto 6): provato in WSL2 il 2026-11-17, non ha mostrato problemi di fondo. Ora il rischio maggiore è l'uso reale, che per definizione trova cose che i test non cercano.
 
 > **Nota:** la tabella di §5 è in parte superata. "Stati come *inconsistent* o *unlinked* non hanno un comando di uscita" non vale più: *unlinked* si risolve con `link` (D-080), *inconsistent* con `unlink <id>` o `branch` (D-081, D-083). Resta la confusione di *inconsistent* sui branch vecchi (punto 2).
+
+## 9. Seconda ricerca di bug: flusso logico e struttura (2026-11-17)
+
+> **Come.** Rilettura di `breef.md`, `project.md` (§5, §6), `reportIdea.md` e di tutto `src/`, cercando i punti in cui il modello promette qualcosa che il flusso non mantiene. Ogni ipotesi è stata provata con l'eseguibile di `build/` (commit `667122c`) in repo temporanee, Windows, git 2.43. "Provato" = riprodotto; "Lettura" = ricavato dal codice. ID nella numerazione di `reportIdea.md` (B = modello o comportamento, C = codice; gravità A/M/B come lì).
+
+### 9.1 Elenco
+
+| ID | Gr. | Problema | Verifica | Dove |
+|---|---|---|---|---|
+| B-46 | **A** | La versione di un peer unita da un'altra repo non è riconosciuta come versione: il peer la vede *divergente*, e il suo `update` reintroduce in silenzio ciò che l'altra repo aveva tolto | Provato | `chain_blobs`, `find_base`, `cmd_has_local_changes` |
+| B-47 | M | `update`: T avanza su una versione ricevuta che non la contiene (avanzamento non fast-forward) | Provato | `receive` in `cmd_update.c` |
+| B-48 | M | Unione abbandonata con `git restore`, poi una modifica qualsiasi in staging: `update` la prende per la risoluzione e scarta le modifiche del peer | Provato | `merge_is_live`, `settle_merge` |
+| B-49 | B | Ogni conclusione di un conflitto tra versioni crea una seconda versione di unione, ridondante | Provato | `update_entry`, `merge_step` |
+| B-50 | M | L'identità di una repo è il path del worktree da cui si lancia il comando: un `link` da un worktree secondario lega i peer a quel path, e alla sua rimozione la repo esce dal gruppo senza che nessuno lo noti | Provato | `find_source`, `complete_link`, `peers_announce` |
+| B-51 | B | Catena locale `refs/shared/<id>` assente: stato *incoerente*, `update` fallisce, `link` rifiuta; l'unica uscita è `unlink`, che smonta la condivisione | Provato | `state_derive`, `receive`, `cmd_link` |
+| C-26 | B | `chain_blobs` rilegge `refs/shared/<id>` per nome invece di partire dalla T già letta: B-31 è chiuso solo a metà | Lettura | `state_derive`, `cmd_has_local_changes` |
+
+### 9.2 Schede
+
+**B-46 — La versione del peer, dopo un'unione, non è più una versione** (provato; gravità A)
+- *Scenario.* A e B allineati a v1. A pubblica vA mentre B non è raggiungibile. B modifica la riga 4 e pubblica: crea vB, A la rifiuta (B-35). A lancia `update`: unione pulita, versione M con genitori (vA, vB), commit, `publish`: B accetta M in fast-forward, perché M discende da vB. Poi A decide che la riga di B è sbagliata, la toglie, committa e pubblica V2.
+- *Che cosa succede in B.* H = contenuto di vB, T = V2, che discende da vB. Lo stato giusto è *da applicare*; `status` dice *diverged* e `publish` rifiuta. `update -c` fa un'unione a 3 vie con base v1: la riga 4 è cambiata solo "dalla parte di B" e torna `l4-B`. Nasce una versione nuova, B la pubblica, A la applica con `update`: **la rimozione fatta da A è annullata in silenzio in entrambe le repo** (provato, contenuto finale `l4-B` in A e in B). Viola la regola 5 del breef ("Nessuna modifica viene scartata").
+- *Anche senza la rimozione:* B vede *diverged* per una versione che contiene già la sua, e `update` stampa "merged … run 'git shared publish'" anche quando il risultato è T e non c'è niente da pubblicare. Se A, risolvendo un conflitto, ha scelto righe diverse da quelle di B, B si ritrova in conflitto su ciò che A ha già risolto.
+- *Causa.* `chain_blobs` segue solo il primo genitore (`<commit>^`): il secondo genitore di un'unione, cioè la versione del peer, non entra mai nella lista delle versioni. `find_base` non la trova nella storia di B e prende come base la versione comune più vecchia (v1). Lo stesso elenco serve a `cmd_has_local_changes`: un index uguale alla versione del peer viene preso per una modifica locale (lettura).
+- *Rimedio possibile.* Leggere la catena con tutti i genitori (un `git rev-list --topo-order refs/shared/<id>` o la visita di `^1` e `^2` sullo stesso `cat-file`) e ricavare la base sul grafo: se H è il blob di una versione raggiungibile da T, quella è la base, e lo stato è *da applicare*. Serve un test in `t0009`: "il peer la cui versione è stata unita riceve l'unione e risulta *da applicare*".
+
+**B-47 — `update` sposta T su una versione che non la contiene** (provato)
+- *Scenario.* A con peer [B, C], nell'ordine. A ha T = vA. C ha vC, che discende da vA; B ha vB, nata da v1 (indipendente da vA). `update` in A riceve vB e vC.
+- *Che cosa succede.* `merge-base --independent vA vB vC` restituisce vB e vC, nell'ordine di ingresso (provato: git conserva l'ordine). vA non c'è, quindi `receive` conclude che "una la contiene" e fa avanzare T su `tops.v[0]`, cioè vB, che vA non la contiene: `update-ref refs/shared/<id> vB vA` (visto con `GIT_TRACE`). Poi il contenuto di A (vA) è trattato come una modifica del branch da unire a vB, e la versione che ne nasce non ha vA tra i genitori; solo l'unione successiva con vC la riporta nel grafo. Se la prima unione va in conflitto, la catena locale resta su vB: vA, pubblicata da A, non è più raggiungibile dalla sua catena. Il messaggio è "new version received".
+- *Causa.* `cmd_update.c`, `receive`: `tops.v[0]` è preso senza controllare che discenda da T. Viola REQ-NF-005 e l'invariante di §6 ("ogni avanzamento della catena è condizionato e solo in fast-forward"): `update-ref` controlla il valore vecchio, non la discendenza.
+- *Rimedio possibile.* Scegliere tra le versioni rimaste quella per cui `merge-base --is-ancestor T <versione>` è vero (un processo per candidata, solo quando sono più di una).
+
+**B-48 — Un'unione abbandonata torna viva con la prima modifica in staging** (provato)
+- *Scenario.* Conflitto tra vA (locale) e vB (peer); l'utente rinuncia come dice il manuale: `git restore -s HEAD -SW -- f.h`. `status` dice *aligned*, ma `refs/shared-merge/<id>` resta (la toglie solo `update`). L'utente lavora sul file (riga 6) e fa `git add`: `status` dice **merge in progress**. `update -c` "conclude l'unione" con quella modifica: nasce una versione con genitori (vA, vB) **senza le righe di vB**, e `publish` la invia.
+- *Effetto.* Ogni peer che non è B riceve una versione che dichiara di contenere vB ma ne ha perso le modifiche. In B l'effetto si somma a B-46 (non provato). È una modifica scartata in silenzio, partendo dalla procedura di abbandono documentata.
+- *Causa.* `merge_is_live` considera viva l'unione se l'index è diverso da H: non distingue una risoluzione da una modifica fatta dopo l'abbandono. `status` vede la ref scaduta e non la toglie.
+- *Rimedio possibile.* Togliere la ref appena un comando qualsiasi (anche `status`) la vede scaduta (index = H, nessuno stage); in più, concludere solo con un atto esplicito (es. `update --continue`) o almeno avvisare quando la risoluzione non contiene nessuna modifica della versione del peer rispetto alla base.
+
+**B-49 — Versione di unione doppia** (provato)
+- Conflitto tra vA e vB, risolto con un contenuto nuovo, `git add`, `update -c`. La catena riceve due versioni con lo stesso tree: `879df60` (genitori vA, vB) e subito dopo `1fe7fa2` (genitori `879df60`, vB). Succede a ogni conclusione di un conflitto tra versioni.
+- *Causa.* `update_entry` calcola le versioni da unire (`heads`) in `receive`, prima che `settle_merge` concluda l'unione; poi le unisce di nuovo. `merge_step` crea una versione ogni volta che c'è un secondo genitore, anche se è già antenato di T e il contenuto non cambia.
+- *Rimedio possibile.* Saltare nel ciclo le versioni già antenate di T (il merge-base è la versione stessa); in `merge_step`, nessuna versione nuova se `p2` è antenato di `tip`.
+
+**B-50 — Peer registrato con il path di un worktree secondario** (provato; `reportIdea.md` §7 punto 12 lo dava "non provato")
+- *Scenario.* A ha un worktree secondario `A-wt` (`git worktree add`). B fa `git shared link -c ../A-wt/f.h`. B registra come peer `A-wt`, non `A`; A registra B. Dopo `git worktree remove A-wt`: `publish` in B dice "peer A-wt not reachable", `prune` lo toglie come "it no longer exists". B non ha più peer; A continua a elencare B e `status --peers` in A dice solo "newer or different version". Il gruppo si è diviso senza un errore.
+- *Causa.* L'identità di una repo è `rev-parse --show-toplevel` del worktree da cui si lavora: vale per la sorgente di `link` (`find_source`) e per `self` nell'annuncio e nella pulizia (`complete_link`, `repo_forget`), anche quando il comando gira in un worktree secondario. Config e ref sono comuni ai worktree, quindi lo stesso repository può comparire con più nomi.
+- *Rimedio possibile.* Usare come identità la radice del worktree principale (da `rev-parse --git-common-dir`), sia per la sorgente sia per `self`; oppure rifiutare `link` e il completamento di un'attesa da un worktree secondario.
+
+**B-51 — Catena locale persa: nessuna uscita** (provato)
+- Con la sezione locale presente e `refs/shared/<id>` assente: `status` dice *inconsistent* (che il breef spiega come "rinominato o cancellato fuori da git shared": consiglio sbagliato), `update` esce con "cannot update the version chain", `link` risponde "already shared here". Resta solo `unlink`, che al commit avvisa i peer e smonta la condivisione.
+- *Come ci si arriva.* `git push --mirror` da un clone verso la repo (cancella `refs/shared/*`, `reportIdea.md` §5), un `fetch --prune` con refspec `+refs/*:refs/*`, una cancellazione a mano.
+- *Rimedio possibile.* `update` rifà il fetch dai peer quando la catena manca, come già fa il completamento di `link` con la ref temporanea; `status` con un messaggio proprio ("catena assente: run 'git shared update'").
+
+**C-26 — B-31 chiuso a metà** (lettura)
+- `state_derive` legge il commit di T e il suo blob, ma poi `chain_blobs` riparte dal nome `refs/shared/<id>`: se un peer invia una versione nel frattempo, la base è calcolata su una catena diversa da quella di `si.tip`. Le scritture restano condizionate (`update-ref` con il valore vecchio), quindi non si perde nulla: si ottiene un errore invece dello stato giusto. Stesso schema in `cmd_has_local_changes`.
+- *Rimedio.* `chain_blobs` riceve il commit di partenza invece dell'ID.
+
+### 9.3 Che cosa cambia nel giudizio
+
+- **La parte da rivedere è l'unione tra versioni** (D-078). Il percorso provato dai test è "una repo unisce e pubblica"; non c'è un test sul **peer la cui versione è stata unita**, che è proprio il caso in cui nascono B-46 e B-49. B-46, B-47 e B-48 hanno la stessa radice: la catena è un grafo, ma il codice la legge come una lista (primo genitore) e decide "chi contiene chi" senza chiederlo a git.
+- **Effetto sulla stima di §8.** Va aggiunto agli indispensabili (A) un punto "Unioni tra versioni: B-46…B-49, con test del peer che riceve l'unione", stimato **1,5–2 sessioni**: il totale A passa a 7,5–10 sessioni. B-50 rientra nel punto 8 (minori che si incontrano davvero), B-51 e C-26 nei non necessari (C).
+- **Fino alla correzione di B-46**, nell'uso reale conviene evitare le divergenze tra versioni: lanciare `git shared update` prima di ogni `publish` (rende raro B-35, da cui nascono) e, dopo un'unione fatta da un'altra repo, controllare il risultato di `update` prima di pubblicarlo.
