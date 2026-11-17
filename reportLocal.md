@@ -4,7 +4,7 @@
 >
 > **Da dove vengono i giudizi.** Dalla lettura del codice, dai test e dalle prove fatte a mano con l'eseguibile durante la ricerca dei bug. Nessuno, a parte l'autore, lo ha ancora usato: la parte sull'uso è una valutazione ragionata, non una misura.
 >
-> **Aggiornamento 2026-11-17.** Linux provato in WSL2 (Ubuntu 22.04, git 2.34, GCC 11): 832 test su 832, come su Windows; trovato e chiuso un bug sul modo degli hook (C-25, D-089). Aggiornati §2, §6 e §8; il resto è fermo al 2026-11-16.
+> **Aggiornamento 2026-11-17.** Linux provato in WSL2 (Ubuntu 22.04, GCC 11) con git 2.34 e 2.56.1: 832 test su 832, come su Windows; trovato e chiuso un bug sul modo degli hook (C-25, D-089). Aggiornati §2, §6 e §8; il resto è fermo al 2026-11-16.
 
 ## 1. In breve
 
@@ -112,7 +112,7 @@ Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a
 
 **Punti deboli, da sapere.**
 - **Nessun bug grave aperto**, 28 tra medi e minori (`reportIdea.md` §2).
-- **Linux provato solo in WSL2** (Ubuntu 22.04, git 2.34, GCC 11): tutti i test passano, ma nessun uso reale su una macchina Linux.
+- **Linux provato solo in WSL2** (Ubuntu 22.04, git 2.34 e 2.56.1, GCC 11): tutti i test passano, ma nessun uso reale su una macchina Linux.
 - **Fine riga** (B-12): tra repo con normalizzazioni diverse ogni versione risulterebbe una modifica.
 - **La base si ricava dai blob nella storia.** Uno squash la cancella: il file risulta *diverged* anche se non lo è. Con il merge si chiude da solo, ma l'utente vede comunque uno stato che non si aspetta (B-42). Il caso contrario, revert più squash, riporta in silenzio la versione che si voleva togliere.
 - **Nessun test di unità** e nessuna prova con più di 8 peer.
@@ -147,7 +147,7 @@ Una versione che l'autore, e un collega che conosce git, possono usare ogni gior
 |---|---|---|
 | Funzioni | **~95%** | Ciclo completo, unione delle divergenze, manutenzione (`unlink`, `prune`, `branch`, `relocate`), `status --peers`. Mancano solo funzioni non essenziali (`mv`, `link` su un file esistente, pattern dei branch) |
 | Correttezza su Windows | **~85%** | Nessun bug grave. Restano casi medi legati all'ambiente (§8.3, gruppo B) |
-| Linux | **~85%** | Provato in WSL2 (Ubuntu 22.04, git 2.34, cioè il minimo di D-032): compila senza warning, 832 test su 832. Mancano l'ultima git stabile su Linux (matrice di D-032) e le misure (punto 9) |
+| Linux | **~85%** | Provato in WSL2 (Ubuntu 22.04) con git 2.34, il minimo di D-032, e con 2.56.1, l'ultima stabile: compila senza warning, 832 test su 832 con entrambe. Mancano le misure (punto 9) e l'uso su una macchina Linux vera |
 | Documentazione per l'utente | **~90%** | Pagina per comando in `help/`, anche in italiano (`git shared lang it`); `git shared -h` spiega come aprire il manuale; `git shared --help` funziona dopo `make install` (su Windows serve copiare la pagina HTML con i permessi di amministratore). Messaggi dei comandi solo in inglese |
 | Uso reale | **0%** | Solo test automatici |
 
