@@ -4,7 +4,7 @@
 >
 > **Da dove vengono i giudizi.** Dalla lettura del codice, dai test e dalle prove fatte a mano con l'eseguibile durante la ricerca dei bug. Nessuno, a parte l'autore, lo ha ancora usato: la parte sull'uso è una valutazione ragionata, non una misura.
 >
-> **Aggiornamento 2026-11-17.** Linux provato in WSL2 (Ubuntu 22.04, git 2.34, GCC 11): 823 test su 823, come su Windows. Aggiornati §2, §6 e §8; il resto è fermo al 2026-11-16.
+> **Aggiornamento 2026-11-17.** Linux provato in WSL2 (Ubuntu 22.04, git 2.34, GCC 11): 832 test su 832, come su Windows; trovato e chiuso un bug sul modo degli hook (C-25, D-089). Aggiornati §2, §6 e §8; il resto è fermo al 2026-11-16.
 
 ## 1. In breve
 
@@ -108,10 +108,10 @@ Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a
 - Lo stato si ricava ogni volta dal contenuto della repo: hook saltati, rebase, reset non lo corrompono.
 - Ogni avanzamento della catena è condizionato e solo in fast-forward: una versione non viene mai sovrascritta.
 - Il contenuto del file non passa mai dai buffer del programma: viaggia come blob tra comandi git.
-- 823 test di sistema, che lanciano i comandi come farebbe l'utente.
+- 832 test di sistema, che lanciano i comandi come farebbe l'utente.
 
 **Punti deboli, da sapere.**
-- **Nessun bug grave aperto**, 29 tra medi e minori (`reportIdea.md` §2).
+- **Nessun bug grave aperto**, 28 tra medi e minori (`reportIdea.md` §2).
 - **Linux provato solo in WSL2** (Ubuntu 22.04, git 2.34, GCC 11): tutti i test passano, ma nessun uso reale su una macchina Linux.
 - **Fine riga** (B-12): tra repo con normalizzazioni diverse ogni versione risulterebbe una modifica.
 - **La base si ricava dai blob nella storia.** Uno squash la cancella: il file risulta *diverged* anche se non lo è. Con il merge si chiude da solo, ma l'utente vede comunque uno stato che non si aspetta (B-42). Il caso contrario, revert più squash, riporta in silenzio la versione che si voleva togliere.
@@ -147,7 +147,7 @@ Una versione che l'autore, e un collega che conosce git, possono usare ogni gior
 |---|---|---|
 | Funzioni | **~95%** | Ciclo completo, unione delle divergenze, manutenzione (`unlink`, `prune`, `branch`, `relocate`), `status --peers`. Mancano solo funzioni non essenziali (`mv`, `link` su un file esistente, pattern dei branch) |
 | Correttezza su Windows | **~85%** | Nessun bug grave. Restano casi medi legati all'ambiente (§8.3, gruppo B) |
-| Linux | **~85%** | Provato in WSL2 (Ubuntu 22.04, git 2.34, cioè il minimo di D-032): compila senza warning, 823 test su 823. Mancano l'ultima git stabile su Linux (matrice di D-032) e le misure (punto 9) |
+| Linux | **~85%** | Provato in WSL2 (Ubuntu 22.04, git 2.34, cioè il minimo di D-032): compila senza warning, 832 test su 832. Mancano l'ultima git stabile su Linux (matrice di D-032) e le misure (punto 9) |
 | Documentazione per l'utente | **~90%** | Pagina per comando in `help/`, anche in italiano (`git shared lang it`); `git shared -h` spiega come aprire il manuale; `git shared --help` funziona dopo `make install` (su Windows serve copiare la pagina HTML con i permessi di amministratore). Messaggi dei comandi solo in inglese |
 | Uso reale | **0%** | Solo test automatici |
 
@@ -166,7 +166,7 @@ Unità di misura: una **sessione** è un blocco di lavoro come quelli degli ulti
 | 3 | Hook non `sh` (Python, binari): non inserire il blocco, avvisare | C-02 | 0,5 | Oggi un hook Python viene rotto da `set` |
 | 4 | Windows: git in un path con accenti, `PATH` vuoto | C-05, C-10 | 0,5 | Con `C:\Users\José` nessun comando parte |
 | 5 | ~~`git shared --help`~~: fatto (D-087), con una pagina per comando in `help/` | REQ-F-019 | – | – |
-| 6 | ~~**Linux**: compilare e far passare i test~~: fatto in WSL2. Unica correzione: due hook di prova senza `chmod +x` in t0006. C-19 provato: senza effetti con git | C-19 | – | – |
+| 6 | ~~**Linux**: compilare e far passare i test~~: fatto in WSL2. Due hook di prova senza `chmod +x` in t0006; un bug sul modo degli hook dell'utente (C-25, D-089). C-19 provato: senza effetti con git | C-19 | – | – |
 | 7 | Fine riga e bit di esecuzione: `link` confronta gli attributi `text`/`eol` con la sorgente e avvisa; il modo `100755` si conserva | B-12, C-11 | 1–1,5 | Tra repo con normalizzazioni diverse ogni versione sembra una modifica e i merge diventano conflitti sull'intero file |
 | 8 | Minori che si incontrano davvero: `set .gitshared`, cartella hook assente, `config --unset` con più valori, path assoluti, maiuscole su Windows, `link` interrotto, staging non protetto, avviso se la sorgente non è allineata | B-36, C-04, C-09, C-13, C-12, C-21, B-43, B-44 | 1,5 | Ognuno è raro, insieme sono la differenza tra "funziona" e "non sorprende" |
 | 9 | Misure: `status` con molti file, `publish` verso 32 peer, costo di un'unione; su Windows e Linux | REQ-NF-007 | 0,5 | Le soglie sono requisiti; oggi misurate solo fino a 8 peer |

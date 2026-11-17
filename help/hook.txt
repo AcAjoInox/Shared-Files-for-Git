@@ -14,8 +14,10 @@ DESCRIPTION
             active branches exists any more
 
     Existing hooks are kept: the block goes right after their first
-    line. No hook runs on commit and no hook ever blocks git. The hooks
-    are a convenience: 'git shared status' shows the same information.
+    line, and the file keeps its permissions. A hook you disabled by
+    removing its execute bit stays disabled, block included. No hook
+    runs on commit and no hook ever blocks git. The hooks are a
+    convenience: 'git shared status' shows the same information.
 
     'git shared hook install' adds the blocks to a repository that has
     shared files but no hooks yet, and removes the blocks that earlier

@@ -50,23 +50,30 @@ static eGsErr_t hooks_dir(const Repo_t *r, Str_t *dir)
     return err;
 }
 
-/* Contenuto del file; un file assente da' contenuto vuoto. */
-static void read_file(const char *path, Str_t *out)
+/* Contenuto del file; un file assente da' contenuto vuoto e 0. */
+static int read_file(const char *path, Str_t *out)
 {
     char chunk[1024];
     size_t n;
     FILE *f = sys_fopen(path, "rb");
+    int found = (f != NULL);
 
     str_reset(out);
-    if (f != NULL) {
+    if (found != 0) {
         while ((n = fread(chunk, 1U, sizeof chunk, f)) > 0U) {
             str_addn(out, chunk, n);
         }
         (void)fclose(f);
     }
+    return found;
 }
 
-static eGsErr_t write_file(const char *path, const Str_t *text)
+/*
+ * Riscrive il file sul posto: un hook che esisteva tiene il suo modo (un
+ * hook non eseguibile e' un hook che l'utente ha disattivato). Il bit di
+ * esecuzione si mette solo a un file creato adesso (created != 0).
+ */
+static eGsErr_t write_file(const char *path, const Str_t *text, int created)
 {
     FILE *f = sys_fopen(path, "wb");
     int put_rc;
@@ -76,14 +83,16 @@ static eGsErr_t write_file(const char *path, const Str_t *text)
     if (f != NULL) {
         put_rc = fputs(str_cstr(text), f);
         close_rc = fclose(f);
-        if ((put_rc >= 0) && (close_rc == 0) && (sys_make_executable(path) == 0)) {
+        if ((put_rc >= 0) && (close_rc == 0) &&
+            ((created == 0) || (sys_make_executable(path) == 0))) {
             err = GS_OK;
         }
     }
     return err;
 }
 
-static eGsErr_t install_one(const char *path, const Str_t *old, const char *event)
+static eGsErr_t install_one(const char *path, const Str_t *old, int exists,
+                            const char *event)
 {
     Str_t text = STR_INIT;
     const char *body = str_cstr(old);
@@ -110,7 +119,7 @@ static eGsErr_t install_one(const char *path, const Str_t *old, const char *even
     str_addf(&text, HOOK_BEGIN "\ngit-shared hook %s \"$@\" </dev/null || :\n"
                     HOOK_END "\n", event);
     str_add(&text, body);
-    err = write_file(path, &text);
+    err = write_file(path, &text, (exists == 0));
     str_free(&text);
     return err;
 }
@@ -134,7 +143,7 @@ static eGsErr_t remove_one(const char *path, const Str_t *old)
         if ((text.len == 0U) || str_eq(&text, HOOK_SHEBANG)) {
             err = (sys_remove(path) == 0) ? GS_OK : GS_ERR_SYS;
         } else {
-            err = write_file(path, &text);
+            err = write_file(path, &text, 0);
         }
     }
     str_free(&text);
@@ -149,6 +158,7 @@ eGsErr_t hooks_sync(const Repo_t *r)
     size_t i;
     int want;
     int has;
+    int exists;
     eGsErr_t one;
     eGsErr_t err = hooks_dir(r, &dir);
 
@@ -158,12 +168,12 @@ eGsErr_t hooks_sync(const Repo_t *r)
     for (i = 0U; (err == GS_OK) && (i < (sizeof hooks / sizeof hooks[0])); i++) {
         str_reset(&path);
         str_addf(&path, "%s/%s", str_cstr(&dir), hooks[i].event);
-        read_file(str_cstr(&path), &old);
+        exists = read_file(str_cstr(&path), &old);
         want = (hooks[i].want != 0U);
         has = (strstr(str_cstr(&old), HOOK_BEGIN) != NULL);
         one = GS_OK;
         if (want && !has) {
-            one = install_one(str_cstr(&path), &old, hooks[i].event);
+            one = install_one(str_cstr(&path), &old, exists, hooks[i].event);
         } else if (!want && has) {
             one = remove_one(str_cstr(&path), &old);
         } else {

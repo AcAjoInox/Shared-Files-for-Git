@@ -14,9 +14,11 @@ DESCRIZIONE
             nessuno dei suoi branch attivi esiste piu'
 
     Gli hook esistenti restano: il blocco va subito dopo la loro prima
-    riga. Nessun hook gira sul commit e nessun hook blocca mai git. Gli
-    hook sono una comodita': 'git shared status' mostra le stesse
-    informazioni.
+    riga e il file tiene i suoi permessi. Un hook che hai disattivato
+    togliendogli il bit di esecuzione resta disattivato, blocco
+    compreso. Nessun hook gira sul commit e nessun hook blocca mai
+    git. Gli hook sono una comodita': 'git shared status' mostra le
+    stesse informazioni.
 
     'git shared hook install' aggiunge i blocchi a un repository che ha
     file shared ma non ancora gli hook, e toglie i blocchi che le

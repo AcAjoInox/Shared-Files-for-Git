@@ -159,6 +159,7 @@ put o.txt o
 git shared link -c ../PA/p.h >/dev/null
 cd "$TRASH/PA" || exit 1
 printf '#!/bin/sh\necho RUN >>"%s/prepush.log"\nexit 1\n' "$TRASH" >.git/hooks/pre-push
+chmod +x .git/hooks/pre-push
 put p.h v2
 run git shared publish
 expect_rc "pre-push dell'utente: publish riuscito" 0
@@ -166,5 +167,43 @@ expect_out "pre-push dell'utente: inviata" "sent to 1 of 1 peers"
 expect_fail "pre-push dell'utente: non eseguito" test -f "$TRASH/prepush.log"
 run git -C ../PB shared status
 expect_out "pre-push dell'utente: il peer la riceve" "new version to apply"
+
+# --- modo degli hook: quello dell'utente non cambia -----------------------------
+# Un hook non eseguibile e' un hook disattivato: inserire o togliere il
+# blocco non lo riattiva. Solo l'hook creato da git shared e' eseguibile.
+make_repo MO
+cd "$TRASH/MO" || exit 1
+put m.h m
+printf '#!/bin/sh\necho "merge-utente" >&2\n' >.git/hooks/post-merge
+chmod 644 .git/hooks/post-merge
+printf '#!/bin/sh\necho "checkout-utente" >&2\n' >.git/hooks/post-checkout
+chmod 700 .git/hooks/post-checkout
+old_hook post-commit 'echo "post-utente" >&2'
+chmod 600 .git/hooks/post-commit
+git shared set -c m.h >/dev/null
+expect_ok "modo: blocco nell'hook disattivato" has_block post-merge
+expect_ok "modo: blocco nell'hook eseguibile" has_block post-checkout
+expect_ok "modo: hook creato da git shared eseguibile" test -x .git/hooks/post-rewrite
+expect_fail "modo: vecchio blocco tolto" has_block post-commit
+if has_exec_bit; then
+	expect_fail "modo: hook disattivato resta disattivato" test -x .git/hooks/post-merge
+	expect_eq "modo: hook disattivato, permessi invariati" \
+		"$(ls -l .git/hooks/post-merge | cut -c1-10)" "-rw-r--r--"
+	expect_eq "modo: hook eseguibile, permessi invariati" \
+		"$(ls -l .git/hooks/post-checkout | cut -c1-10)" "-rwx------"
+	expect_eq "modo: blocco tolto, permessi invariati" \
+		"$(ls -l .git/hooks/post-commit | cut -c1-10)" "-rw-------"
+	git checkout -q -b mo2 2>/dev/null
+	put n.txt n
+	git checkout -q main 2>/dev/null
+	run git -c advice.ignoredHook=false merge -q mo2
+	expect_eq "modo: l'hook disattivato non gira" "$OUT$ERR" ""
+else
+	for t in "hook disattivato resta disattivato" "hook disattivato, permessi invariati" \
+		"hook eseguibile, permessi invariati" "blocco tolto, permessi invariati" \
+		"l'hook disattivato non gira"; do
+		skip "modo: $t" "niente bit di esecuzione su questo filesystem"
+	done
+fi
 
 done_testing

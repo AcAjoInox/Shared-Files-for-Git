@@ -45,6 +45,20 @@ not_ok() {
 	done
 }
 
+# skip <descrizione> <motivo>: test che qui non ha senso (direttiva TAP)
+skip() {
+	n_test=$((n_test + 1))
+	echo "ok $n_test - $1 # SKIP $2"
+}
+
+# has_exec_bit: il filesystem conserva il bit di esecuzione. Su Windows no:
+# Git Bash considera eseguibile ogni file che comincia con "#!".
+has_exec_bit() {
+	printf '#!/bin/sh\n' >"$TRASH/.exec"
+	chmod 644 "$TRASH/.exec"
+	! [ -x "$TRASH/.exec" ]
+}
+
 # run <comando...>: esegue e salva codice di uscita, stdout e stderr
 # in $RC, $OUT, $ERR.
 run() {
