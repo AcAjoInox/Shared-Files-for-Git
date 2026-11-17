@@ -315,7 +315,7 @@ La v0 è il **core solo locale**: tutto ciò che serve perché due o più repo s
 >
 > **Manuale in italiano (D-088, 2026-11-17).** `help/it/`, comando `lang`, `-h` che spiega dove sta il manuale. 823 test.
 >
-> **Linux e modo degli hook (D-089, 2026-11-17).** Compilato e provato in WSL2 (Ubuntu 22.04, GCC 11) con git 2.34 (il minimo) e 2.56.1 (l'ultima stabile): nessun warning, tutti i test passano con entrambe. Un hook dell'utente tiene il suo modo. 832 test (5 saltati su Windows, che non ha il bit di esecuzione).
+> **Linux e modo degli hook (D-089, 2026-11-17).** Compilato e provato in WSL2 (Ubuntu 22.04, GCC 11) con git 2.34 (il minimo) e 2.56.1 (l'ultima stabile): nessun warning, tutti i test passano con entrambe. Su Windows passano anche con l'ultima stabile (PortableGit 2.56.1). Un hook dell'utente tiene il suo modo. 832 test (5 saltati su Windows, che non ha il bit di esecuzione).
 >
 > **M3 completato (rev. D-074, 2026-11-16).** `set`/`link` installano solo `post-checkout`/`post-merge`/`post-rewrite`, che avvisano dei file non allineati: **il commit non paga nulla** e si pubblica solo con `publish`. `shared.autoPublish` e il `post-commit` sono eliminati; `hook install` toglie i blocchi `pre-commit` e `post-commit` delle versioni precedenti. Stato *da committare* (D-076); attese completate da qualunque branch (D-077). 308 test.
 >
@@ -575,11 +575,14 @@ Quando la sezione con quell'ID compare in `refs/heads/<pendingBranch>:.gitshared
 
   | Sistema | git | Come |
   |---|---|---|
-  | Windows 11 | 2.43 (Git for Windows) | `make test` da Git Bash |
+  | Windows 11 | 2.43 (Git for Windows installato) | `make test` da Git Bash |
+  | Windows 11 | **2.56.1**, ultima stabile al 2026-11-17 (PortableGit) | `make test` dalla bash della PortableGit: `%USERPROFILE%\git-latest\bin\bash.exe -l` |
   | Linux, WSL2 Ubuntu 22.04 | **2.34**, il minimo (pacchetto della distribuzione) | `make test` |
   | Linux, WSL2 Ubuntu 22.04 | **2.56.1**, ultima stabile al 2026-11-17 | `PATH="$HOME/git-latest/bin:$PATH" make test` |
 
-  L'ultima stabile su Linux si compila dai sorgenti in `~/git-latest`, senza toccare la git del sistema: `make prefix=$HOME/git-latest NO_RUST=1 NO_CURL=1 NO_PERL=1 NO_PYTHON=1 NO_TCLTK=1 NO_GETTEXT=1 NO_OPENSSL=1 install` (servono `build-essential`, `zlib1g-dev`, `libexpat1-dev`). Dalla 2.55 git compila per default una parte in Rust; `NO_RUST` la esclude finché resta facoltativa (fino a Git 3.0). A ogni nuova versione stabile si ricompila e si aggiorna questa tabella. Su Windows manca ancora l'ultima stabile.
+  L'ultima stabile su Linux si compila dai sorgenti in `~/git-latest`, senza toccare la git del sistema: `make prefix=$HOME/git-latest NO_RUST=1 NO_CURL=1 NO_PERL=1 NO_PYTHON=1 NO_TCLTK=1 NO_GETTEXT=1 NO_OPENSSL=1 install` (servono `build-essential`, `zlib1g-dev`, `libexpat1-dev`). Dalla 2.55 git compila per default una parte in Rust; `NO_RUST` la esclude finché resta facoltativa (fino a Git 3.0). A ogni nuova versione stabile si ricompila e si aggiorna questa tabella.
+
+  Su Windows l'ultima stabile è la **PortableGit** di Git for Windows (`PortableGit-<versione>-64-bit.7z.exe` dalla release su GitHub, hash e firma controllati), estratta in `%USERPROFILE%\git-latest` senza toccare la git installata. I test si lanciano dalla sua bash e non dalla Git Bash installata: due runtime MSYS diversi nello stesso albero di processi non convivono. Il compilatore resta MinGW-w64 dal `PATH` di Windows. Resta fuori il minimo 2.34 su Windows.
 
 | Test | Requisiti | Test |
 |---|---|---|

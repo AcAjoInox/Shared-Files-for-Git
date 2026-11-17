@@ -4,7 +4,7 @@
 >
 > **Da dove vengono i giudizi.** Dalla lettura del codice, dai test e dalle prove fatte a mano con l'eseguibile durante la ricerca dei bug. Nessuno, a parte l'autore, lo ha ancora usato: la parte sull'uso è una valutazione ragionata, non una misura.
 >
-> **Aggiornamento 2026-11-17.** Linux provato in WSL2 (Ubuntu 22.04, GCC 11) con git 2.34 e 2.56.1: 832 test su 832, come su Windows; trovato e chiuso un bug sul modo degli hook (C-25, D-089). Aggiornati §2, §6 e §8; il resto è fermo al 2026-11-16.
+> **Aggiornamento 2026-11-17.** Linux provato in WSL2 (Ubuntu 22.04, GCC 11) con git 2.34 e 2.56.1, Windows anche con git 2.56.1: 832 test su 832, come su Windows; trovato e chiuso un bug sul modo degli hook (C-25, D-089). Aggiornati §2, §6 e §8; il resto è fermo al 2026-11-16.
 
 ## 1. In breve
 
