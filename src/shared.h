@@ -31,6 +31,7 @@ typedef struct {
     Str_t pending_src; /* link in attesa: radice della repo sorgente */
     Str_t pending_branch; /* attesa: branch del comando ("" = HEAD staccata, D-077) */
     Str_t pending_path;   /* attesa: path del file, solo per i messaggi (D-077) */
+    Str_t pending_commit; /* unlink in attesa: HEAD al comando (D-081) */
     char id[GS_ID_HEX_LEN + 1U]; /* "" se in .gitshared non e' valido */
     unsigned in_gitshared : 1U; /* sezione in .gitshared (working tree) */
     unsigned in_config : 1U;    /* sezione [shared "<id>"] in .git/config */
@@ -94,8 +95,27 @@ eGsErr_t shared_new_id(char id[GS_ID_HEX_LEN + 1U]);
  *     altrimenti e' annullata dall'utente (git restore) e si scarta;
  *   - altrimenti l'attesa resta.
  * Senza branch registrato (HEAD staccata al comando) vale HEAD.
- * Nella v0: set e link.
+ *
+ * unlink (D-081): si completa quando HEAD o un branch locale discende dal
+ * commit del comando e il suo .gitshared non dichiara piu' l'ID; si
+ * scarta sul branch del comando se la sezione e' tornata nel working tree.
  */
 eGsErr_t repo_complete_pending(Repo_t *r, GitBatch_t *b);
+
+/* *declared = 1 se il .gitshared committato in <rev> dichiara l'ID. */
+eGsErr_t repo_rev_declares(GitBatch_t *b, const char *rev, const char *id,
+                           int *declared);
+
+/* Un branch locale il cui .gitshared committato dichiara l'ID (D-079):
+ * *found = 1 e il nome in branch (senza "refs/heads/"). */
+eGsErr_t repo_declaring_branch(const char *id, GitBatch_t *b, Str_t *branch,
+                               int *found);
+
+/*
+ * Toglie i dati locali di un file shared (REQ-F-003): i peer dimenticano
+ * questa repo, refs/shared/<id> (e le ref di lavoro) e la sezione
+ * [shared "<id>"] spariscono. Un peer irraggiungibile e' un avviso.
+ */
+eGsErr_t repo_forget(const Repo_t *r, SharedEntry_t *e, GitBatch_t *b);
 
 #endif /* GS_SHARED_H */

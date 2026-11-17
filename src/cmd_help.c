@@ -22,6 +22,7 @@ static const char manual[] =
     "    git shared set [-c | -m <message>] [--] <path>\n"
     "    git shared link [-c | -m <message>] [--] <source-file> "
     "[<destination>]\n"
+    "    git shared unlink [-c | -m <message>] [--] <path>\n"
     "    git shared status\n"
     "    git shared publish [<path>]\n"
     "    git shared update [-f] [-c | -m <message>] [<path>]\n"
@@ -47,6 +48,11 @@ static const char manual[] =
     "        from its latest version and staged with .gitshared. When they\n"
     "        are committed the repositories become peers: each one learns\n"
     "        about the other and about the other peers.\n"
+    "\n"
+    "    unlink [-c | -m <message>] [--] <path>\n"
+    "        Stop sharing a file. The file stays, as a regular file. When\n"
+    "        .gitshared is committed, the other repositories forget this\n"
+    "        one. To cancel before the commit: git restore .gitshared.\n"
     "\n"
     "    publish [<path>]\n"
     "        For each shared file changed and committed on top of the\n"
@@ -112,6 +118,7 @@ static const struct {
     { "publish", MSG_USAGE_PUBLISH },
     { "set", MSG_USAGE_SET },
     { "status", MSG_USAGE_STATUS },
+    { "unlink", MSG_USAGE_UNLINK },
     { "update", MSG_USAGE_UPDATE },
 };
 

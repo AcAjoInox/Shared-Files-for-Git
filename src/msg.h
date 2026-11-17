@@ -15,6 +15,7 @@ typedef enum {
     MSG_USAGE_HELP,
     MSG_USAGE_SET,
     MSG_USAGE_LINK,
+    MSG_USAGE_UNLINK,
     MSG_USAGE_PUBLISH,
     MSG_USAGE_UPDATE,
     MSG_USAGE_STATUS,
@@ -51,6 +52,9 @@ typedef enum {
     MSG_ERR_DEST_EXISTS,     /* path */
     MSG_ERR_ALREADY_LINKED,  /* nome, id */
     MSG_ERR_RELINK_PATH,     /* nome, path */
+    MSG_ERR_PENDING_OP,      /* path */
+    MSG_ERR_UNLINK_UNCOMMITTED, /* path */
+    MSG_ERR_UNLINK_ELSEWHERE, /* id, branch */
     MSG_ERR_WRITE_FILE,      /* path */
     MSG_ERR_NOT_SHARED_PATH, /* path */
     MSG_ERR_LOCAL_CHANGES,   /* path */
@@ -78,6 +82,10 @@ typedef enum {
     MSG_LINK_STAGED,         /* path, nome, repo sorgente */
     MSG_LINK_DONE,           /* path, nome, repo sorgente */
     MSG_LINK_COMMIT_MSG,     /* path */
+    MSG_UNLINK_STAGED,       /* path */
+    MSG_UNLINK_DONE,         /* path */
+    MSG_UNLINK_COMMIT_MSG,   /* path */
+    MSG_UNLINK_ORPHAN,       /* id */
     MSG_PUB_CREATED,         /* file */
     MSG_PUB_PUSHED,          /* file, peer raggiunti (unsigned), peer (unsigned) */
     MSG_PUB_NO_PEERS,        /* file */

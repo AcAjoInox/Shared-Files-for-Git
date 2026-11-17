@@ -210,7 +210,7 @@ int cmd_link(int argc, char **argv)
 
     /* --- scrittura: attesa per prima (come set) ------------------------- */
     if (cmd_set_pending(&repo, str_cstr(&id), "link", str_cstr(&dest),
-                        str_cstr(&src.top)) != GS_OK) {
+                        str_cstr(&src.top), NULL) != GS_OK) {
         msg_error(MSG_ERR_PENDING);
         goto exit;
     }

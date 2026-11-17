@@ -46,4 +46,9 @@ void peers_incoming_ref(Str_t *ref, const char *id, unsigned k);
 void peers_announce(const char *id, const Str_t *peers, const char *self,
                     PeerTally_t *t);
 
+/* Toglie `self` dai peer di ogni peer (unlink, REQ-F-003). Un peer che
+ * non lo conosceva gia' piu' non e' un errore. */
+void peers_forget(const char *label, const char *id, const Str_t *peers,
+                  const char *self, PeerTally_t *t);
+
 #endif /* GS_PEERS_H */

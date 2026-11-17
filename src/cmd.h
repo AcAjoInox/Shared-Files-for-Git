@@ -14,6 +14,7 @@ int cmd_link(int argc, char **argv);
 int cmd_publish(int argc, char **argv);
 int cmd_set(int argc, char **argv);
 int cmd_status(int argc, char **argv);
+int cmd_unlink(int argc, char **argv);
 int cmd_update(int argc, char **argv);
 
 #endif /* GS_CMD_H */

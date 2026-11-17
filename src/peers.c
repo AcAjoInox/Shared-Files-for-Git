@@ -160,6 +160,49 @@ void peers_fetch(const char *label, const char *id, const Str_t *peers,
     free(jobs);
 }
 
+void peers_forget(const char *label, const char *id, const Str_t *peers,
+                  const char *self, PeerTally_t *t)
+{
+    /* --fixed-value --unset-all: toglie solo la riga uguale a self. */
+    const char *args[] = { NULL, "config", "--fixed-value", "--unset-all",
+                           NULL, self, NULL };
+    size_t n = str_zcount(peers);
+    Job_t *jobs = xmalloc(((n > 0U) ? n : 1U) * sizeof *jobs);
+    Str_t key = STR_INIT;
+    Str_t dir = STR_INIT;
+    Str_t out = STR_INIT;
+    const char *peer;
+    size_t k;
+    int code;
+
+    str_addf(&key, "shared.%s.peer", id);
+    args[4] = str_cstr(&key);
+    for (k = 0U, peer = str_znext(peers, NULL); peer != NULL;
+         k++, peer = str_znext(peers, peer)) {
+        git_dir_arg(&dir, peer);
+        args[0] = str_cstr(&dir);
+        jobs[k].started = (git_start(&jobs[k].p, args,
+                                     PROC_STDERR_NULL | PROC_CLEAN_ENV) == GS_OK);
+    }
+    for (k = 0U, peer = str_znext(peers, NULL); peer != NULL;
+         k++, peer = str_znext(peers, peer)) {
+        code = -1;
+        if (jobs[k].started && (proc_collect(&jobs[k].p, &out, &code) != GS_OK)) {
+            code = -1;
+        }
+        if ((code == 0) || (code == 5)) { /* 5 = non c'era */
+            t->ok++;
+        } else {
+            t->unreachable++;
+            msg_warning(MSG_WARN_PEER_UNREACHABLE, label, peer);
+        }
+    }
+    str_free(&out);
+    str_free(&dir);
+    str_free(&key);
+    free(jobs);
+}
+
 void peers_announce(const char *id, const Str_t *peers, const char *self,
                     PeerTally_t *t)
 {

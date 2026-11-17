@@ -107,7 +107,7 @@ Le repo stanno su un servizio di hosting. I peer non sono più path ma **URL**, 
 |---|---|
 | `git shared set <file>` | Dichiara shared un file della repo corrente |
 | `git shared link <file-in-altra-repo> [<destinazione>]` | Collega alla repo corrente un file shared di un'altra repo |
-| `git shared unlink <file>` | Toglie il file dalla condivisione; resta come file normale |
+| `git shared unlink <file>` | Toglie il file dalla condivisione; resta come file normale. Al commit gli altri progetti dimenticano questo |
 | `git shared status` | Mostra lo stato di ogni file shared |
 | `git shared update [<file>]` | Prende le versioni dai peer e applica l'ultima |
 | `git shared publish [<file>]` | Crea la nuova versione e la invia ai peer |

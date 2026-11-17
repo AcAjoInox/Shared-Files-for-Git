@@ -12,6 +12,7 @@ static const char *const msg_en[] = {
         "\n"
         "    set       declare a file of this repository as shared\n"
         "    link      link a shared file of another repository\n"
+        "    unlink    stop sharing a file\n"
         "    status    show the shared files of this repository\n"
         "    publish   send new versions to the peers\n"
         "    update    get the new versions and apply them\n"
@@ -34,6 +35,13 @@ static const char *const msg_en[] = {
         "(default: as in the source)\n"
         "    -c, --commit      commit right away\n"
         "    -m <message>      commit right away with <message>\n",
+    [MSG_USAGE_UNLINK] =
+        "usage: git shared unlink [-c | -m <message>] [--] <path>\n"
+        "\n"
+        "Stop sharing <path>. The file stays, as a regular file.\n"
+        "\n"
+        "    -c, --commit      commit .gitshared right away\n"
+        "    -m <message>      commit .gitshared right away with <message>\n",
     [MSG_USAGE_PUBLISH] =
         "usage: git shared publish [<path>]\n",
     [MSG_USAGE_UPDATE] =
@@ -92,6 +100,12 @@ static const char *const msg_en[] = {
     [MSG_ERR_DEST_EXISTS] =
         "'%s' already exists: linking an existing file is not supported yet",
     [MSG_ERR_ALREADY_LINKED] = "'%s' is already shared here (id %s)",
+    [MSG_ERR_PENDING_OP] =
+        "'%s' has a pending operation: commit .gitshared first, or restore it",
+    [MSG_ERR_UNLINK_UNCOMMITTED] =
+        "'%s' is not committed in .gitshared on this branch: commit it first",
+    [MSG_ERR_UNLINK_ELSEWHERE] =
+        "%s is still shared on branch '%s': run unlink there",
     [MSG_ERR_RELINK_PATH] =
         "'%s' is declared here at '%s': run link without <destination>",
     [MSG_ERR_WRITE_FILE] = "cannot write '%s'",
@@ -135,6 +149,11 @@ static const char *const msg_en[] = {
         "'%s' linked as '%s' from %s. Commit it with .gitshared to confirm.",
     [MSG_LINK_DONE] = "'%s' linked as '%s' from %s.",
     [MSG_LINK_COMMIT_MSG] = "Link %s",
+    [MSG_UNLINK_STAGED] =
+        "'%s' is no longer shared. Commit .gitshared to confirm.",
+    [MSG_UNLINK_DONE] = "'%s' is no longer shared: it is now a regular file.",
+    [MSG_UNLINK_COMMIT_MSG] = "Unshare %s",
+    [MSG_UNLINK_ORPHAN] = "Removed the leftover local data of %s.",
     [MSG_PUB_CREATED] = "%s: new version created",
     [MSG_PUB_PUSHED] = "%s: sent to %u of %u peers",
     [MSG_PUB_NO_PEERS] = "%s: no peers to send it to",

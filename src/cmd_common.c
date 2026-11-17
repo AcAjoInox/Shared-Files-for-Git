@@ -102,7 +102,8 @@ static eGsErr_t set_key(const char *id, const char *field, const char *value)
 }
 
 eGsErr_t cmd_set_pending(const Repo_t *r, const char *id, const char *op,
-                         const char *path, const char *src)
+                         const char *path, const char *src,
+                         const char *commit)
 {
     /* "pending" per ultima: senza di lei le altre chiavi sono ignorate,
      * quindi un'interruzione non lascia un'attesa senza branch (D-077). */
@@ -113,6 +114,9 @@ eGsErr_t cmd_set_pending(const Repo_t *r, const char *id, const char *op,
     }
     if ((err == GS_OK) && (src != NULL)) {
         err = set_key(id, "pendingSource", src);
+    }
+    if ((err == GS_OK) && (commit != NULL)) {
+        err = set_key(id, "pendingCommit", commit);
     }
     if (err == GS_OK) {
         err = set_key(id, "pending", op);
@@ -189,8 +193,8 @@ exit:
 
 eGsErr_t cmd_stage(const Repo_t *r, const char *path)
 {
-    const char *args[] = { "-C", NULL, "update-index", "--add", "--", path,
-                           NULL };
+    const char *args[] = { "-C", NULL, "update-index", "--add", "--remove",
+                           "--", path, NULL };
 
     args[1] = str_cstr(&r->top);
     return git_run(args, 0U, NULL);

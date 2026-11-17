@@ -8,6 +8,7 @@
 
 #include "chain.h"
 #include "mem.h"
+#include "merge.h"
 #include "msg.h"
 #include "peers.h"
 #include "sys.h"
@@ -36,6 +37,7 @@ static void entry_init(SharedEntry_t *e)
     str_init(&e->pending_src);
     str_init(&e->pending_branch);
     str_init(&e->pending_path);
+    str_init(&e->pending_commit);
     e->id[0] = '\0';
     e->in_gitshared = 0U;
     e->in_config = 0U;
@@ -52,6 +54,7 @@ static void entry_free(SharedEntry_t *e)
     str_free(&e->pending_src);
     str_free(&e->pending_branch);
     str_free(&e->pending_path);
+    str_free(&e->pending_commit);
 }
 
 void repo_close(Repo_t *r)
@@ -271,6 +274,9 @@ static void parse_local_rec(Repo_t *r, const char *rec)
         } else if (field_is(&k, "pendingpath")) {
             str_reset(&e->pending_path);
             str_add(&e->pending_path, k.value);
+        } else if (field_is(&k, "pendingcommit")) {
+            str_reset(&e->pending_commit);
+            str_add(&e->pending_commit, k.value);
         } else if (field_is(&k, "branch")) {
             str_addz(&e->branches, k.value);
         } else if (field_is(&k, "peer")) {
@@ -554,12 +560,16 @@ static eGsErr_t end_pending(SharedEntry_t *e)
     if ((err == GS_OK) && (e->pending_branch.len > 0U)) {
         err = config_unset(e->id, "pendingbranch");
     }
+    if ((err == GS_OK) && (e->pending_commit.len > 0U)) {
+        err = config_unset(e->id, "pendingcommit");
+    }
     if (err == GS_OK) {
         e->pending = SHARED_PENDING_NONE;
         e->in_config = 1U;
         str_reset(&e->pending_src);
         str_reset(&e->pending_path);
         str_reset(&e->pending_branch);
+        str_reset(&e->pending_commit);
     }
     return err;
 }
@@ -768,6 +778,239 @@ static eGsErr_t find_on_branches(const char *id, GitBatch_t *b,
     return err;
 }
 
+eGsErr_t repo_declaring_branch(const char *id, GitBatch_t *b, Str_t *branch,
+                               int *found)
+{
+    static const char heads[] = "refs/heads/";
+    Repo_t declared = REPO_INIT;
+    Str_t rev = STR_INIT;
+    const SharedEntry_t *committed = NULL;
+    eGsErr_t err = find_on_branches(id, b, &declared, &rev, &committed);
+
+    *found = (err == GS_OK) && (committed != NULL);
+    if (*found) {
+        str_reset(branch);
+        str_add(branch, (strncmp(str_cstr(&rev), heads, sizeof heads - 1U) == 0)
+                            ? (str_cstr(&rev) + (sizeof heads - 1U))
+                            : str_cstr(&rev));
+    }
+    repo_close(&declared);
+    str_free(&rev);
+    return err;
+}
+
+/* ---- unlink (REQ-F-003, D-081) ------------------------------------------ */
+
+eGsErr_t repo_rev_declares(GitBatch_t *b, const char *rev, const char *id,
+                           int *declared)
+{
+    Repo_t d = REPO_INIT;
+    Str_t name = STR_INIT;
+    Oid_t oid;
+    eGsErr_t err = GS_OK;
+
+    *declared = 0;
+    str_addf(&name, "%s:.gitshared", rev);
+    if (git_batch_blob(b, str_cstr(&name), &oid)) {
+        err = repo_load_gitshared(&d, str_cstr(&name), 1, 0);
+        *declared = (err == GS_OK) && (repo_find_id(&d, id) != NULL);
+    }
+    repo_close(&d);
+    str_free(&name);
+    return err;
+}
+
+eGsErr_t repo_forget(const Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
+{
+    PeerTally_t tally = { 0U, 0U, 0U };
+    Str_t refs = STR_INIT;
+    Str_t name = STR_INIT;
+    Oid_t oid;
+    size_t k;
+    size_t n = str_zcount(&e->peers) + 1U;
+    eGsErr_t err;
+
+    /* 1. I peer dimenticano questa repo (B-07: irraggiungibile = avviso). */
+    peers_forget(pending_label(e), e->id, &e->peers, str_cstr(&r->top), &tally);
+
+    /* 2. Catena e ref di lavoro. */
+    chain_ref(&name, e->id);
+    if (git_batch_query(b, str_cstr(&name), &oid) == GIT_OBJ_COMMIT) {
+        str_addz(&refs, str_cstr(&name));
+    }
+    merge_ref(&name, e->id);
+    if (git_batch_query(b, str_cstr(&name), &oid) == GIT_OBJ_COMMIT) {
+        str_addz(&refs, str_cstr(&name));
+    }
+    for (k = 0U; k < n; k++) {
+        peers_incoming_ref(&name, e->id, (unsigned)k);
+        if (git_batch_query(b, str_cstr(&name), &oid) == GIT_OBJ_COMMIT) {
+            str_addz(&refs, str_cstr(&name));
+        }
+    }
+    err = git_delete_refs(&refs);
+
+    /* 3. Per ultima la sezione locale, attesa compresa: se ci si ferma
+     * prima, il comando successivo ripete tutto. */
+    if (err == GS_OK) {
+        str_reset(&name);
+        str_addf(&name, "shared.%s", e->id);
+        err = config_run("--remove-section", str_cstr(&name), NULL);
+    }
+    if (err == GS_OK) {
+        e->in_config = 0U;
+        e->pending = SHARED_PENDING_NONE;
+        str_reset(&e->peers);
+        str_reset(&e->branches);
+        str_reset(&e->pending_path);
+        str_reset(&e->pending_branch);
+        str_reset(&e->pending_commit);
+    }
+    str_free(&name);
+    str_free(&refs);
+    return err;
+}
+
+/* 1 se a e' antenato di b (o uguale). */
+static int is_ancestor(const char *a, const char *b)
+{
+    const char *args[] = { "merge-base", "--is-ancestor", a, b, NULL };
+    Str_t out = STR_INIT;
+    int code = 1;
+
+    if (git_capture(args, PROC_STDERR_NULL, &out, &code) != GS_OK) {
+        code = 1;
+    }
+    str_free(&out);
+    return code == 0;
+}
+
+/*
+ * Commit di conferma di un unlink tra le revisioni date (elenco compatto):
+ * una revisione che discende dal commit del comando e il cui .gitshared
+ * non dichiara piu' l'ID. Un branch nato prima del comando non discende da
+ * quel commit; il commit del comando dichiara l'ID. Ogni punta e ogni
+ * .gitshared distinti si guardano una volta sola.
+ */
+static eGsErr_t unlink_confirmed(const SharedEntry_t *e, GitBatch_t *b,
+                                 const Str_t *revs, int *found)
+{
+    OidList_t tips = OIDLIST_INIT;
+    OidList_t with = OIDLIST_INIT;    /* .gitshared che dichiarano l'ID */
+    OidList_t without = OIDLIST_INIT; /* .gitshared che non lo dichiarano */
+    Str_t name = STR_INIT;
+    const char *rev;
+    Oid_t tip;
+    Oid_t blob;
+    int declared = 0;
+    eGsErr_t err = GS_OK;
+
+    *found = 0;
+    for (rev = str_znext(revs, NULL); (rev != NULL) && (*found == 0) && (err == GS_OK);
+         rev = str_znext(revs, rev)) {
+        if ((git_batch_query(b, rev, &tip) != GIT_OBJ_COMMIT) ||
+            oidlist_has(&tips, &tip)) {
+            continue;
+        }
+        oidlist_add(&tips, &tip);
+        str_reset(&name);
+        str_addf(&name, "%s:.gitshared", rev);
+        if (!git_batch_blob(b, str_cstr(&name), &blob)) {
+            declared = 0; /* .gitshared tolto del tutto */
+        } else if (oidlist_has(&with, &blob)) {
+            declared = 1;
+        } else if (oidlist_has(&without, &blob)) {
+            declared = 0;
+        } else {
+            err = repo_rev_declares(b, rev, e->id, &declared);
+            oidlist_add(declared ? &with : &without, &blob);
+        }
+        if ((err == GS_OK) && (declared == 0) &&
+            is_ancestor(str_cstr(&e->pending_commit), rev)) {
+            *found = 1;
+        }
+    }
+    oidlist_free(&without);
+    oidlist_free(&with);
+    oidlist_free(&tips);
+    str_free(&name);
+    return err;
+}
+
+/* Tutti i branch locali, in un elenco compatto. */
+static eGsErr_t local_branches(Str_t *out)
+{
+    static const char *const args[] = { "for-each-ref", "--format=%(refname)",
+                                        "refs/heads", NULL };
+    Str_t lines = STR_INIT;
+    char *line;
+    char *nl;
+    eGsErr_t err = git_run(args, 0U, &lines);
+
+    line = (err == GS_OK) ? lines.buf : NULL;
+    while ((line != NULL) && (*line != '\0')) {
+        nl = strchr(line, '\n');
+        if (nl != NULL) {
+            *nl = '\0';
+        }
+        str_addz(out, line);
+        line = (nl != NULL) ? (nl + 1) : NULL;
+    }
+    str_free(&lines);
+    return err;
+}
+
+/*
+ * Un'attesa di unlink (D-081): completa, scarta o lascia com'e'.
+ * Prima il branch del comando e HEAD; tutti i branch solo se si sta per
+ * scartare o il branch del comando non c'e' piu' (come D-079).
+ */
+static eGsErr_t settle_unlink(Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
+{
+    Str_t revs = STR_INIT;
+    Str_t name = STR_INIT;
+    Oid_t oid;
+    int on_branch = 1;
+    int exists = 1;
+    int found = 0;
+    eGsErr_t err = GS_OK;
+
+    if (e->pending_branch.len > 0U) {
+        str_addf(&name, "refs/heads/%s", str_cstr(&e->pending_branch));
+        on_branch = str_eq(&r->branch, str_cstr(&e->pending_branch));
+        exists = (git_batch_query(b, str_cstr(&name), &oid) == GIT_OBJ_COMMIT);
+        if (exists) {
+            str_addz(&revs, str_cstr(&name));
+        }
+    }
+    str_addz(&revs, "HEAD");
+    err = unlink_confirmed(e, b, &revs, &found);
+    if ((err == GS_OK) && (found == 0) &&
+        ((on_branch && e->in_gitshared) || !exists)) {
+        str_reset(&revs);
+        err = local_branches(&revs);
+        if (err == GS_OK) {
+            err = unlink_confirmed(e, b, &revs, &found);
+        }
+    }
+
+    if ((err == GS_OK) && (found != 0)) {
+        err = repo_forget(r, e, b);
+    } else if ((err == GS_OK) && on_branch && e->in_gitshared) {
+        /* la sezione e' tornata (git restore): unlink annullato */
+        msg_warning(MSG_WARN_DISCARDED, pending_label(e));
+        err = end_pending(e);
+    } else if ((err == GS_OK) && !exists) {
+        msg_warning(MSG_WARN_PENDING_NO_BRANCH, pending_label(e),
+                    str_cstr(&e->pending_branch), e->id);
+    } else {
+        /* ancora in attesa di commit */
+    }
+    str_free(&name);
+    str_free(&revs);
+    return err;
+}
+
 /* Un'attesa (set o link): completa, scarta o lascia com'e' (D-077). */
 static eGsErr_t settle_pending(Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
 {
@@ -859,6 +1102,10 @@ eGsErr_t repo_complete_pending(Repo_t *r, GitBatch_t *b)
         if ((r->v[i].pending == SHARED_PENDING_SET) ||
             (r->v[i].pending == SHARED_PENDING_LINK)) {
             err = settle_pending(r, &r->v[i], b);
+        } else if (r->v[i].pending == SHARED_PENDING_UNLINK) {
+            err = settle_unlink(r, &r->v[i], b);
+        } else {
+            /* nessuna attesa */
         }
     }
     return err;

@@ -38,11 +38,13 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
 int cmd_open(Repo_t *r, GitBatch_t *b);
 
 /* Operazione in attesa in .git/config (REQ-F-023, D-077): op = "set" |
- * "link"; path = path del file (per i messaggi); src = radice della
- * sorgente per link, NULL altrimenti. Registra anche il branch corrente,
- * su cui si cerchera' il commit di conferma. */
+ * "link" | "unlink"; path = path del file (per i messaggi); src = radice
+ * della sorgente per link, NULL altrimenti; commit = HEAD al comando per
+ * unlink (D-081), NULL altrimenti. Registra anche il branch corrente, su
+ * cui si cerchera' il commit di conferma. */
 eGsErr_t cmd_set_pending(const Repo_t *r, const char *id, const char *op,
-                         const char *path, const char *src);
+                         const char *path, const char *src,
+                         const char *commit);
 
 /*
  * Sezione [shared "<name>"] in .gitshared (id, path, branch corrente come
@@ -52,7 +54,8 @@ eGsErr_t cmd_set_pending(const Repo_t *r, const char *id, const char *op,
 eGsErr_t cmd_write_gitshared(const Repo_t *r, const char *name,
                              const char *id, const char *path);
 
-/* Mette in staging un path relativo alla radice (update-index). */
+/* Mette in staging un path relativo alla radice (update-index), anche
+ * la sua cancellazione se non c'e' piu' nel working tree. */
 eGsErr_t cmd_stage(const Repo_t *r, const char *path);
 
 /* Porta un blob nell'index e nel working tree, senza passare il contenuto
