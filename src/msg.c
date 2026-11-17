@@ -210,6 +210,9 @@ static const char *const msg_en[] = {
     [MSG_WARN_MOVED] =
         "this repository was at %s: if it was moved, run 'git shared "
         "relocate'; if it is a copy, 'git shared relocate --copy'",
+    [MSG_WARN_BRANCHES_GONE] =
+        "%s: none of its active branches exists (%s): "
+        "run 'git shared branch %s -a <branch>'",
     [MSG_WARN_RELOCATE_NOT_MEMBER] = "%s: %s does not share this file: skipped",
     [MSG_HOOK_NOT_ALIGNED] = "%s: %s (run 'git shared %s')",
     [MSG_HOOKS_INSTALLED] = "Hooks installed.",
@@ -286,6 +289,10 @@ static const char *const msg_en[] = {
     [MSG_STATUS_UNDECLARED] = "(not declared in .gitshared)",
     [MSG_STATUS_SUSPENDED] = "suspended on this branch (%s)",
     [MSG_STATUS_PENDING_ON] = "%s (on branch %s)",
+    [MSG_STATUS_FIELD_NOTE] = "note",
+    [MSG_STATUS_BRANCHES_GONE] =
+        "none of its active branches exists (%s): "
+        "git shared branch %s -a <branch>",
 
     [MSG_STATE_ALIGNED] = "aligned",
     [MSG_STATE_TO_APPLY] = "new version to apply",

@@ -108,4 +108,8 @@ int cmd_repo_path(const Repo_t *r, const char *user_path, Str_t *out);
  */
 int cmd_select(Repo_t *r, const char *user_path, unsigned char *sel);
 
+/* Avviso per publish/update lanciati a mano su un branch sospeso (atto
+ * esplicito: si fa); se nessun branch attivo esiste, anche il rimedio. */
+void cmd_warn_suspended(const SharedEntry_t *e, BranchNames_t *bn);
+
 #endif /* GS_CMD_COMMON_H */

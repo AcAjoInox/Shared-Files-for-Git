@@ -97,6 +97,7 @@ typedef enum {
     MSG_WARN_PRUNE_KEPT,     /* file, peer */
     MSG_WARN_BRANCH_MISSING, /* branch */
     MSG_WARN_MOVED,          /* path ricordato */
+    MSG_WARN_BRANCHES_GONE,  /* file, branch attivi, path */
     MSG_WARN_RELOCATE_NOT_MEMBER, /* file, path */
     MSG_HOOK_NOT_ALIGNED,    /* file, stato, comando */
     MSG_HOOKS_INSTALLED,
@@ -160,6 +161,8 @@ typedef enum {
     MSG_STATUS_UNDECLARED,
     MSG_STATUS_SUSPENDED,    /* stato ricavato */
     MSG_STATUS_PENDING_ON,   /* stato, branch */
+    MSG_STATUS_FIELD_NOTE,
+    MSG_STATUS_BRANCHES_GONE, /* branch attivi, path */
 
     MSG_STATE_ALIGNED,
     MSG_STATE_TO_APPLY,

@@ -131,7 +131,7 @@ Gli stati che vedi in `git shared status`:
 | unione in corso | `update` ha trovato un conflitto, oppure l'hai risolto e messo in staging | Correggi il file, `git add`, poi `git shared update`; per rinunciare `git restore -s HEAD -SW <file>` |
 | in attesa di commit | Hai lanciato `set`, `link` o `unlink` ma non hai ancora committato | `git commit`, oppure `git restore` per annullare |
 | incoerente | Il file è stato rinominato o cancellato fuori da `git shared` | `git shared mv` o `git shared unlink` |
-| sospeso | Su questo branch il file non è gestito come shared | Niente, oppure `git shared branch <file> --add <branch>` |
+| sospeso | Su questo branch il file non è gestito come shared. Se nessuno dei suoi branch esiste più (es. lo hai rinominato) te lo dicono `status` e gli avvisi | Niente, oppure `git shared branch <file> -a <branch>` |
 | scollegato | La repo dichiara il file ma non conosce i peer (clone) | `git shared link` |
 
 ## Limiti della prima versione

@@ -84,6 +84,26 @@ SharedEntry_t *repo_find_id(Repo_t *r, const char *id);
 /* 1 se branch e' tra i branch attivi della voce (nomi esatti nella v0). */
 int shared_is_active(const SharedEntry_t *e, const char *branch);
 
+/* Nomi brevi dei branch locali, in un elenco compatto. */
+eGsErr_t repo_branch_names(Str_t *out);
+
+/* Branch locali letti al primo bisogno: un processo solo se serve. */
+typedef struct {
+    Str_t names;
+    unsigned loaded : 1U;
+} BranchNames_t;
+
+#define BRANCHNAMES_INIT { STR_INIT, 0U }
+
+/*
+ * 1 se nessuno dei branch attivi della voce esiste: il file e' sospeso
+ * ovunque, di solito dopo una rinomina (reportIdea B-21, D-085). In
+ * `list` i branch attivi separati da ", ". Un errore nel leggere i branch
+ * vale 0: meglio nessun avviso che uno falso.
+ */
+int shared_branches_gone(BranchNames_t *bn, const SharedEntry_t *e, Str_t *list);
+void branchnames_free(BranchNames_t *bn);
+
 /* Nuovo ID casuale: UUID v4 in 32 cifre esadecimali minuscole (D-006). */
 eGsErr_t shared_new_id(char id[GS_ID_HEX_LEN + 1U]);
 

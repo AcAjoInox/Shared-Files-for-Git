@@ -40,6 +40,8 @@ static void hook_warn(void)
 {
     Repo_t repo = REPO_INIT;
     GitBatch_t batch;
+    BranchNames_t names = BRANCHNAMES_INIT;
+    Str_t list = STR_INIT;
     const SharedEntry_t *e;
     const char *command;
     eState_t st;
@@ -51,6 +53,14 @@ static void hook_warn(void)
     if (git_batch_open(&batch) == GS_OK) {
         for (i = 0U; i < repo.n; i++) {
             e = &repo.v[i];
+            /* Sospeso perche' nessun suo branch esiste piu' (B-21): l'unico
+             * avviso per un file sospeso. */
+            if (e->in_gitshared && e->valid && e->in_config &&
+                (e->pending == SHARED_PENDING_NONE) && !is_live(&repo, e) &&
+                shared_branches_gone(&names, e, &list)) {
+                msg_warning(MSG_WARN_BRANCHES_GONE, str_cstr(&e->path),
+                            str_cstr(&list), str_cstr(&e->path));
+            }
             if (is_live(&repo, e) && (state_derive(&repo, e, &batch, &st, NULL) == GS_OK) &&
                 (st != STATE_ALIGNED) && state_is_derived(st)) {
                 if (st == STATE_TO_COMMIT) {
@@ -67,6 +77,8 @@ static void hook_warn(void)
 
 exit:
     repo_close(&repo);
+    branchnames_free(&names);
+    str_free(&list);
 }
 
 /* "git shared hook install": allinea gli hook (es. in una repo con file

@@ -132,6 +132,62 @@ int shared_is_active(const SharedEntry_t *e, const char *branch)
     return (branch[0] != '\0') && str_zhas(&e->branches, branch);
 }
 
+eGsErr_t repo_branch_names(Str_t *out)
+{
+    static const char *const args[] = { "for-each-ref",
+                                        "--format=%(refname:short)",
+                                        "refs/heads", NULL };
+    Str_t lines = STR_INIT;
+    char *line;
+    char *nl;
+    eGsErr_t err = git_run(args, 0U, &lines);
+
+    for (line = (err == GS_OK) ? lines.buf : NULL; (line != NULL) && (*line != '\0');
+         line = (nl != NULL) ? (nl + 1) : NULL) {
+        nl = strchr(line, '\n');
+        if (nl != NULL) {
+            *nl = '\0';
+        }
+        str_addz(out, line);
+    }
+    str_free(&lines);
+    return err;
+}
+
+int shared_branches_gone(BranchNames_t *bn, const SharedEntry_t *e, Str_t *list)
+{
+    const char *b;
+    int gone = 1;
+
+    if (!bn->loaded) {
+        bn->loaded = 1U;
+        if (repo_branch_names(&bn->names) != GS_OK) {
+            str_reset(&bn->names);
+            str_addz(&bn->names, ""); /* errore: nessun avviso */
+        }
+    }
+    if ((bn->names.len == 1U) && (bn->names.buf[0] == '\0')) {
+        return 0;
+    }
+    str_reset(list);
+    for (b = str_znext(&e->branches, NULL); b != NULL; b = str_znext(&e->branches, b)) {
+        if (str_zhas(&bn->names, b)) {
+            gone = 0;
+        }
+        if (list->len > 0U) {
+            str_add(list, ", ");
+        }
+        str_add(list, b);
+    }
+    return gone;
+}
+
+void branchnames_free(BranchNames_t *bn)
+{
+    str_free(&bn->names);
+    bn->loaded = 0U;
+}
+
 static int id_is_valid(const char *s, size_t len)
 {
     size_t i;

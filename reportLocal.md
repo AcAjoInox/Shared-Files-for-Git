@@ -1,6 +1,6 @@
 # Report sull'uso locale — git shared
 
-> **2026-11-16.** Baseline `project.md` v2.22 (D-001…D-084). Codice v0 con unione delle divergenze, ri-aggancio e comandi di manutenzione completi: 670 test su 670, Windows, git 2.43. Riguarda solo la fase 1 (repo sulla stessa macchina). I bug sono in `reportIdea.md`; qui ci sono due giudizi: l'impatto atteso e la facilità d'uso.
+> **2026-11-16.** Baseline `project.md` v2.23 (D-001…D-085). Codice v0 con unione delle divergenze, ri-aggancio e comandi di manutenzione completi: 696 test su 696, Windows, git 2.43. Riguarda solo la fase 1 (repo sulla stessa macchina). I bug sono in `reportIdea.md`; qui ci sono due giudizi: l'impatto atteso e la facilità d'uso.
 >
 > **Da dove vengono i giudizi.** Dalla lettura del codice, dai test e dalle prove fatte a mano con l'eseguibile durante la ricerca dei bug. Nessuno, a parte l'autore, lo ha ancora usato: la parte sull'uso è una valutazione ragionata, non una misura.
 
@@ -18,7 +18,7 @@
 |---|---|---|---|
 | Uso personale, più repo sulla stessa macchina | Funziona finché nessuno modifica da una versione vecchia; poi "merging is not implemented yet" | Ciclo completo: modifica, pubblicazione, applicazione, unione, conflitto | **Sì, molto** |
 | Robustezza | 1 dato salvato fragile previsto (merge in `.git/`), vicoli ciechi con squash e amend | Stato sempre ricavato; l'unica ref salvata vale solo se l'index la conferma; squash e amend si chiudono con un `update` | **Sì** |
-| Valore come dimostrazione ("un file condiviso con una ref e il solo trasporto git") | Idea documentata, metà realizzata | Realizzata per il locale, con 670 test e un registro di 84 decisioni | **Sì** |
+| Valore come dimostrazione ("un file condiviso con una ref e il solo trasporto git") | Idea documentata, metà realizzata | Realizzata per il locale, con 696 test e un registro di 85 decisioni | **Sì** |
 | Adozione da parte di altri | Di nicchia | Di nicchia | **No** |
 | Uso in un gruppo | Impossibile (una macchina) | Impossibile (una macchina) | **No** |
 
@@ -31,7 +31,7 @@
 **Che cosa è cambiato davvero.** Il rischio del progetto. Prima la parte più difficile, il merge senza stato salvato, era una scommessa; ora è fatta e non ha richiesto di toccare il modello. La fase 2 parte da una base che regge, e il suo dubbio principale resta uno solo: A-01, cioè se gli hosting accettano `refs/shared/*`.
 
 **Che cosa alzerebbe l'impatto, in ordine di resa.**
-1. I comandi di manutenzione sono completi (ri-aggancio, `unlink`, `prune`, `branch`, `relocate`: D-080…D-084). Restano da chiudere i silenzi: un file sospeso per un branch rinominato non avvisa (B-21), un comando su un file in attesa non dice nulla (B-37).
+1. I comandi di manutenzione sono completi (ri-aggancio, `unlink`, `prune`, `branch`, `relocate`: D-080…D-084) e i silenzi principali sono chiusi (D-085): un file sospeso perché il suo branch non esiste più viene segnalato, e un comando su un file in attesa dice perché non fa nulla.
 2. Linux compilato e provato, con B-12 (fine riga) deciso.
 3. La prova di A-01: decide se la fase 2 esiste.
 4. Un confronto pubblico e onesto con git-subrepo, Copybara e peru.
@@ -79,9 +79,9 @@ Situazioni in cui si arriva senza aver sbagliato nulla, con l'uscita che c'è og
 | `set` o `link`, poi `git stash`, poi un comando `git shared`, poi `stash pop` | "discarded pending operation", file *unlinked* | Rilanciare lo stesso `set` o `link`: riprende lo stesso ID | B-40, chiuso |
 | Repo clonata | *unlinked* | `git shared link <path del file in un peer>`: ricollega subito, senza toccare il file. Da evitare `set`, che crea una catena separata | chiuso (D-080) |
 | Branch nato prima del `set` | *inconsistent*, e il tool suggerisce `unlink` | Ignorarlo, o portare `.gitshared` sul branch. `unlink` lì non smonta nulla: rifiuta e indica il branch giusto | B-16 |
-| Il file è shared solo sul branch del `set`; su `main` dopo il merge è *suspended* | Nessun avviso, mai | `git shared branch <file> --add main` | chiuso (D-083); resta il silenzio |
-| Branch rinominato (`git branch -m`) | *suspended*, nessun avviso | `git shared branch` lo segna "no such branch"; `--add <nuovo> --remove <vecchio>` | B-21, attenuato |
-| `publish <file>` o `update <file>` su un file in attesa o scollegato | Nessun output, codice 0 | `status` | B-37 |
+| Il file è shared solo sul branch del `set`; su `main` dopo il merge è *suspended* | Nessun avviso, finché quel branch esiste (è una scelta: potrebbe essere voluto) | `git shared branch <file> -a main` | chiuso (D-083) |
+| Branch rinominato (`git branch -m`) | *suspended*, con una riga `note` in `status` e un avviso dagli hook, da `update` e `publish` | Il comando suggerito: `git shared branch <file> -a <nuovo>` | chiuso (D-085) |
+| `publish <file>` o `update <file>` su un file in attesa o scollegato | Errore con il motivo e codice 1; senza argomento, una riga per il file saltato | Quella suggerita | chiuso (D-085) |
 | Un peer cancellato | "peer not reachable" a ogni `publish` e `update` | `git shared prune`: lo toglie qui e negli altri peer | chiuso (D-082) |
 | Una repo spostata | Al primo comando: "this repository was at …" | `git shared relocate` | chiuso (D-084) |
 | Una repo copiata (`cp -r`, backup) | Lo stesso avviso; `relocate` rifiuta, perché l'originale c'è ancora | `git shared relocate --copy`: la copia diventa un progetto in più | chiuso (D-084) |
@@ -90,7 +90,7 @@ Situazioni in cui si arriva senza aver sbagliato nulla, con l'uscita che c'è og
 | Risolvere un conflitto tenendo esattamente la propria versione | L'unione risulta abbandonata, di nuovo *diverged* | Cambiare almeno un carattere | limite di D-078 |
 | Committare la risoluzione prima di rilanciare `update` | Di nuovo *diverged* | Rilanciare `update`: di solito unisce da solo | limite di D-078 |
 
-Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a mano. Quello che resta è il **silenzio**: un file sospeso per un branch rinominato o mai aggiunto non dà avvisi, e bisogna sapere di lanciare `git shared branch`.
+Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a mano, e nessuna resta muta. Il silenzio che rimane è voluto: un file sospeso su un branch che esiste ancora non avvisa, perché può essere una scelta.
 
 ## 5. Giudizio per tipo di utente
 
@@ -106,10 +106,10 @@ Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a
 - Lo stato si ricava ogni volta dal contenuto della repo: hook saltati, rebase, reset non lo corrompono.
 - Ogni avanzamento della catena è condizionato e solo in fast-forward: una versione non viene mai sovrascritta.
 - Il contenuto del file non passa mai dai buffer del programma: viaggia come blob tra comandi git.
-- 670 test di sistema, che lanciano i comandi come farebbe l'utente.
+- 696 test di sistema, che lanciano i comandi come farebbe l'utente.
 
 **Punti deboli, da sapere.**
-- **Nessun bug grave aperto**, 31 tra medi e minori (`reportIdea.md` §2).
+- **Nessun bug grave aperto**, 29 tra medi e minori (`reportIdea.md` §2).
 - **Solo Windows è provato.** I file `*_posix.c` non sono mai stati compilati.
 - **Fine riga** (B-12): tra repo con normalizzazioni diverse ogni versione risulterebbe una modifica.
 - **La base si ricava dai blob nella storia.** Uno squash la cancella: il file risulta *diverged* anche se non lo è. Con il merge si chiude da solo, ma l'utente vede comunque uno stato che non si aspetta (B-42). Il caso contrario, revert più squash, riporta in silenzio la versione che si voleva togliere.
@@ -119,8 +119,8 @@ Nessuna di queste tredici situazioni richiede più di modificare `.git/config` a
 ## 7. Che cosa farei per l'uso quotidiano, in ordine
 
 1. ~~C-20~~ e ~~ri-aggancio dopo un clone~~: fatti (D-080).
-2. ~~`unlink`~~, ~~`prune`~~, ~~`branch`~~: fatti (D-081…D-083). Prossimo: **`status` che segnala un file sospeso su tutti i branch esistenti** (nomi che non esistono più), per chiudere il silenzio di B-21.
-3. **B-37 e un `status --peers`.** Nessun comando deve restare muto; serve vedere se gli altri hanno la versione.
+2. ~~`unlink`~~, ~~`prune`~~, ~~`branch`~~, ~~`relocate`~~, ~~nota per i branch spariti~~: fatti (D-081…D-085).
+3. ~~B-37~~: fatto (D-085). **`status --peers`**: serve vedere se gli altri hanno la versione.
 4. **B-16.** Toglie *inconsistent* dai branch vecchi, lo stato che confonde di più.
 5. **Un `update` che dopo il commit dell'unione pubblica da solo** (o lo propone): chiude il "due passi per finire" nel caso in cui dimenticarlo costa di più.
 6. **Usarlo davvero per qualche settimana** sugli header reali, annotando ogni volta che serve aprire `.git/config`. È la misura che manca a questo report.

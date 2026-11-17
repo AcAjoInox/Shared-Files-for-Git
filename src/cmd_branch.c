@@ -130,24 +130,7 @@ static int name_is_valid(const char *b)
 /* Branch locali esistenti, nomi brevi, elenco compatto. */
 static eGsErr_t local_branches(Str_t *out)
 {
-    static const char *const args[] = { "for-each-ref",
-                                        "--format=%(refname:short)",
-                                        "refs/heads", NULL };
-    Str_t lines = STR_INIT;
-    char *line;
-    char *nl;
-    eGsErr_t err = git_run(args, 0U, &lines);
-
-    for (line = (err == GS_OK) ? lines.buf : NULL; (line != NULL) && (*line != '\0');
-         line = (nl != NULL) ? (nl + 1) : NULL) {
-        nl = strchr(line, '\n');
-        if (nl != NULL) {
-            *nl = '\0';
-        }
-        str_addz(out, line);
-    }
-    str_free(&lines);
-    return err;
+    return repo_branch_names(out);
 }
 
 /* Elenco di default della voce, dal .gitshared del working tree. */

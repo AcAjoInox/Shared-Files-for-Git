@@ -48,6 +48,8 @@ int cmd_status(int argc, char **argv)
 {
     Repo_t repo = REPO_INIT;
     GitBatch_t batch;
+    BranchNames_t names = BRANCHNAMES_INIT;
+    Str_t list = STR_INIT;
     const SharedEntry_t *e;
     eState_t st;
     size_t i;
@@ -100,6 +102,13 @@ int cmd_status(int argc, char **argv)
                 putchar('\n');
             }
             print_entry(&repo, e, st, suspended);
+            /* Sospeso perche' nessun suo branch esiste piu' (B-21). */
+            if (suspended && shared_branches_gone(&names, e, &list)) {
+                printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+                printf(msg(MSG_STATUS_BRANCHES_GONE), str_cstr(&list),
+                       e->in_gitshared ? str_cstr(&e->path) : e->id);
+                putchar('\n');
+            }
             shown++;
         } else {
             /* attesa appena scartata: niente da mostrare */
@@ -114,5 +123,7 @@ exit:
         git_batch_close(&batch);
     }
     repo_close(&repo);
+    branchnames_free(&names);
+    str_free(&list);
     return rc;
 }

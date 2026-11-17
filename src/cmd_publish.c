@@ -27,6 +27,7 @@ int cmd_publish(int argc, char **argv)
     unsigned char *sel = NULL;
     eState_t st;
     StateInfo_t si;
+    BranchNames_t names = BRANCHNAMES_INIT;
     size_t i;
     int first;
     int opened = 0;
@@ -64,7 +65,7 @@ int cmd_publish(int argc, char **argv)
             goto exit;
         }
         if (state_is_derived(st) && !shared_is_active(e, str_cstr(&repo.branch))) {
-            msg_warning(MSG_WARN_SUSPENDED, label); /* atto esplicito: si fa */
+            cmd_warn_suspended(e, &names); /* atto esplicito: si fa */
         }
         if ((st == STATE_TO_PUBLISH) || (st == STATE_ALIGNED)) {
             if (cmd_publish_entry(e, (st == STATE_TO_PUBLISH) ? &si : NULL) != GS_EXIT_OK) {
@@ -94,5 +95,6 @@ exit:
         git_batch_close(&batch);
         repo_close(&repo);
     }
+    branchnames_free(&names);
     return rc;
 }

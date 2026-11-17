@@ -404,7 +404,7 @@ static int apply(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
  * il comando non puo' proseguire (*rc = GS_EXIT_FATAL). */
 static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
                         const CmdOpts_t *o, Touched_t *touched, int *rc,
-                        int *batch_ok)
+                        int *batch_ok, BranchNames_t *bn)
 {
     const char *label = str_cstr(&e->path);
     OidList_t heads = OIDLIST_INIT; /* versioni dei peer da unire */
@@ -444,7 +444,7 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         goto exit;
     }
     if (state_is_derived(st) && !shared_is_active(e, str_cstr(&r->branch))) {
-        msg_warning(MSG_WARN_SUSPENDED, label); /* atto esplicito: si fa */
+        cmd_warn_suspended(e, bn); /* atto esplicito: si fa */
     }
     tip = si.tip;
 
@@ -571,6 +571,7 @@ int cmd_update(int argc, char **argv)
     Repo_t repo = REPO_INIT;
     GitBatch_t batch;
     Touched_t touched = { STR_INIT, STR_INIT };
+    BranchNames_t names = BRANCHNAMES_INIT;
     unsigned char *sel = NULL;
     Str_t text = STR_INIT;
     const char *p;
@@ -607,7 +608,7 @@ int cmd_update(int argc, char **argv)
     for (i = 0U; i < repo.n; i++) {
         if ((sel[i] != 0U) &&
             !update_entry(&repo, &repo.v[i], &batch, &o, &touched, &rc,
-                          &batch_ok)) {
+                          &batch_ok, &names)) {
             goto exit;
         }
     }
@@ -649,5 +650,6 @@ exit:
     str_free(&text);
     str_free(&touched.merged);
     str_free(&touched.applied);
+    branchnames_free(&names);
     return rc;
 }

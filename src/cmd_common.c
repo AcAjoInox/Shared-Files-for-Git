@@ -381,6 +381,18 @@ exit:
     return rc;
 }
 
+void cmd_warn_suspended(const SharedEntry_t *e, BranchNames_t *bn)
+{
+    Str_t list = STR_INIT;
+
+    msg_warning(MSG_WARN_SUSPENDED, str_cstr(&e->path));
+    if (shared_branches_gone(bn, e, &list)) {
+        msg_warning(MSG_WARN_BRANCHES_GONE, str_cstr(&e->path), str_cstr(&list),
+                    str_cstr(&e->path));
+    }
+    str_free(&list);
+}
+
 int cmd_repo_path(const Repo_t *r, const char *user_path, Str_t *out)
 {
     return !path_is_absolute(user_path) &&
@@ -405,9 +417,31 @@ int cmd_select(Repo_t *r, const char *user_path, unsigned char *sel)
                      ? 1U
                      : 0U;
     }
-    if ((user_path != NULL) && (repo_find_path(r, str_cstr(&full)) == NULL)) {
+    /* Un file che non si puo' scegliere lo dice, con il motivo
+     * (reportIdea B-37): errore se indicato, una riga se no. */
+    e = (user_path != NULL) ? repo_find_path(r, str_cstr(&full)) : NULL;
+    if ((user_path != NULL) && ((e == NULL) || !e->valid)) {
         msg_error(MSG_ERR_NOT_SHARED_PATH, user_path);
         ok = 0;
+    } else if ((e != NULL) && (e->pending != SHARED_PENDING_NONE)) {
+        msg_error(MSG_ERR_PENDING_OP, str_cstr(&e->path));
+        ok = 0;
+    } else if ((e != NULL) && !e->in_config) {
+        msg_error(MSG_ERR_NOT_LINKED, str_cstr(&e->path));
+        ok = 0;
+    } else if (user_path == NULL) {
+        for (i = 0U; i < r->n; i++) {
+            e = &r->v[i];
+            if (e->in_gitshared && e->valid && (sel[i] == 0U)) {
+                printf(msg(MSG_SKIP_STATE), str_cstr(&e->path),
+                       state_name((e->pending != SHARED_PENDING_NONE)
+                                      ? STATE_PENDING
+                                      : STATE_UNLINKED));
+                putchar('\n');
+            }
+        }
+    } else {
+        /* scelto */
     }
     str_free(&full);
     return ok;
