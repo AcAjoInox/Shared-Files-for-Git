@@ -52,20 +52,21 @@ static const char *const msg_en[] = {
         "    -n, --dry-run     only show what would be removed\n",
     [MSG_USAGE_BRANCH] =
         "usage: git shared branch [<path>]\n"
-        "   or: git shared branch <path> (--add | --remove) <branch>\n"
+        "   or: git shared branch <path> (-a | -rm) <branch>\n"
         "   or: git shared branch <path> --reset\n"
-        "   or: git shared branch <path> --default (--add | --remove) <branch>\n"
+        "   or: git shared branch <path> --default (-a | -rm) <branch>\n"
         "                                [-c | -m <message>]\n"
         "\n"
         "Choose the branches where <path> is shared. On the other branches\n"
         "it is a regular file: no warnings, nothing published.\n"
         "\n"
-        "    --add <branch>      share the file on <branch> too\n"
-        "    --remove <branch>   stop sharing the file on <branch>\n"
-        "    --reset             go back to the default list\n"
-        "    --default           change the default list in .gitshared,\n"
-        "                        the one copied by set, link and clones\n"
-        "    -c, -m <message>    with --default: commit .gitshared right away\n",
+        "    -a, --add <branch>       share the file on <branch> too\n"
+        "    -rm, --remove <branch>   stop sharing the file on <branch>\n"
+        "    --reset                  go back to the default list\n"
+        "    --default                change the default list in .gitshared,\n"
+        "                             the one copied by set, link and clones\n"
+        "    -c, -m <message>         with --default: commit .gitshared\n"
+        "                             right away\n",
     [MSG_USAGE_PUBLISH] =
         "usage: git shared publish [<path>]\n",
     [MSG_USAGE_UPDATE] =

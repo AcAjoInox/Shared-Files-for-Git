@@ -113,7 +113,7 @@ Le repo stanno su un servizio di hosting. I peer non sono più path ma **URL**, 
 | `git shared publish [<file>]` | Crea la nuova versione e la invia ai peer |
 | `git shared hook install` | Installa gli hook di avviso, per esempio in una repo i cui file shared non li hanno ancora |
 | `git shared mv <vecchio> <nuovo>` | Rinomina un file shared |
-| `git shared branch [<file>] [--add\|--remove <branch>]` | Mostra o modifica i branch su cui il file è shared (effetto immediato); con `--default` modifica l'elenco di default in `.gitshared`, con `--reset` lo ricopia in locale. Solo nomi esatti |
+| `git shared branch [<file>] [-a\|-rm <branch>]` | Mostra o modifica i branch su cui il file è shared (effetto immediato; `-a` e `-rm` sono le forme brevi di `--add` e `--remove`);\|--remove <branch>]` | Mostra o modifica i branch su cui il file è shared (effetto immediato); con `--default` modifica l'elenco di default in `.gitshared`, con `--reset` lo ricopia in locale. Solo nomi esatti |
 | `git shared prune [-n]` | Toglie dall'elenco i peer cancellati o che non condividono più il file |
 | `git shared relocate <vecchio-path>` | Avvisa i peer che questa repo è stata spostata |
 | `git shared lang <en\|it>` | Sceglie la lingua dei messaggi |

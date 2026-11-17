@@ -169,6 +169,19 @@ git shared branch c.h --add master --remove main >/dev/null
 expect_eq "rinomina: elenco corretto" "$(active "$ID")" "master "
 expect_eq "rinomina: di nuovo allineato" "$(state)" "    state  aligned"
 
+# --- forme brevi -a e -rm ------------------------------------------------------------
+git shared branch c.h -a dev2 >/dev/null
+expect_eq "-a: come --add" "$(active "$ID")" "master dev2 "
+git shared branch c.h -rm dev2 -a feat --remove feat >/dev/null
+expect_eq "-rm: come --remove, anche mescolate" "$(active "$ID")" "master "
+run git shared branch c.h -a
+expect_rc "-a senza valore: codice 129" 129
+git shared branch c.h --default -a hot >/dev/null
+expect_eq "--default -a" "$(dflt c.h)" "main dev hot "
+git shared branch c.h --default -rm hot >/dev/null
+expect_eq "--default -rm" "$(dflt c.h)" "main dev "
+git restore --staged --worktree .gitshared
+
 # --- piu' file ------------------------------------------------------------------------------
 put d.h d
 git shared set -c d.h >/dev/null

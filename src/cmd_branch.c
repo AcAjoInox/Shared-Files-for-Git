@@ -2,7 +2,8 @@
  * cmd_branch.c - branch attivi di un file shared (REQ-F-022, D-083).
  *
  *   git shared branch [<path>]                        mostra gli elenchi
- *   git shared branch <path> (--add | --remove) <b>   elenco locale
+ *   git shared branch <path> (-a | -rm) <b>           elenco locale
+ *                            (forme lunghe: --add, --remove)
  *   git shared branch <path> --reset                  locale = default
  *   git shared branch <path> --default (--add | --remove) <b> [-c | -m <msg>]
  *                                                     default in .gitshared
@@ -42,12 +43,16 @@ static int parse_args(int argc, char **argv, BranchOpts_t *o)
         if (!end_opts && (strcmp(a, "--") == 0)) {
             end_opts = 1;
         } else if (!end_opts && ((strcmp(a, "--add") == 0) ||
-                                 (strcmp(a, "--remove") == 0))) {
+                                 (strcmp(a, "-a") == 0) ||
+                                 (strcmp(a, "--remove") == 0) ||
+                                 (strcmp(a, "-rm") == 0))) {
+            /* -a e -rm: forme brevi di --add e --remove */
             if ((i + 1) >= argc) {
                 msg_error(MSG_ERR_OPT_VALUE, a);
                 ok = 0;
             } else {
-                str_addch(&o->ops, (a[2] == 'a') ? '+' : '-');
+                str_addch(&o->ops, ((strcmp(a, "--add") == 0) ||
+                                    (strcmp(a, "-a") == 0)) ? '+' : '-');
                 str_addz(&o->ops, argv[++i]);
             }
         } else if (!end_opts && (strcmp(a, "--reset") == 0)) {
