@@ -29,6 +29,8 @@ static const char *const manual[] = {
     "    git shared publish [<path>]\n"
     "    git shared update [-f] [-c | -m <message>] [<path>]\n"
     "    git shared prune [-n] [<path>]\n"
+    "    git shared branch [<path>] [--add | --remove <branch>] [--reset]\n"
+    "                      [--default] [-c | -m <message>]\n"
     "    git shared hook install\n"
     "    git shared help [<command>]\n"
     "\n"
@@ -83,6 +85,13 @@ static const char *const manual[] = {
     "        the file, here and in the other peers. A peer that cannot be\n"
     "        read right now is kept. -n only shows what would be removed.\n"
     "\n"
+    "    branch [<path>] [--add | --remove <branch>] [--reset] [--default]\n"
+    "        Show or change the branches where a file is shared. On the\n"
+    "        other branches it is a regular file: no warnings, nothing\n"
+    "        published. The list is local and works at once; --default\n"
+    "        changes the list in .gitshared, copied by set, link and\n"
+    "        clones, and is confirmed by committing .gitshared.\n"
+    "\n"
     "    status\n"
     "        Show each shared file with its state: aligned, new version to\n"
     "        apply, applied (to commit), to publish, diverged, merge in\n"
@@ -123,6 +132,7 @@ static const struct {
     const char *name;
     eMsgId_t usage;
 } topics[] = {
+    { "branch", MSG_USAGE_BRANCH },
     { "help", MSG_USAGE_HELP },
     { "hook", MSG_USAGE_HOOK },
     { "link", MSG_USAGE_LINK },

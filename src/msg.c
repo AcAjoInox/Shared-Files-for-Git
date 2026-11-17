@@ -17,6 +17,7 @@ static const char *const msg_en[] = {
         "    publish   send new versions to the peers\n"
         "    update    get the new versions and apply them\n"
         "    prune     forget the peers that no longer exist\n"
+        "    branch    choose the branches where a file is shared\n"
         "    help      show the manual\n"
         "\n"
         "'git shared <command> -h' shows the options of a command.\n",
@@ -49,6 +50,22 @@ static const char *const msg_en[] = {
         "Forget the peers that no longer exist or no longer share the file.\n"
         "\n"
         "    -n, --dry-run     only show what would be removed\n",
+    [MSG_USAGE_BRANCH] =
+        "usage: git shared branch [<path>]\n"
+        "   or: git shared branch <path> (--add | --remove) <branch>\n"
+        "   or: git shared branch <path> --reset\n"
+        "   or: git shared branch <path> --default (--add | --remove) <branch>\n"
+        "                                [-c | -m <message>]\n"
+        "\n"
+        "Choose the branches where <path> is shared. On the other branches\n"
+        "it is a regular file: no warnings, nothing published.\n"
+        "\n"
+        "    --add <branch>      share the file on <branch> too\n"
+        "    --remove <branch>   stop sharing the file on <branch>\n"
+        "    --reset             go back to the default list\n"
+        "    --default           change the default list in .gitshared,\n"
+        "                        the one copied by set, link and clones\n"
+        "    -c, -m <message>    with --default: commit .gitshared right away\n",
     [MSG_USAGE_PUBLISH] =
         "usage: git shared publish [<path>]\n",
     [MSG_USAGE_UPDATE] =
@@ -114,6 +131,23 @@ static const char *const msg_en[] = {
     [MSG_ERR_UNLINK_ELSEWHERE] =
         "%s is still shared on branch '%s': run unlink there",
     [MSG_ERR_PRUNE] = "%s: cannot remove peer %s",
+    [MSG_ERR_NOT_LINKED] =
+        "'%s' is not linked here: run 'git shared link' first",
+    [MSG_ERR_BRANCH_RESET_ALONE] =
+        "--reset cannot be used with --add, --remove or --default",
+    [MSG_ERR_BRANCH_DEFAULT_OP] = "--default needs --add or --remove",
+    [MSG_ERR_BRANCH_COMMIT] = "-c and -m can only be used with --default",
+    [MSG_ERR_BRANCH_PATTERN] =
+        "branch patterns are not supported yet: '%s' (use exact names)",
+    [MSG_ERR_BRANCH_NAME] = "invalid branch name: '%s'",
+    [MSG_ERR_BRANCH_NOT_IN] = "%s: '%s' is not in the list",
+    [MSG_ERR_BRANCH_WRITE] = "%s: cannot change the active branches",
+    [MSG_ERR_BRANCH_LAST] =
+        "%s: it must stay active on at least one branch "
+        "(to stop sharing it: git shared unlink)",
+    [MSG_ERR_BRANCH_DETACHED] =
+        "%s: no default in .gitshared and HEAD is detached: "
+        "use --add <branch>",
     [MSG_ERR_RELINK_PATH] =
         "'%s' is declared here at '%s': run link without <destination>",
     [MSG_ERR_WRITE_FILE] = "cannot write '%s'",
@@ -148,6 +182,7 @@ static const char *const msg_en[] = {
         "%s: the merge in progress was abandoned: dropped",
     [MSG_WARN_PRUNE_KEPT] =
         "%s: peer %s cannot be read now: kept",
+    [MSG_WARN_BRANCH_MISSING] = "no branch named '%s' yet",
     [MSG_HOOK_NOT_ALIGNED] = "%s: %s (run 'git shared %s')",
     [MSG_HOOKS_INSTALLED] = "Hooks installed.",
 
@@ -172,6 +207,19 @@ static const char *const msg_en[] = {
         "%s: would remove peer %s (it no longer shares the file)",
     [MSG_PRUNE_WOULD_REF] = "would remove leftover %s",
     [MSG_PRUNE_NOTHING] = "Nothing to prune.",
+    [MSG_BRANCH_FIELD_ACTIVE] = "active",
+    [MSG_BRANCH_FIELD_DEFAULT] = "default",
+    [MSG_BRANCH_CURRENT] = "current",
+    [MSG_BRANCH_MISSING] = "no such branch",
+    [MSG_BRANCH_NONE] = "(none)",
+    [MSG_BRANCH_NOT_LINKED] = "(not linked here)",
+    [MSG_BRANCH_ADDED] = "%s: active on '%s'",
+    [MSG_BRANCH_REMOVED] = "%s: no longer active on '%s'",
+    [MSG_BRANCH_DEFAULT_ADDED] = "%s: '%s' added to the default",
+    [MSG_BRANCH_DEFAULT_REMOVED] = "%s: '%s' removed from the default",
+    [MSG_BRANCH_DEFAULT_STAGED] = "Commit .gitshared to confirm.",
+    [MSG_BRANCH_RESET] = "%s: active branches reset to the default",
+    [MSG_BRANCH_COMMIT_MSG] = "Change the default branches of %s",
     [MSG_PUB_CREATED] = "%s: new version created",
     [MSG_PUB_PUSHED] = "%s: sent to %u of %u peers",
     [MSG_PUB_NO_PEERS] = "%s: no peers to send it to",

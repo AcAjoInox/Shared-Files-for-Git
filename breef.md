@@ -113,7 +113,7 @@ Le repo stanno su un servizio di hosting. I peer non sono più path ma **URL**, 
 | `git shared publish [<file>]` | Crea la nuova versione e la invia ai peer |
 | `git shared hook install` | Installa gli hook di avviso, per esempio in una repo i cui file shared non li hanno ancora |
 | `git shared mv <vecchio> <nuovo>` | Rinomina un file shared |
-| `git shared branch <file> [--add\|--remove <branch>]` | Mostra o modifica i branch su cui il file è shared; con `--default` modifica l'elenco di default in `.gitshared`, con `--reset` lo ricopia in locale |
+| `git shared branch [<file>] [--add\|--remove <branch>]` | Mostra o modifica i branch su cui il file è shared (effetto immediato); con `--default` modifica l'elenco di default in `.gitshared`, con `--reset` lo ricopia in locale. Solo nomi esatti |
 | `git shared prune [-n]` | Toglie dall'elenco i peer cancellati o che non condividono più il file |
 | `git shared relocate <vecchio-path>` | Avvisa i peer che questa repo è stata spostata |
 | `git shared lang <en\|it>` | Sceglie la lingua dei messaggi |
@@ -131,7 +131,7 @@ Gli stati che vedi in `git shared status`:
 | unione in corso | `update` ha trovato un conflitto, oppure l'hai risolto e messo in staging | Correggi il file, `git add`, poi `git shared update`; per rinunciare `git restore -s HEAD -SW <file>` |
 | in attesa di commit | Hai lanciato `set`, `link` o `unlink` ma non hai ancora committato | `git commit`, oppure `git restore` per annullare |
 | incoerente | Il file è stato rinominato o cancellato fuori da `git shared` | `git shared mv` o `git shared unlink` |
-| sospeso | Su questo branch il file non è gestito come shared | Niente, oppure `git shared branch --add` |
+| sospeso | Su questo branch il file non è gestito come shared | Niente, oppure `git shared branch <file> --add <branch>` |
 | scollegato | La repo dichiara il file ma non conosce i peer (clone) | `git shared link` |
 
 ## Limiti della prima versione
