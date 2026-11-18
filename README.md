@@ -1,109 +1,115 @@
-# Git Shared Files
+🇮🇹 [Leggi in italiano](README.it.md)
+🇬🇧 [Read in English](README.md)
 
-Lo stesso file in più repository git, sempre allineato.
+# Shared Files per Git
 
-Un header comune, un file di configurazione, uno script: spesso servono a più progetti, e copiarli a mano porta prima o poi a copie diverse. `git shared` è un'estensione di git che tiene **lo stesso file allineato in più repository**. Modifichi il file in un progetto qualsiasi e lo pubblichi; gli altri progetti vengono a sapere che c'è una versione nuova e la adottano quando vogliono, con un comando.
+The same file in several git repositories, always aligned.
 
-Il file resta un file normale: chi usa la repo senza l'estensione lo vede, lo compila e lo usa come sempre.
+A common header, a configuration file, a script: they are often needed by more than one project, and copying them by hand sooner or later leaves you with different copies. `git shared` is a git extension that keeps **the same file aligned across several repositories**. You change the file in any of the projects and publish it; the other projects learn that a new version exists and adopt it when they want, with one command.
 
-> **Stato:** prima versione, tra repository sulla **stessa macchina**. L'uso tra repository remote (GitHub, GitLab) è in sviluppo.
+The file stays a regular file: anyone using the repository without the extension sees it, builds it and uses it as always.
 
-## Installazione
+> **Status:** first release, for repositories on the **same machine**. Support for remote repositories (GitHub, GitLab) is in development.
 
-Servono git 2.34 o più recente, `make` e `gcc` (su Windows MinGW-w64).
+## Installation
+
+You need git 2.34 or later, `make` and `gcc` (MinGW-w64 on Windows).
 
 ```bash
-make            # compila
-make install    # copia git-shared in ~/bin (Windows: %USERPROFILE%\bin)
-git shared -h   # verifica
+make            # build
+make install    # copy git-shared to ~/bin (Windows: %USERPROFILE%\bin)
+git shared -h   # check
 ```
 
-Se `git shared` non viene trovato, aggiungi quella cartella al `PATH`. Su Windows, per avere anche `git shared --help`, lancia `make install` da amministratore.
+If `git shared` is not found, add that folder to your `PATH`. On Windows, to also get `git shared --help`, run `make install` as administrator.
 
-## In due minuti
+## Two-minute tour
 
 ```bash
-# Progetto A: dichiaro shared l'header
-cd ~/progetti/A
+# Project A: make the header shared
+cd ~/projects/A
 git shared set include/common.h
-git commit -m "common.h diventa shared"
+git commit -m "common.h becomes shared"
 
-# Progetto B: lo collego (il path può essere diverso)
-cd ~/progetti/B
-git shared link ~/progetti/A/include/common.h inc/common.h
-git commit -m "collego common.h"      # da qui A e B si conoscono
+# Project B: link it (the path can be different)
+cd ~/projects/B
+git shared link ~/projects/A/include/common.h inc/common.h
+git commit -m "link common.h"         # from now on A and B know each other
 
-# In B modifico l'header e pubblico
-git commit -am "aggiungo MAX_LEN"
-git shared publish                    # A riceve un avviso
+# In B, change the header and publish
+git commit -am "add MAX_LEN"
+git shared publish                    # A gets a notice
 
-# In A adotto la versione nuova
-cd ~/progetti/A
-git shared status                     # common.h: versione nuova da applicare
+# In A, adopt the new version
+cd ~/projects/A
+git shared status                     # common.h: new version to apply
 git shared update
-git commit -m "aggiorno common.h"
+git commit -m "update common.h"
 ```
 
-## Come funziona
+## How it works
 
-- **Nessuna repo principale.** Tutte le repo che usano il file (i *peer*) sono alla pari, e tutte possono modificarlo. Non c'è un server: le repo si parlano direttamente.
-- **`.gitshared`.** Elenca i file shared della repo. Lo gestisce l'estensione e si versiona con la repo, come `.gitmodules`.
-- **Una storia per file.** Ogni file shared ha una sua piccola storia di versioni, uguale in tutti i peer e separata da quella del progetto. Serve a capire quale versione è più recente.
-- **Pubblicare, ricevere, applicare.** `publish` crea una versione e avvisa i peer. Ogni peer la riceve da sé al suo primo comando `git shared`, senza toccare i tuoi file. `update` la porta nel progetto, e tu confermi con un commit.
+- **No main repository.** All the repositories that use the file (the *peers*) are equal, and all of them can change it. There is no server: the repositories talk to each other directly.
+- **`.gitshared`.** Lists the shared files of the repository. It is managed by the extension and versioned with the repository, like `.gitmodules`.
+- **One history per file.** Each shared file has its own small history of versions, the same in every peer and separate from the project's. It is used to tell which version is newer.
+- **Publish, receive, apply.** `publish` creates a version and notifies the peers. Each peer receives it by itself at its next `git shared` command, without touching your files. `update` brings it into the project, and you confirm it with a commit.
 
-## Le regole
+## The rules
 
-1. **Conta solo ciò che è committato.** Una modifica non committata non si pubblica mai. `set`, `link` e `unlink` diventano effettivi al commit: prima puoi annullarli con `git restore`.
-2. **Decidi tu quando.** Si pubblica solo con `git shared publish`, e i comandi non fanno commit da soli. Con `-c` o `-m "messaggio"` committano subito, ma solo il file shared e `.gitshared`: il resto dello staging non entra nel commit.
-3. **Il tuo lavoro non si perde.** `update` non sovrascrive modifiche non committate, nemmeno quelle in staging. Per forzare serve `-f`.
-4. **Nessuna modifica viene scartata.** Se due repo modificano il file ognuna per conto suo, `update` unisce le versioni come `git merge`. In caso di conflitto risolvi i marker, fai `git add` e rilanci `git shared update`. Per rinunciare c'è `git shared update --abort`.
-5. **Nessun blocco.** Puoi modificare il file anche se la tua copia è indietro: il file risulta *divergente* e `update` unisce.
+1. **Only committed work counts.** An uncommitted change is never published. `set`, `link` and `unlink` take effect at the commit: until then you can cancel them with `git restore`.
+2. **You decide when.** Nothing is published except by `git shared publish`, and the commands never commit by themselves. With `-c` or `-m "message"` they commit right away, but only the shared file and `.gitshared`: the rest of the staging area stays out of the commit.
+3. **Your work is never lost.** `update` does not overwrite uncommitted changes, staged ones included. Forcing it takes `-f`.
+4. **No change is thrown away.** If two repositories change the file independently, `update` merges the versions like `git merge`. On a conflict, resolve the markers, `git add` and run `git shared update` again. To give up, use `git shared update --abort`.
+5. **Nothing is locked.** You can change the file even if your copy is behind: the file is *diverged* and `update` merges.
 
-## I comandi
+## Commands
 
-| Comando | Cosa fa |
+| Command | What it does |
 |---|---|
-| `git shared set <file>` | Dichiara shared un file della repo |
-| `git shared link <file-in-altra-repo> [<dest>]` | Collega un file shared di un'altra repo |
-| `git shared unlink <file>` | Smette di condividere il file, che resta come file normale |
-| `git shared status [--peers]` | Stato di ogni file shared; con `--peers`, anche quello dei peer |
-| `git shared publish [<file>]` | Crea una versione nuova e avvisa i peer |
-| `git shared update [--all] [<file>]` | Riceve e applica l'ultima versione; `--abort` rinuncia a un'unione |
-| `git shared branch <file> [-a\|-rm <branch>]` | Sceglie i branch su cui il file è shared; sugli altri è un file normale |
-| `git shared prune [-n]` | Toglie i peer cancellati o che non condividono più il file |
-| `git shared relocate [--copy]` | Avvisa i peer che la repo è stata spostata o copiata |
-| `git shared lang [en\|it]` | Lingua del manuale |
+| `git shared set <file>` | Makes a file of the repository shared |
+| `git shared link <file-in-other-repo> [<dest>]` | Links a file shared by another repository |
+| `git shared unlink <file>` | Stops sharing the file, which stays as a regular file |
+| `git shared status [--peers]` | State of each shared file; with `--peers`, also that of the peers |
+| `git shared publish [<file>]` | Creates a new version and notifies the peers |
+| `git shared update [--all] [<file>]` | Receives and applies the latest version; `--abort` gives up a merge |
+| `git shared branch <file> [-a\|-rm <branch>]` | Chooses the branches where the file is shared; on the others it is a regular file |
+| `git shared prune [-n]` | Removes peers that were deleted or no longer share the file |
+| `git shared relocate [--copy]` | Tells the peers that the repository was moved or copied |
+| `git shared lang [en\|it]` | Language of the manual |
 
-Ogni comando ha la sua pagina: `git shared <comando> --help`. Le stesse pagine sono nella cartella [`help/`](help/) (in italiano in [`help/it/`](help/it/)).
+Each command has its own page: `git shared <command> --help`. The same pages are in the [`help/`](help/) folder (Italian in [`help/it/`](help/it/)).
 
-## Gli stati
+## States
 
-| Stato | Significato | Cosa fare |
+| State | Meaning | What to do |
 |---|---|---|
-| allineato | Hai l'ultima versione | Niente |
-| da applicare | C'è una versione più recente | `git shared update` |
-| da committare | Hai applicato con `update`, manca il commit | `git commit` |
-| da pubblicare | Hai una modifica che i peer non hanno | `git shared publish` |
-| divergente | Tu e un peer avete modificato il file separatamente | `git shared update` |
-| unione in corso | `update` ha trovato un conflitto | Correggi, `git add`, `git shared update` |
-| in attesa di commit | `set`, `link` o `unlink` non ancora committato | `git commit` o `git restore` |
-| sospeso | Su questo branch il file non è shared | Niente, o `git shared branch` |
-| scollegato | La repo dichiara il file ma non conosce i peer (es. un clone) | `git shared link` |
-| incoerente | File rinominato o cancellato, o `.gitshared` modificato a mano | `git shared unlink` o `git restore .gitshared` |
+| aligned | You have the latest version | Nothing |
+| new version to apply | There is a newer version | `git shared update` |
+| applied, to commit | You applied it with `update`, the commit is missing | `git commit` |
+| to publish | You have a change the peers don't have | `git shared publish` |
+| diverged | You and a peer changed the file separately | `git shared update` |
+| merge in progress | `update` found a conflict | Fix it, `git add`, `git shared update` |
+| pending commit | `set`, `link` or `unlink` not committed yet | `git commit` or `git restore` |
+| suspended on this branch | On this branch the file is not shared | Nothing, or `git shared branch` |
+| unlinked | The repository declares the file but doesn't know the peers (e.g. a clone) | `git shared link` |
+| inconsistent | File renamed or deleted, or `.gitshared` edited by hand | `git shared unlink` or `git restore .gitshared` |
 
-## Limiti della prima versione
+## Limits of the first release
 
-- Solo repository sulla stessa macchina, su Linux e Windows.
-- Solo singoli file di testo: niente cartelle, niente binari.
-- Al massimo 32 peer per file.
-- Mancano ancora la rinomina di un file shared (`git shared mv`) e il `link` verso un file che esiste già nella destinazione.
-- I messaggi dei comandi sono in inglese; il manuale è anche in italiano.
-- L'estensione serve su ogni macchina che pubblica o applica versioni. Chi non ce l'ha usa la repo normalmente.
+- Only repositories on the same machine (Linux and Windows).
+- Only single text files: no folders, no binaries.
+- At most 32 peers per file.
+- Renaming a shared file (`git shared mv`) and `link` to a file that already exists at the destination are not available yet.
+- The extension must be installed on every machine that publishes or applies versions. Anyone without it uses the repository as usual.
 
-## Come è stato fatto
+## How it was made
 
-Il codice è stato scritto interamente da un modello di AI, sotto supervisione umana. Idee, requisiti, test e debug sono guidati da una persona.
+The code was written entirely by an AI model, under human supervision. Ideas, requirements, testing and debugging are driven by a person.
 
-## Licenza e contatti
+## License and contact
 
-Rilasciato con licenza [MIT](LICENSE). Per domande o segnalazioni: lucamurani@gmail.com
+Released under the [MIT](LICENSE) license.
+
+"Shared Files per Git" is an independent project and is not affiliated with or endorsed by the Git project. Git and the Git logo are either registered trademarks or trademarks of Software Freedom Conservancy, Inc., corporate home of the Git project, in the United States and/or other countries.
+
+For questions or reports: lucamurani@gmail.com
