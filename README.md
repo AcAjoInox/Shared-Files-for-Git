@@ -1,7 +1,7 @@
 🇮🇹 [Leggi in italiano](README.it.md)
 🇬🇧 [Read in English](README.md)
 
-# Shared Files per Git
+# Shared Files for Git
 
 The same file in several git repositories, always aligned.
 
