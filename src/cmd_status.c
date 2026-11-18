@@ -14,6 +14,7 @@
 #include <string.h>
 
 #include "cmd.h"
+#include "cmd_common.h"
 #include "chain.h"
 #include "err.h"
 #include "git.h"
@@ -191,7 +192,7 @@ int cmd_status(int argc, char **argv)
     }
     batch_open = 1;
     rc = GS_EXIT_OK;
-    if (repo_complete_pending(&repo, &batch) != GS_OK) {
+    if (cmd_complete(&repo, &batch, 1) != GS_OK) {
         msg_error(MSG_ERR_PENDING);
         rc = GS_EXIT_ERROR; /* si mostra comunque lo stato */
     }

@@ -89,6 +89,7 @@ int cmd_set(int argc, char **argv)
     int first;
     int readopt = 0;
     int opened = 0;
+    int hooks = 0;
     int rc = GS_EXIT_USAGE;
 
     first = cmd_parse(argc, argv, CMD_OPT_COMMIT, MSG_USAGE_SET, &o);
@@ -150,7 +151,7 @@ int cmd_set(int argc, char **argv)
         msg_error(MSG_ERR_STAGE_GITSHARED);
         goto exit;
     }
-    (void)hooks_sync(&repo); /* REQ-F-016: un errore e' solo un avviso */
+    hooks = 1; /* REQ-F-016: installati alla fine, vedi exit */
 
     if (readopt == 0) {
         e = repo_add(&repo);
@@ -215,6 +216,12 @@ int cmd_set(int argc, char **argv)
     rc = GS_EXIT_OK;
 
 exit:
+    /* Hook alla fine, quando l'attesa e' aperta o gia' chiusa: il
+     * post-commit serve solo se resta aperta (D-100). Un errore e' solo un
+     * avviso. */
+    if ((opened != 0) && (hooks != 0)) {
+        (void)hooks_sync(&repo);
+    }
     if (opened != 0) {
         git_batch_close(&batch);
         repo_close(&repo);

@@ -37,6 +37,12 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
               CmdOpts_t *o);
 
 /*
+ * Completa le operazioni in attesa (repo_complete_pending) e, se si e'
+ * chiusa l'ultima, toglie il blocco del post-commit (D-100).
+ */
+eGsErr_t cmd_complete(Repo_t *r, GitBatch_t *b, int may_discard);
+
+/*
  * Apre la repo e il processo cat-file e completa le operazioni in attesa.
  * GS_EXIT_OK oppure il codice di uscita da restituire (messaggio stampato).
  * Se riesce, il chiamante chiude con git_batch_close e repo_close.
@@ -84,11 +90,12 @@ int cmd_has_local_changes(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b
 eGsErr_t cmd_commit(const Repo_t *r, const char *message, const Str_t *paths);
 
 /*
- * Dopo un commit lanciato dal comando: completa le attese con un cat-file
- * nuovo (che veda il nuovo HEAD). Nessun hook gira sul commit (D-074),
- * quindi repo e configurazione lette prima valgono ancora. GS_EXIT_OK o il
- * codice di uscita (messaggio stampato); se non riesce, repo e cat-file
- * sono chiusi.
+ * Dopo un commit lanciato dal comando: rilegge la repo e completa le
+ * attese con un cat-file nuovo (che veda il nuovo HEAD). Si rilegge tutto
+ * perche' il post-commit puo' aver gia' completato delle attese (D-100):
+ * i puntatori alle voci di prima non valgono piu'. GS_EXIT_OK o il codice
+ * di uscita (messaggio stampato); se non riesce, repo e cat-file sono
+ * chiusi.
  */
 int cmd_reopen(Repo_t *r, GitBatch_t *b);
 

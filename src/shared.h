@@ -120,8 +120,15 @@ eGsErr_t shared_new_id(char id[GS_ID_HEX_LEN + 1U]);
  * unlink (D-081): si completa quando HEAD o un branch locale discende dal
  * commit del comando e il suo .gitshared non dichiara piu' l'ID; si
  * scarta sul branch del comando se la sezione e' tornata nel working tree.
+ *
+ * may_discard = 0: si completa soltanto, nessuna attesa si scarta. E' il
+ * caso di un completamento chiesto da un'altra repo (link verso una
+ * sorgente in attesa, D-100): scartare lo decide solo la repo stessa.
  */
-eGsErr_t repo_complete_pending(Repo_t *r, GitBatch_t *b);
+eGsErr_t repo_complete_pending(Repo_t *r, GitBatch_t *b, int may_discard);
+
+/* 1 se almeno una voce ha un set, link o unlink in attesa. */
+int repo_has_pending(const Repo_t *r);
 
 /* *declared = 1 se il .gitshared committato in <rev> dichiara l'ID. */
 eGsErr_t repo_rev_declares(GitBatch_t *b, const char *rev, const char *id,

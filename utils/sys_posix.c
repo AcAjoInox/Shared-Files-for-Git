@@ -83,6 +83,17 @@ int sys_make_executable(const char *path)
     return rc;
 }
 
+int sys_copy_mode(const char *from, const char *to)
+{
+    struct stat st;
+    int rc = -1;
+
+    if (stat(from, &st) == 0) {
+        rc = chmod(to, st.st_mode & 07777);
+    }
+    return rc;
+}
+
 eGsErr_t sys_abs_path(const char *path, Str_t *out)
 {
     const char *slash = strrchr(path, '/');

@@ -111,6 +111,13 @@ int sys_make_executable(const char *path)
     return 0;
 }
 
+int sys_copy_mode(const char *from, const char *to)
+{
+    (void)from; /* nessun bit di esecuzione da conservare */
+    (void)to;
+    return 0;
+}
+
 /* Divide path in cartella e ultimo nome ("." e ".." restano cartella). */
 static void split_last(const char *path, Str_t *dir, Str_t *name)
 {

@@ -50,6 +50,7 @@ typedef enum {
     MSG_ERR_SRC_NOT_REPO,    /* path */
     MSG_ERR_SRC_NOT_SHARED,  /* path */
     MSG_ERR_SRC_NO_VERSIONS, /* path, repo sorgente */
+    MSG_ERR_SRC_PENDING,     /* path, repo sorgente */
     MSG_ERR_SAME_REPO,
     MSG_ERR_HASH_MISMATCH,   /* algoritmo sorgente, algoritmo destinazione */
     MSG_ERR_DEST_PATH,       /* path */
@@ -103,6 +104,7 @@ typedef enum {
     MSG_WARN_HOOK,           /* path dell'hook */
     MSG_WARN_HOOK_NOT_SHELL, /* path dell'hook */
     MSG_WARN_HOOK_REPAIRED,  /* path dell'hook */
+    MSG_WARN_HOOK_PENDING_NOT_SHELL, /* path dell'hook */
     MSG_WARN_MERGE_DROPPED,  /* file */
     MSG_WARN_PRUNE_KEPT,     /* file, peer */
     MSG_WARN_BRANCH_MISSING, /* branch */

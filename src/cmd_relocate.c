@@ -251,7 +251,7 @@ int cmd_relocate(int argc, char **argv)
         goto exit;
     }
     opened = 1;
-    if (repo_complete_pending(&repo, &batch) != GS_OK) {
+    if (cmd_complete(&repo, &batch, 1) != GS_OK) {
         msg_error(MSG_ERR_PENDING);
     }
     rc = GS_EXIT_ERROR;

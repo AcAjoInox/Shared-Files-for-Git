@@ -1,11 +1,11 @@
 #!/bin/sh
-# t0006-hooks.sh - hook: solo avvisi, nessun hook sui commit; si pubblica
-# solo con publish (REQ-F-004, REQ-F-013, REQ-F-016, REQ-F-023, D-030,
-# D-069, D-073, D-074).
+# t0006-hooks.sh - hook: avvisi; sui commit solo il post-commit che completa
+# le attese, finche' ce n'e' una; si pubblica solo con publish (REQ-F-004,
+# REQ-F-013, REQ-F-016, REQ-F-023, D-030, D-069, D-073, D-074, D-100).
 
 . "$(dirname "$0")/lib.sh"
 
-BREEF="$TEST_DIR/../breef.md"
+BREEF="$TEST_DIR/../report/breef.md"
 WARN_HOOKS="post-checkout post-merge post-rewrite"
 
 top() {
@@ -28,24 +28,28 @@ ID=$(shared_id breef.md)
 for h in $WARN_HOOKS; do
 	expect_ok "default: blocco in $h" has_block "$h"
 done
-expect_fail "default: nessun blocco nel post-commit" has_block post-commit
+expect_ok "set in attesa: blocco nel post-commit" has_block post-commit
 expect_fail "default: nessun blocco nel pre-commit" has_block pre-commit
 expect_eq "default: hook dell'utente intatto" \
 	"$(cat .git/hooks/pre-commit)" "$(printf '#!/bin/sh\necho "hook-utente" >&2\nexit 0')"
 expect_eq "hook nuovo: inizia con #!/bin/sh" "$(head -n 1 .git/hooks/post-merge)" "#!/bin/sh"
 
-# Commit senza hook di git shared: il set si completa al comando dopo.
+# Il commit completa il set (D-100) e il blocco del post-commit sparisce:
+# l'hook l'aveva creato git shared, quindi il file si cancella.
 run git commit -q -m "share breef.md"
 expect_err "commit: l'hook dell'utente gira" "hook-utente"
-expect_fail "default: dopo il commit la catena non c'e' ancora" \
-	git rev-parse -q --verify "refs/shared/$ID"
+expect_ok "commit: la catena c'e' subito" git rev-parse -q --verify "refs/shared/$ID"
+expect_fail "commit: attesa chiusa" git config "shared.$ID.pending"
+expect_fail "commit: post-commit tolto" test -e .git/hooks/post-commit
 run git shared status
-expect_out "default: il comando successivo completa" "aligned"
+expect_out "dopo il commit: allineato" "aligned"
 
 put altro.h a
 git shared set altro.h >/dev/null
 expect_eq "secondo set: nessun blocco duplicato" "$(grep -c '>>> git shared >>>' .git/hooks/post-merge)" 1
+expect_ok "secondo set: post-commit di nuovo" has_block post-commit
 git commit -q -m "share altro.h" 2>/dev/null
+expect_fail "secondo set: post-commit tolto al commit" test -e .git/hooks/post-commit
 
 # --- B: link; il commit non pubblica (D-074) ---------------------------------
 make_repo B
@@ -109,7 +113,8 @@ old_hook() {
 	chmod +x ".git/hooks/$1"
 }
 
-# Il blocco rimasto nel post-commit non fa nulla al commit.
+# Il blocco rimasto nel post-commit senza attese non pubblica nulla al
+# commit, e si toglie da solo (D-100).
 old_hook post-commit
 printf 'terza riga di B\n' >>breef.md
 OLD_A=$(git -C ../A rev-parse "refs/shared/$ID")
@@ -118,6 +123,9 @@ expect_eq "vecchio post-commit: commit senza output" "$OUT$ERR" ""
 expect_eq "vecchio post-commit: A non riceve" \
 	"$(git -C ../A rev-parse "refs/shared/$ID")" "$OLD_A"
 
+expect_fail "vecchio post-commit: tolto al commit" test -e .git/hooks/post-commit
+
+old_hook post-commit
 run git shared hook install
 expect_fail "post-commit creato da git shared: cancellato" test -e .git/hooks/post-commit
 

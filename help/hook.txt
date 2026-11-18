@@ -13,18 +13,26 @@ DESCRIPTION
             warn when a shared file is not aligned, or when none of its
             active branches exists any more
 
+    While a set, link or unlink waits for its commit, a block is also in
+    post-commit: the commit that confirms .gitshared completes the
+    operation, and the block removes itself. With -c or -m the command
+    commits and completes at once, and post-commit is not touched. If
+    the hook does not run (a client that skips hooks, a post-commit that
+    is not a shell script), the next 'git shared' command completes it.
+
     Existing hooks are kept: the block goes right after their first
     line, and the file keeps its permissions. Only shell scripts get the
     block: a hook written in Python, Perl or another language, or a
     binary, is left as it is, with a warning (and a block that an
     earlier version put there is removed). A hook you disabled by
-    removing its execute bit stays disabled, block included. No hook
-    runs on commit and no hook ever blocks git. The hooks are a
+    removing its execute bit stays disabled, block included. Committing
+    never publishes and no hook ever blocks git. The warnings are a
     convenience: 'git shared status' shows the same information.
 
     'git shared hook install' adds the blocks to a repository that has
     shared files but no hooks yet, and removes the blocks that earlier
-    versions put in pre-commit and post-commit.
+    versions put in pre-commit, and in post-commit when nothing waits
+    for a commit.
 
     The other forms of 'git shared hook' are called by the hooks
     themselves, not by you.

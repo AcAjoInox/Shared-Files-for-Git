@@ -20,6 +20,7 @@
 
 #include "cmd.h"
 #include "cmd_common.h"
+#include "hooks.h"
 #include "sys.h"
 
 /* Toglie la sezione da .gitshared; se non resta nessuna sezione, toglie
@@ -95,6 +96,7 @@ int cmd_unlink(int argc, char **argv)
     int declared = 0;
     int first;
     int opened = 0;
+    int hooks = 0;
     int rc = GS_EXIT_USAGE;
 
     first = cmd_parse(argc, argv, CMD_OPT_COMMIT, MSG_USAGE_UNLINK, &o);
@@ -168,6 +170,7 @@ int cmd_unlink(int argc, char **argv)
         str_add(&e->pending_branch, str_cstr(&repo.branch));
         str_add(&e->pending_commit, head_hex);
         e->pending = SHARED_PENDING_UNLINK;
+        hooks = 1;
     }
 
     if (o.commit == 0U) {
@@ -199,6 +202,11 @@ int cmd_unlink(int argc, char **argv)
     rc = GS_EXIT_OK;
 
 exit:
+    /* Il post-commit completa l'attesa al commit, se resta aperta
+     * (D-100). Un errore e' solo un avviso. */
+    if ((opened != 0) && (hooks != 0)) {
+        (void)hooks_sync_post_commit(&repo);
+    }
     if (opened != 0) {
         git_batch_close(&batch);
         repo_close(&repo);

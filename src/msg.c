@@ -156,6 +156,9 @@ static const char *const msg_en[] = {
         "'%s' is not shared in its repository: run 'git shared set' there",
     [MSG_ERR_SRC_NO_VERSIONS] =
         "cannot get the versions of '%s' from %s: is it committed there?",
+    [MSG_ERR_SRC_PENDING] =
+        "'%s' is not shared yet in %s: commit .gitshared there, "
+        "then run link again",
     [MSG_ERR_SAME_REPO] = "source and destination are the same repository",
     [MSG_ERR_HASH_MISMATCH] =
         "the repositories use different hash algorithms (%s, %s)",
@@ -246,6 +249,9 @@ static const char *const msg_en[] = {
     [MSG_WARN_HOOK_REPAIRED] =
         "%s is not a shell script: removed the git shared block that an "
         "earlier version had added",
+    [MSG_WARN_HOOK_PENDING_NOT_SHELL] =
+        "%s is not a shell script: left as it is (the pending operation "
+        "completes at the next 'git shared' command, not at the commit)",
     [MSG_WARN_MERGE_DROPPED] =
         "%s: the merge in progress was abandoned: dropped",
     [MSG_WARN_PRUNE_KEPT] =

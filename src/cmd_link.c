@@ -5,7 +5,11 @@
  * Al comando: fetch della catena dalla sorgente in una ref temporanea,
  * file scritto dal blob dell'ultima versione, sezione in .gitshared, tutto
  * in staging; operazione in attesa con la radice della sorgente. Al commit
- * (repo_complete_pending): catena, membership, annuncio ai peer.
+ * (post-commit, D-100; repo_complete_pending): catena, membership,
+ * annuncio ai peer, avvisi delle versioni pubblicate nel frattempo.
+ *
+ * Una sorgente con il set (o il link) ancora in attesa lo completa prima
+ * del fetch (D-100): il suo post-commit puo' non essere girato.
  *
  * v0: la destinazione non deve esistere (D-062, riuso della storia, e
  * D-064, --adopt, non sono ancora implementati).
@@ -86,6 +90,43 @@ exit:
     return e;
 }
 
+/* 1 se la sorgente ha un'operazione in attesa per l'ID (set o link). */
+static int source_pending(const Source_t *s, const char *id)
+{
+    const char *args[] = { "-C", NULL, "config", "--local", "--get", NULL, NULL };
+    Str_t key = STR_INIT;
+    Str_t out = STR_INIT;
+    int code = 1;
+
+    str_addf(&key, "shared.%s.pending", id);
+    args[1] = str_cstr(&s->top);
+    args[5] = str_cstr(&key);
+    if (git_capture(args, PROC_STDERR_NULL | PROC_CLEAN_ENV, &out, &code) != GS_OK) {
+        code = 1;
+    }
+    str_free(&out);
+    str_free(&key);
+    return code == 0;
+}
+
+/*
+ * Sorgente con un set o un link in attesa (D-100): di solito committato,
+ * ma nessun comando git shared vi e' girato dopo (hook saltato). Lo
+ * completa la sorgente stessa, con le sue regole (D-077), senza scartare
+ * nulla. 1 se adesso non e' piu' in attesa.
+ */
+static int source_settle(const Source_t *s, const char *id)
+{
+    const char *args[] = { "-C", NULL, "shared", "hook", "complete", NULL };
+
+    if (!source_pending(s, id)) {
+        return 1;
+    }
+    args[1] = str_cstr(&s->top);
+    (void)git_run(args, PROC_CLEAN_ENV, NULL); /* i suoi avvisi su stderr */
+    return !source_pending(s, id);
+}
+
 /* 1 se il path esiste gia' nella destinazione: su disco o nell'index. */
 static int dest_exists(const Repo_t *r, GitBatch_t *b, const char *path)
 {
@@ -130,6 +171,7 @@ int cmd_link(int argc, char **argv)
     int relink = 0;
     int dest_new = 1; /* il file non e' in HEAD: entra nel commit */
     int opened = 0;
+    int hooks = 0;
     int rc = GS_EXIT_USAGE;
 
     first = cmd_parse(argc, argv, CMD_OPT_COMMIT, MSG_USAGE_LINK, &o);
@@ -198,6 +240,12 @@ int cmd_link(int argc, char **argv)
         }
     }
 
+    /* --- sorgente in attesa: la si completa (D-100) ------------------- */
+    if (!source_settle(&src, str_cstr(&id))) {
+        msg_error(MSG_ERR_SRC_PENDING, argv[first], str_cstr(&src.top));
+        goto exit;
+    }
+
     /* --- catena: fetch in refs/shared-incoming/<id>/0 (D-040) ---------- */
     str_addz(&peers, str_cstr(&src.top));
     peers_fetch(str_cstr(&dest), str_cstr(&id), &peers, &fetched, &tally);
@@ -240,7 +288,7 @@ int cmd_link(int argc, char **argv)
         msg_error(MSG_ERR_STAGE_GITSHARED);
         goto exit;
     }
-    (void)hooks_sync(&repo); /* REQ-F-016: un errore e' solo un avviso */
+    hooks = 1; /* REQ-F-016: installati alla fine, vedi exit */
 
     if (!relink) {
         e = repo_add(&repo);
@@ -311,6 +359,12 @@ int cmd_link(int argc, char **argv)
     rc = GS_EXIT_OK;
 
 exit:
+    /* Hook alla fine, quando l'attesa e' aperta o gia' chiusa: il
+     * post-commit serve solo se resta aperta (D-100). Un errore e' solo un
+     * avviso. */
+    if ((opened != 0) && (hooks != 0)) {
+        (void)hooks_sync(&repo);
+    }
     if (opened != 0) {
         git_batch_close(&batch);
         repo_close(&repo);

@@ -66,4 +66,7 @@ eGsErr_t sys_abs_path(const char *path, Str_t *out);
 /* Bit di esecuzione per tutti (POSIX); su Windows non serve: 0 = riuscito. */
 int sys_make_executable(const char *path);
 
+/* Copia i permessi di `from` su `to` (POSIX); su Windows niente: 0 = riuscito. */
+int sys_copy_mode(const char *from, const char *to);
+
 #endif /* GS_SYS_H */

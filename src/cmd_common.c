@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "chain.h"
+#include "hooks.h"
 #include "mem.h"
 #include "path.h"
 #include "inbox.h"
@@ -78,6 +79,18 @@ exit:
     return rc;
 }
 
+eGsErr_t cmd_complete(Repo_t *r, GitBatch_t *b, int may_discard)
+{
+    int had = repo_has_pending(r);
+    eGsErr_t err = repo_complete_pending(r, b, may_discard);
+
+    /* L'ultima attesa chiusa: il post-commit non serve piu' (D-100). */
+    if (had && !repo_has_pending(r)) {
+        (void)hooks_sync_post_commit(r);
+    }
+    return err;
+}
+
 int cmd_open(Repo_t *r, GitBatch_t *b)
 {
     int rc = GS_EXIT_FATAL;
@@ -94,7 +107,7 @@ int cmd_open(Repo_t *r, GitBatch_t *b)
         repo_close(r);
     } else {
         rc = GS_EXIT_OK;
-        if (repo_complete_pending(r, b) != GS_OK) {
+        if (cmd_complete(r, b, 1) != GS_OK) {
             msg_error(MSG_ERR_PENDING); /* si prosegue: lo stato lo mostra */
         }
         repo_check_self(r);
@@ -329,20 +342,11 @@ eGsErr_t cmd_commit(const Repo_t *r, const char *message, const Str_t *paths)
 
 int cmd_reopen(Repo_t *r, GitBatch_t *b)
 {
-    int rc = GS_EXIT_OK;
-
+    /* Da capo: il post-commit puo' aver gia' completato delle attese
+     * durante il commit (D-100), e la repo letta prima non vale piu'. */
     git_batch_close(b);
-    if (git_batch_open(b) != GS_OK) {
-        /* un cat-file nuovo, che veda il nuovo HEAD */
-        msg_fatal(MSG_ERR_PROC, "git cat-file");
-        repo_close(r);
-        rc = GS_EXIT_FATAL;
-    } else if (repo_complete_pending(r, b) != GS_OK) {
-        msg_error(MSG_ERR_PENDING);
-    } else {
-        repo_check_self(r); /* un set o link appena completato */
-    }
-    return rc;
+    repo_close(r);
+    return cmd_open(r, b);
 }
 
 /* Nuova versione: blob di HEAD, genitore T, ref condizionata a T. H e T

@@ -13,19 +13,28 @@ DESCRIZIONE
             avvisano quando un file shared non e' allineato, o quando
             nessuno dei suoi branch attivi esiste piu'
 
+    Finche' un set, un link o un unlink aspetta il suo commit, un blocco
+    c'e' anche nel post-commit: il commit che conferma .gitshared
+    completa l'operazione, e il blocco si toglie da solo. Con -c o -m il
+    comando committa e completa subito, e il post-commit non si tocca. Se
+    l'hook non gira (un client che salta gli hook, un post-commit che
+    non e' uno script di shell), lo completa il comando 'git shared'
+    successivo.
+
     Gli hook esistenti restano: il blocco va subito dopo la loro prima
     riga e il file tiene i suoi permessi. Il blocco entra solo negli
     script di shell: un hook scritto in Python, Perl o in un'altra
     lingua, o un binario, resta com'e', con un avviso (e un blocco che
     una versione precedente ci aveva messo si toglie). Un hook che hai disattivato
     togliendogli il bit di esecuzione resta disattivato, blocco
-    compreso. Nessun hook gira sul commit e nessun hook blocca mai
-    git. Gli hook sono una comodita': 'git shared status' mostra le
-    stesse informazioni.
+    compreso. Il commit non pubblica mai e nessun hook blocca mai git.
+    Gli avvisi sono una comodita': 'git shared status' mostra le stesse
+    informazioni.
 
     'git shared hook install' aggiunge i blocchi a un repository che ha
     file shared ma non ancora gli hook, e toglie i blocchi che le
-    versioni precedenti mettevano in pre-commit e post-commit.
+    versioni precedenti mettevano in pre-commit, e nel post-commit
+    quando niente aspetta un commit.
 
     Le altre forme di 'git shared hook' le chiamano gli hook stessi, non
     tu.

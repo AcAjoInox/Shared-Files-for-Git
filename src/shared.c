@@ -676,6 +676,10 @@ static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
     const char *p;
     uint8_t ok = 0U;
     Oid_t tip;
+    Oid_t t;
+    Oid_t *tips;
+    size_t n;
+    size_t k;
     eGsErr_t err = copy_branches(r, e, committed);
 
     if (err != GS_OK) {
@@ -702,6 +706,7 @@ static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
             goto exit;
         }
     }
+    t = tip; /* T */
     if (git_batch_query(b, str_cstr(&incoming), &tip) == GIT_OBJ_COMMIT) {
         str_addz(&del, str_cstr(&incoming));
         (void)git_delete_refs(&del);
@@ -741,6 +746,24 @@ static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
     /* 3. Annuncio: ogni peer aggiunge questa repo ai propri (REQ-F-002).
      * Un peer irraggiungibile non blocca (REQ-F-008, B-07). */
     peers_announce(e->id, &e->peers, str_cstr(&r->top), &tally);
+
+    /* 4. Versioni pubblicate tra il comando e il commit (D-100): chi le ha
+     * pubblicate non conosceva ancora questa repo e non l'ha avvisata. Per
+     * ogni peer con una T diversa, un avviso a se stessi a nome suo: le
+     * riceve il primo comando che ricava lo stato (receive.h). Niente
+     * fetch qui, che puo' girare dentro un hook (come D-099). */
+    n = str_zcount(&e->peers);
+    if (n > 0U) {
+        tips = xmalloc(n * sizeof *tips);
+        peers_tips(e->id, &e->peers, tips);
+        for (k = 0U, p = str_znext(&e->peers, NULL); p != NULL;
+             k++, p = str_znext(&e->peers, p)) {
+            if ((tips[k].len > 0U) && !oid_eq(&tips[k], &t)) {
+                (void)inbox_add(str_cstr(&r->top), e->id, &tips[k], p);
+            }
+        }
+        free(tips);
+    }
 
     err = end_pending(e);
 
@@ -1066,7 +1089,8 @@ static eGsErr_t local_branches(Str_t *out)
  * Prima il branch del comando e HEAD; tutti i branch solo se si sta per
  * scartare o il branch del comando non c'e' piu' (come D-079).
  */
-static eGsErr_t settle_unlink(Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
+static eGsErr_t settle_unlink(Repo_t *r, SharedEntry_t *e, GitBatch_t *b,
+                              int may_discard)
 {
     Str_t revs = STR_INIT;
     Str_t name = STR_INIT;
@@ -1097,7 +1121,7 @@ static eGsErr_t settle_unlink(Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
 
     if ((err == GS_OK) && (found != 0)) {
         err = repo_forget(r, e, b);
-    } else if ((err == GS_OK) && on_branch && e->in_gitshared) {
+    } else if ((err == GS_OK) && may_discard && on_branch && e->in_gitshared) {
         /* la sezione e' tornata (git restore): unlink annullato */
         msg_warning(MSG_WARN_DISCARDED, pending_label(e));
         err = end_pending(e);
@@ -1113,7 +1137,8 @@ static eGsErr_t settle_unlink(Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
 }
 
 /* Un'attesa (set o link): completa, scarta o lascia com'e' (D-077). */
-static eGsErr_t settle_pending(Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
+static eGsErr_t settle_pending(Repo_t *r, SharedEntry_t *e, GitBatch_t *b,
+                               int may_discard)
 {
     Repo_t declared = REPO_INIT; /* .gitshared committato */
     Str_t revs = STR_INIT;       /* dove cercare, elenco compatto */
@@ -1175,7 +1200,7 @@ static eGsErr_t settle_pending(Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
         } else {
             err = complete_link(r, e, committed, b);
         }
-    } else if ((err == GS_OK) && on_branch && !e->in_gitshared) {
+    } else if ((err == GS_OK) && may_discard && on_branch && !e->in_gitshared) {
         /* 4. Sul branch del comando la sezione non c'e' piu' ne' nel
          * commit ne' nel working tree: annullata (git restore). */
         err = discard_pending(e, b);
@@ -1194,7 +1219,18 @@ static eGsErr_t settle_pending(Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
     return err;
 }
 
-eGsErr_t repo_complete_pending(Repo_t *r, GitBatch_t *b)
+int repo_has_pending(const Repo_t *r)
+{
+    size_t i;
+    int found = 0;
+
+    for (i = 0U; (i < r->n) && !found; i++) {
+        found = (r->v[i].pending != SHARED_PENDING_NONE);
+    }
+    return found;
+}
+
+eGsErr_t repo_complete_pending(Repo_t *r, GitBatch_t *b, int may_discard)
 {
     size_t i;
     eGsErr_t err = GS_OK;
@@ -1202,9 +1238,9 @@ eGsErr_t repo_complete_pending(Repo_t *r, GitBatch_t *b)
     for (i = 0U; (i < r->n) && (err == GS_OK); i++) {
         if ((r->v[i].pending == SHARED_PENDING_SET) ||
             (r->v[i].pending == SHARED_PENDING_LINK)) {
-            err = settle_pending(r, &r->v[i], b);
+            err = settle_pending(r, &r->v[i], b, may_discard);
         } else if (r->v[i].pending == SHARED_PENDING_UNLINK) {
-            err = settle_unlink(r, &r->v[i], b);
+            err = settle_unlink(r, &r->v[i], b, may_discard);
         } else {
             /* nessuna attesa */
         }
