@@ -306,7 +306,7 @@ expect_out "clone: allineato" "aligned"
 cd "$TRASH/LA" || exit 1
 put l.h v2
 run git shared publish
-expect_out "clone: publish arriva a LB e al clone" "sent to 2 of 2 peers"
+expect_out "clone: publish arriva a LB e al clone" "2 of 2 peers notified"
 cd "$TRASH/LC" || exit 1
 run git shared update -c
 expect_out "clone: update dal peer" "new version applied and committed"

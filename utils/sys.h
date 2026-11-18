@@ -37,6 +37,25 @@ int sys_remove(const char *path);
 /* 1 se il path esiste ed e' una cartella. */
 int sys_is_dir(const char *path);
 
+/* Crea una cartella (un solo livello). 0 se creata o se c'era gia'. */
+int sys_mkdir(const char *path);
+
+/* Toglie una cartella vuota. 0 = riuscito. */
+int sys_rmdir(const char *path);
+
+/*
+ * Rinomina atomica nella stessa cartella; se `to` esiste lo sostituisce.
+ * 0 = riuscito.
+ */
+int sys_rename(const char *from, const char *to);
+
+/*
+ * Nomi contenuti in una cartella, "." e ".." esclusi, in un elenco
+ * compatto (str_addz), in ordine qualsiasi. GS_ERR_SYS se la cartella non
+ * si apre (anche se non esiste).
+ */
+eGsErr_t sys_list_dir(const char *path, Str_t *names);
+
 /*
  * Path assoluto con separatore '/', anche se l'ultimo elemento non esiste
  * piu' (es. una repo spostata): si risolve la cartella che lo contiene

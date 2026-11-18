@@ -15,7 +15,7 @@
  *
  * Senza <path> toglie anche le ref di lavoro rimaste senza sezione locale
  * (refs/shared/<id>, refs/shared-incoming/<id>/<k>, refs/shared-merge/<id>):
- * reportIdea B-27, C-22.
+ * reportIdea B-27, C-22. E gli avvisi rimasti senza sezione (D-099).
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,6 +23,7 @@
 
 #include "cmd.h"
 #include "cmd_common.h"
+#include "inbox.h"
 #include "mem.h"
 #include "peers.h"
 
@@ -182,6 +183,35 @@ exit:
     return count;
 }
 
+/* Avvisi di ID senza sezione locale (D-099), per esempio dopo un unlink
+ * con un peer che ancora non lo sapeva. Ritorna quanti (da) togliere. */
+static unsigned prune_inbox(Repo_t *r, int dry)
+{
+    const SharedEntry_t *e;
+    Str_t ids = STR_INIT;
+    Str_t shown = STR_INIT;
+    const char *id;
+    unsigned count = 0U;
+
+    inbox_ids(str_cstr(&r->top), &ids);
+    for (id = str_znext(&ids, NULL); id != NULL; id = str_znext(&ids, id)) {
+        e = repo_find_id(r, id);
+        if ((e == NULL) || !e->in_config) {
+            str_reset(&shown);
+            str_addf(&shown, ".git/shared/inbox/%s", id);
+            printf(msg(dry ? MSG_PRUNE_WOULD_REF : MSG_PRUNE_REF), str_cstr(&shown));
+            putchar('\n');
+            if (!dry) {
+                inbox_remove(str_cstr(&r->top), id);
+            }
+            count++;
+        }
+    }
+    str_free(&shown);
+    str_free(&ids);
+    return count;
+}
+
 int cmd_prune(int argc, char **argv)
 {
     CmdOpts_t o;
@@ -235,6 +265,7 @@ int cmd_prune(int argc, char **argv)
     }
     if (path == NULL) {
         count += prune_refs(&repo, (int)o.dry_run, &rc);
+        count += prune_inbox(&repo, (int)o.dry_run);
     }
     if ((count == 0U) && (rc == GS_EXIT_OK)) {
         puts(msg(MSG_PRUNE_NOTHING));

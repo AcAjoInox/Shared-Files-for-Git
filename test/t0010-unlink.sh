@@ -114,7 +114,7 @@ expect_eq "peer: C non conosce piu' B" "$(git -C ../C config --get-all "shared.$
 cd "$TRASH/A" || exit 1
 put p.h v2
 run git shared publish
-expect_out "peer: A pubblica solo a C" "sent to 1 of 1 peers"
+expect_out "peer: A pubblica solo a C" "1 of 1 peers notified"
 expect_fail "peer: B non riceve piu'" git -C ../B rev-parse -q --verify "refs/shared/$PID"
 
 # Peer irraggiungibile: avviso, unlink completato lo stesso.

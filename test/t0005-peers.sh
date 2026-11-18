@@ -111,12 +111,13 @@ expect_out "B: da pubblicare" "to publish"
 run git shared publish
 expect_rc "publish: codice 0" 0
 expect_out "publish: nuova versione" "new version created"
-expect_out "publish: inviata a tutti" "sent to 2 of 2 peers"
+expect_out "publish: inviata a tutti" "2 of 2 peers notified"
 expect_eq "publish: due versioni" "$(git rev-list --count "refs/shared/$ID")" 2
-expect_eq "publish: A ha ricevuto" \
-	"$(git -C ../A rev-parse "refs/shared/$ID")" "$(git rev-parse "refs/shared/$ID")"
-expect_eq "publish: C ha ricevuto" \
-	"$(git -C ../C rev-parse "refs/shared/$ID")" "$(git rev-parse "refs/shared/$ID")"
+T_B=$(git rev-parse "refs/shared/$ID")
+expect_ok "publish: avviso in A" test -f "$TRASH/A/.git/shared/inbox/$ID/$T_B"
+expect_ok "publish: avviso in C" test -f "$TRASH/C/.git/shared/inbox/$ID/$T_B"
+expect_fail "publish: la ref di A non la scrive B" \
+	test "$(git -C ../A rev-parse "refs/shared/$ID")" = "$T_B"
 expect_eq "publish: B allineato" "$(git shared status | grep state)" "    state  aligned"
 run git shared publish nessuno.md
 expect_rc "publish di un file non shared: codice 1" 1
@@ -126,6 +127,8 @@ cd "$TRASH/A" || exit 1
 expect_fail "A: file non toccato dalla ricezione" grep -q "riga aggiunta da B" breef.md
 run git shared status
 expect_out "A: da applicare" "new version to apply"
+expect_eq "A: ricevuta da status" "$(git rev-parse "refs/shared/$ID")" "$T_B"
+expect_fail "A: ricevere non e' applicare" grep -q "riga aggiunta da B" breef.md
 run git shared update
 expect_rc "update: codice 0" 0
 expect_out "update: applicata, da committare" "new version applied. Commit it to confirm."
@@ -177,7 +180,7 @@ expect_rc "update divergente: codice 1" 1
 # C e B hanno aggiunto righe in fondo: conflitto (le unioni sono in t0009)
 expect_err "update divergente: conflitto da risolvere" "merge conflict"
 
-# --- peer irraggiungibile e push rifiutato ----------------------------------------
+# --- peer irraggiungibile e avviso perso (D-099) ------------------------------------
 cd "$TRASH" || exit 1
 mv B B.off
 cd "$TRASH/A" || exit 1
@@ -185,7 +188,7 @@ printf 'modifica di A\n' >>breef.md
 git commit -q -a -m "A modifica"
 run git shared publish
 expect_rc "peer irraggiungibile: codice 0" 0
-expect_out "peer irraggiungibile: inviata agli altri" "sent to 1 of 2 peers"
+expect_out "peer irraggiungibile: inviata agli altri" "1 of 2 peers notified"
 expect_err "peer irraggiungibile: avviso" "not reachable"
 cd "$TRASH" || exit 1
 mv B.off B
@@ -193,9 +196,11 @@ cd "$TRASH/B" || exit 1
 printf 'modifica concorrente di B\n' >>breef.md
 git commit -q -a -m "B modifica senza aver visto A"
 run git shared publish
-expect_rc "push rifiutato: codice 1" 1
-expect_err "push rifiutato: errore" "rejected by"
+expect_rc "avviso perso: B pubblica" 0
+expect_out "avviso perso: A e C notificati" "2 of 2 peers notified"
 run git shared update
+expect_out "avviso perso: senza --all B non sa di A" "up to date"
+run git shared update --all
 expect_rc "versioni divergenti tra peer: codice 1" 1
 expect_err "versioni divergenti tra peer: conflitto da risolvere" "merge conflict"
 
@@ -236,7 +241,7 @@ expect_eq "destinazione non ASCII: path in .gitshared" \
 cd "$TRASH/U1" || exit 1
 put "dir è/perché.h" v2
 run git shared publish
-expect_out "non ASCII: publish a entrambi" "sent to 2 of 2 peers"
+expect_out "non ASCII: publish a entrambi" "2 of 2 peers notified"
 cd "$TRASH/U2" || exit 1
 run git shared update -c
 expect_out "non ASCII: update in U2" "dir è/perché.h: new version applied and committed"

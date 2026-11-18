@@ -6,7 +6,8 @@
  * i problemi diventano avvisi. Gli hook sono solo comodita' (D-041).
  *
  *   post-checkout, post-merge, post-rewrite
- *                  avvisano se un file non e' allineato (REQ-F-013)
+ *                  avvisano se un file non e' allineato (REQ-F-013) o se
+ *                  un peer ha annunciato una versione nuova (D-099)
  *
  * Nessun hook gira sui commit: si pubblica solo con "git shared publish" e
  * set/link si completano al primo comando git shared (D-074). Il blocco
@@ -20,9 +21,11 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "chain.h"
 #include "cmd.h"
 #include "cmd_common.h"
 #include "hooks.h"
+#include "inbox.h"
 #include "state.h"
 #include "sys.h"
 
@@ -32,6 +35,31 @@ static int is_live(const Repo_t *r, const SharedEntry_t *e)
     return e->in_gitshared && e->valid && e->in_config &&
            (e->pending == SHARED_PENDING_NONE) &&
            shared_is_active(e, str_cstr(&r->branch));
+}
+
+/* 1 se un peer ha annunciato una versione diversa da T (D-099). Niente
+ * fetch negli hook: girano dentro le operazioni di git. */
+static int announced(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b)
+{
+    Inbox_t in = INBOX_INIT;
+    Str_t ref = STR_INIT;
+    Oid_t t;
+    size_t k;
+    int found = 0;
+
+    inbox_read(r, e->id, &in);
+    if (in.oids.n > 0U) {
+        chain_ref(&ref, e->id);
+        if (git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) {
+            t.len = 0U;
+        }
+        for (k = 0U; (k < in.oids.n) && (found == 0); k++) {
+            found = !oid_eq(&in.oids.v[k], &t);
+        }
+    }
+    inbox_free(&in);
+    str_free(&ref);
+    return found;
 }
 
 /* post-checkout, post-merge, post-rewrite: avviso, senza modificare nulla
@@ -70,6 +98,9 @@ static void hook_warn(void)
                     msg_warning(MSG_HOOK_NOT_ALIGNED, str_cstr(&e->path),
                                 state_name(st), command);
                 }
+            }
+            if (is_live(&repo, e) && announced(&repo, e, &batch)) {
+                msg_warning(MSG_HOOK_ANNOUNCED, str_cstr(&e->path));
             }
         }
         git_batch_close(&batch);

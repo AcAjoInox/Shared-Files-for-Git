@@ -4,11 +4,12 @@ NOME
     git shared update - riceve le versioni nuove e le applica
 
 SINTASSI
-    git shared update [-f] [-c | -m <messaggio>] [<path>]
+    git shared update [-f] [--all] [-c | -m <messaggio>] [<path>]
     git shared update --abort [<path>]
 
 DESCRIZIONE
-    Riceve le versioni dai peer e scrive l'ultima nel file e nell'index.
+    Riceve le versioni annunciate dai peer e scrive l'ultima nel file e
+    nell'index. Scarica solo dai peer che hanno annunciato qualcosa.
     Non committa nulla, salvo -c o -m.
 
     Le modifiche non committate, anche quelle in staging, non vengono mai
@@ -38,6 +39,11 @@ DESCRIZIONE
 OPZIONI
     -f, --force
         Sovrascrive le modifiche non committate.
+
+    --all
+        Scarica da tutti i peer, non solo da quelli che hanno annunciato
+        una versione nuova: per un avviso andato perso, per esempio
+        mentre questa repo era spostata o non si raggiungeva.
 
     -c, --commit
         Committa subito i file applicati o uniti. Nient'altro di cio' che

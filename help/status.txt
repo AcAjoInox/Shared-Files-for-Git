@@ -9,6 +9,12 @@ SYNOPSIS
 DESCRIPTION
     Shows each shared file with its path, ID and state, and what to do.
 
+    First status receives the versions the peers announced: nothing is
+    fetched unless there is something new, and the working tree is not
+    touched. A note says when an announced version could not be
+    received, or when the version of a peer must be merged: in both
+    cases, update.
+
     aligned               you have the latest version: nothing to do
     new version to apply  a peer published a newer one: update
     applied, to commit    update applied it: commit
@@ -37,9 +43,11 @@ DESCRIPTION
 OPTIONS
     --peers
         Also shows, for each peer: same version; older version (publish);
-        newer or different version (update); no version yet (publish);
-        no longer shares the file, or not found (prune); cannot be read
-        now. Nothing is fetched or changed.
+        announced, not received yet (nothing to do: it will get it by
+        itself); newer or different version (update --all); no version
+        yet (publish); no longer shares the file, or not found (prune);
+        cannot be read now. Nothing is fetched from the peers or changed
+        in them.
 
 SEE ALSO
     git shared update --help, git shared publish --help

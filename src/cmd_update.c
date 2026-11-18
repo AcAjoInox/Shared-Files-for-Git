@@ -1,16 +1,16 @@
 /*
- * cmd_update.c - "git shared update [-f] [-c | -m <msg>] [<path>]"
- * (REQ-F-009, REQ-F-010, REQ-F-011, D-040, D-078).
+ * cmd_update.c - "git shared update [-f] [--all] [-c | -m <msg>] [<path>]"
+ * (REQ-F-009, REQ-F-010, REQ-F-011, D-040, D-078, D-099).
  *
  * Per ogni file shared (o quello indicato):
- *   1. fetch dai peer, in parallelo, in ref temporanee;
- *   2. se una versione ricevuta discende da T, T avanza in fast-forward
- *      (merge-base --independent: un solo processo per tutte le versioni);
- *      le versioni che non discendono da T restano da unire;
- *   3. un'unione in corso con la risoluzione in staging viene conclusa;
- *   4. il branch va a T: "da applicare" -> T nel working tree e
+ *   1. ricezione (receive.h): fetch solo dalle repo che hanno annunciato
+ *      una versione che qui manca, da tutti i peer con --all; se una
+ *      versione ricevuta discende da T, T avanza in fast-forward; le
+ *      versioni che non discendono da T restano da unire;
+ *   2. un'unione in corso con la risoluzione in staging viene conclusa;
+ *   3. il branch va a T: "da applicare" -> T nel working tree e
  *      nell'index; "divergente" -> unione a 3 vie (base, H, T);
- *   5. le versioni dei peer rimaste si uniscono una alla volta.
+ *   4. le versioni dei peer rimaste si uniscono una alla volta.
  * Ogni unione pulita crea la versione nella catena prima del commit:
  * dopo, il file e' "da committare" (D-076). Al primo conflitto ci si
  * ferma: stage nell'index, marker nel file, refs/shared-merge/<id>.
@@ -30,6 +30,7 @@
 #include "mem.h"
 #include "merge.h"
 #include "peers.h"
+#include "receive.h"
 #include "state.h"
 
 /* Esito di un passo di unione. */
@@ -50,126 +51,6 @@ static void add_once(Str_t *list, const char *label)
     if (!str_zhas(list, label)) {
         str_addz(list, label);
     }
-}
-
-/*
- * Riceve le versioni dei peer e avanza T se possibile. In `heads` restano
- * le versioni che non discendono da T e da cui T non discende: vanno
- * unite (REQ-F-011).
- */
-static eGsErr_t receive(const SharedEntry_t *e, GitBatch_t *b, int *advanced,
-                        OidList_t *heads)
-{
-    const char *label = str_cstr(&e->path);
-    size_t n = str_zcount(&e->peers);
-    uint8_t *ok = xmalloc((n > 0U) ? n : 1U);
-    PeerTally_t tally = { 0U, 0U, 0U };
-    OidList_t tops = OIDLIST_INIT;
-    Str_t ref = STR_INIT;
-    Str_t incoming = STR_INIT;
-    Str_t fetched = STR_INIT; /* ref temporanee da cancellare */
-    Str_t out = STR_INIT;
-    Str_t argbuf = STR_INIT;  /* oid esadecimali degli argomenti */
-    const char **args = NULL;
-    const char *h;
-    const char *nl;
-    char hex[OID_HEX_SIZE];
-    Oid_t t;
-    Oid_t in;
-    size_t k;
-    size_t pick;
-    size_t na = 0U;
-    eGsErr_t err = GS_OK;
-
-    *advanced = 0;
-    heads->n = 0U;
-    if (n == 0U) {
-        goto exit;
-    }
-    peers_fetch(label, e->id, &e->peers, ok, &tally);
-    for (k = 0U; k < n; k++) {
-        if (ok[k] != 0U) {
-            peers_incoming_ref(&incoming, e->id, (unsigned)k);
-            str_addz(&fetched, str_cstr(&incoming));
-        }
-    }
-
-    chain_ref(&ref, e->id);
-    if (git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) {
-        err = GS_ERR_GIT;
-        goto exit;
-    }
-    /* merge-base --independent T I1 I2 ...: restano le versioni che nessuna
-     * altra contiene. */
-    args = xmalloc((n + 4U) * sizeof *args);
-    args[na++] = "merge-base";
-    args[na++] = "--independent";
-    oid_to_hex(&t, hex);
-    str_addz(&argbuf, hex);
-    for (h = str_znext(&fetched, NULL); h != NULL; h = str_znext(&fetched, h)) {
-        if ((git_batch_query(b, h, &in) == GIT_OBJ_COMMIT) && !oid_eq(&in, &t)) {
-            oid_to_hex(&in, hex);
-            str_addz(&argbuf, hex);
-        }
-    }
-    if (str_zcount(&argbuf) <= 1U) {
-        goto exit; /* i peer hanno la stessa versione */
-    }
-    for (h = str_znext(&argbuf, NULL); h != NULL; h = str_znext(&argbuf, h)) {
-        args[na++] = h;
-    }
-    args[na] = NULL;
-    err = git_run(args, 0U, &out);
-    if (err != GS_OK) {
-        goto exit;
-    }
-    for (h = str_cstr(&out); *h != '\0'; h = (*nl == '\n') ? (nl + 1) : nl) {
-        nl = strchr(h, '\n');
-        nl = (nl != NULL) ? nl : (h + strlen(h));
-        if (oid_from_hex(&in, h, (size_t)(nl - h))) {
-            oidlist_add(&tops, &in);
-        }
-    }
-    /* T non e' tra le versioni rimaste: una di loro la contiene, e T avanza
-     * su quella, in fast-forward. Non e' per forza la prima: l'ordine e'
-     * quello dei peer (reportIdea B-47). Si chiede a git per ogni rimasta
-     * tranne l'ultima, che se nessun'altra la contiene e' lei. */
-    if ((tops.n > 0U) && !oidlist_has(&tops, &t)) {
-        pick = tops.n;
-        for (k = 0U; (k < tops.n) && (pick == tops.n); k++) {
-            if (((k + 1U) == tops.n) || merge_is_ancestor(&t, &tops.v[k])) {
-                pick = k;
-            }
-        }
-        err = git_update_ref(str_cstr(&ref), &tops.v[pick], &t,
-                             "git shared: update");
-        if (err != GS_OK) {
-            goto exit;
-        }
-        *advanced = 1;
-        t = tops.v[pick];
-    }
-    for (k = 0U; k < tops.n; k++) {
-        if (!oid_eq(&tops.v[k], &t)) {
-            oidlist_add(heads, &tops.v[k]);
-        }
-    }
-
-exit:
-    if (fetched.len > 0U) {
-        /* Gli oggetti restano nella repo: servono alle unioni di questo
-         * comando; un conflitto li lega a refs/shared-merge/<id>. */
-        (void)git_delete_refs(&fetched);
-    }
-    free((void *)args);
-    oidlist_free(&tops);
-    str_free(&argbuf);
-    str_free(&out);
-    str_free(&fetched);
-    str_free(&incoming);
-    str_free(&ref);
-    free(ok);
-    return err;
 }
 
 /* Un cat-file nuovo, che veda l'index appena modificato. */
@@ -416,7 +297,7 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
                         int *batch_ok, BranchNames_t *bn)
 {
     const char *label = str_cstr(&e->path);
-    OidList_t heads = OIDLIST_INIT; /* versioni dei peer da unire */
+    Received_t rv = RECEIVED_INIT; /* versioni dei peer da unire: rv.heads */
     StateInfo_t si;
     eState_t st;
     Oid_t cur;    /* contenuto attuale dell'index, se e' noto */
@@ -426,18 +307,17 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     Oid_t theirs;
     Oid_t result;
     size_t k;
-    int advanced = 0;
     int was_merged;
     int go_on = 1;
     eStep_t step;
 
     cur.len = 0U;
-    if (receive(e, b, &advanced, &heads) != GS_OK) {
+    if (receive_entry(r, e, b, (int)o->all, &rv) != GS_OK) {
         msg_error(MSG_ERR_CHAIN, str_cstr(&e->name));
         *rc = GS_EXIT_ERROR;
         goto exit;
     }
-    if (advanced != 0) {
+    if (rv.advanced != 0) {
         printf(msg(MSG_UPD_RECEIVED), label);
         putchar('\n');
     }
@@ -463,7 +343,7 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         if (was_merged) {
             printf(msg(MSG_UPD_MERGED_PUBLISH), label);
             putchar('\n');
-        } else if (heads.n == 0U) {
+        } else if (rv.heads.n == 0U) {
             printf(msg(MSG_UPD_UP_TO_DATE), label);
             putchar('\n');
         } else {
@@ -481,7 +361,7 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
          * working tree e' ancora quello (--only committa il WT). */
         cur = si.t;
         if (o->commit == 0U) {
-            if (heads.n == 0U) {
+            if (rv.heads.n == 0U) {
                 printf(msg(was_merged ? MSG_UPD_MERGED : MSG_UPD_TO_COMMIT),
                        label);
                 putchar('\n');
@@ -495,7 +375,7 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         }
     } else if (st == STATE_TO_PUBLISH) {
         cur = si.h;
-        if (heads.n == 0U) {
+        if (rv.heads.n == 0U) {
             printf(msg(MSG_UPD_TO_PUBLISH), label);
             putchar('\n');
         }
@@ -535,8 +415,8 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     }
 
     /* --- versioni dei peer che non discendono da T: una alla volta ------- */
-    for (k = 0U; (k < heads.n) && (cur.len > 0U); k++) {
-        if (merge_base(&tip, &heads.v[k], &mb) != GS_OK) {
+    for (k = 0U; (k < rv.heads.n) && (cur.len > 0U); k++) {
+        if (merge_base(&tip, &rv.heads.v[k], &mb) != GS_OK) {
             msg_error(MSG_ERR_MERGE, label);
             *rc = GS_EXIT_ERROR;
             break;
@@ -544,7 +424,7 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         /* Gia' contenuta in T: la conclusione di un'unione in corso
          * (settle_merge) l'ha appena unita. Unirla di nuovo creerebbe una
          * seconda versione con lo stesso contenuto (reportIdea B-49). */
-        if ((mb.len > 0U) && oid_eq(&mb, &heads.v[k])) {
+        if ((mb.len > 0U) && oid_eq(&mb, &rv.heads.v[k])) {
             continue;
         }
         if ((o->force == 0U) && cmd_has_local_changes(r, e, b)) {
@@ -552,14 +432,14 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
             *rc = GS_EXIT_ERROR;
             break;
         }
-        if (!version_blob(b, &heads.v[k], &theirs) ||
+        if (!version_blob(b, &rv.heads.v[k], &theirs) ||
             ((mb.len > 0U) && !version_blob(b, &mb, &base))) {
             msg_error(MSG_ERR_MERGE, label);
             *rc = GS_EXIT_ERROR;
             break;
         }
         step = merge_step(r, e, b, (mb.len > 0U) ? &base : NULL, &cur, &theirs,
-                          &cur, &heads.v[k], &tip, &result);
+                          &cur, &rv.heads.v[k], &tip, &result);
         if (refresh(b, batch_ok) != GS_OK) {
             *rc = GS_EXIT_FATAL;
             go_on = 0;
@@ -580,7 +460,7 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     }
 
 exit:
-    oidlist_free(&heads);
+    received_free(&rv);
     return go_on;
 }
 
@@ -653,7 +533,7 @@ int cmd_update(int argc, char **argv)
     int rc = GS_EXIT_USAGE;
 
     first = cmd_parse(argc, argv,
-                      CMD_OPT_COMMIT | CMD_OPT_FORCE | CMD_OPT_ABORT,
+                      CMD_OPT_COMMIT | CMD_OPT_FORCE | CMD_OPT_ABORT | CMD_OPT_ALL,
                       MSG_USAGE_UPDATE, &o);
     if (first < 0) {
         goto exit;
@@ -663,7 +543,7 @@ int cmd_update(int argc, char **argv)
         fputs(msg(MSG_USAGE_UPDATE), stderr);
         goto exit;
     }
-    if ((o.abort != 0U) && ((o.commit != 0U) || (o.force != 0U))) {
+    if ((o.abort != 0U) && ((o.commit != 0U) || (o.force != 0U) || (o.all != 0U))) {
         msg_error(MSG_ERR_ABORT_OPTS);
         fputs(msg(MSG_USAGE_UPDATE), stderr);
         goto exit;

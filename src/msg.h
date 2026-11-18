@@ -108,6 +108,7 @@ typedef enum {
     MSG_WARN_BRANCHES_GONE,  /* file, branch attivi, path */
     MSG_WARN_RELOCATE_NOT_MEMBER, /* file, path */
     MSG_HOOK_NOT_ALIGNED,    /* file, stato, comando */
+    MSG_HOOK_ANNOUNCED,      /* file */
     MSG_HOOKS_INSTALLED,
 
     MSG_SET_STAGED,          /* path, nome */
@@ -147,11 +148,12 @@ typedef enum {
     MSG_LANG_CURRENT,        /* lingua */
     MSG_LANG_SET,            /* lingua */
     MSG_PUB_CREATED,         /* file */
-    MSG_PUB_PUSHED,          /* file, peer raggiunti (unsigned), peer (unsigned) */
+    MSG_PUB_NOTIFIED,        /* file, peer raggiunti (unsigned), peer (unsigned) */
     MSG_PUB_NO_PEERS,        /* file */
     MSG_PUB_TO_APPLY,        /* file */
     MSG_PUB_DIVERGED,        /* file */
     MSG_PUB_MERGING,         /* file */
+    MSG_PUB_TO_MERGE,        /* file */
     MSG_SKIP_STATE,          /* file, stato */
     MSG_UPD_RECEIVED,        /* file */
     MSG_UPD_APPLIED,         /* file */
@@ -178,11 +180,14 @@ typedef enum {
     MSG_PEER_BEHIND,
     MSG_PEER_NEWER,
     MSG_PEER_NO_VERSION,
+    MSG_PEER_ANNOUNCED,
     MSG_PEER_LEFT,
     MSG_PEER_GONE,
     MSG_PEER_UNREACHABLE,
     MSG_STATUS_BRANCHES_GONE, /* branch attivi, path */
     MSG_STATUS_ELSEWHERE,    /* branch */
+    MSG_STATUS_ANNOUNCED,    /* repo che ha annunciato */
+    MSG_STATUS_TO_MERGE,     /* repo che ha annunciato */
 
     MSG_STATE_ALIGNED,
     MSG_STATE_TO_APPLY,

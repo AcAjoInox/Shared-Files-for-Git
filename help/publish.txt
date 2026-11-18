@@ -8,14 +8,19 @@ SYNOPSIS
 
 DESCRIPTION
     For each shared file changed and committed on top of the latest
-    version, creates a new version and sends it to every peer. A file
-    already aligned is sent again to the peers that do not have it.
+    version, creates a new version and tells every peer about it: a
+    small notice goes into the peer's .git folder, and the peer fetches
+    the version by itself at its next git shared command. For a file
+    already aligned, the notice is written again where it is missing.
 
     Committing never publishes: this is the only way.
 
-    A peer that already has a newer version refuses it. Run
-    'git shared update' to merge the two versions, commit, and publish
-    again. A peer that cannot be reached is skipped, with a warning.
+    First publish receives what the peers announced. If a peer published
+    a version that does not follow yours, run 'git shared update' to
+    merge the two versions, commit, and publish again. A peer that
+    cannot be reached is skipped, with a warning: publish again later.
+    A peer whose .git is a file (a secondary worktree) gets the version
+    with git push.
 
     Without <path>, all the shared files; with it, only that one.
 

@@ -4,12 +4,13 @@ NAME
     git shared update - get the new versions and apply them
 
 SYNOPSIS
-    git shared update [-f] [-c | -m <message>] [<path>]
+    git shared update [-f] [--all] [-c | -m <message>] [<path>]
     git shared update --abort [<path>]
 
 DESCRIPTION
-    Gets the versions from the peers and writes the latest one into the
-    file and the index. Nothing is committed unless -c or -m is given.
+    Receives the versions the peers announced and writes the latest one
+    into the file and the index. Nothing is committed unless -c or -m is
+    given. Only the peers that announced something are fetched from.
 
     Changes that are not committed, even staged ones, are never
     overwritten: update stops, unless -f is given. A version applied by
@@ -37,6 +38,11 @@ DESCRIPTION
 OPTIONS
     -f, --force
         Overwrite changes that are not committed.
+
+    --all
+        Fetch from every peer, not only from the ones that announced a
+        new version: for a notice that got lost, for example while this
+        repository was moved or could not be reached.
 
     -c, --commit
         Commit the applied or merged files right away. Nothing else

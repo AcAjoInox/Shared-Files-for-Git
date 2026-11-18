@@ -10,6 +10,7 @@
 #include "mem.h"
 #include "merge.h"
 #include "msg.h"
+#include "inbox.h"
 #include "peers.h"
 #include "sys.h"
 
@@ -914,6 +915,7 @@ eGsErr_t repo_forget(const Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
         }
     }
     err = git_delete_refs(&refs);
+    inbox_remove(str_cstr(&r->top), e->id); /* avvisi: suggerimenti */
 
     /* 3. Per ultima la sezione locale, attesa compresa: se ci si ferma
      * prima, il comando successivo ripete tutto. */

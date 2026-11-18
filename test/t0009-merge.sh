@@ -65,7 +65,7 @@ git commit -q -m "merge f.h"
 expect_eq "pulita: allineato dopo il commit" "$(state)" "    state  aligned"
 run git shared publish
 expect_rc "pulita: publish accettato" 0
-expect_out "pulita: inviata" "sent to 1 of 1 peers"
+expect_out "pulita: inviata" "1 of 1 peers notified"
 cd "$TRASH/A" || exit 1
 run git shared update -c
 expect_out "pulita: A la applica" "new version applied and committed"
@@ -127,7 +127,7 @@ expect_eq "risolto: da committare" "$(state)" "    state  applied, to commit"
 git commit -q -m "risolto"
 expect_eq "risolto: allineato" "$(state)" "    state  aligned"
 run git shared publish
-expect_out "risolto: inviata" "sent to 1 of 1 peers"
+expect_out "risolto: inviata" "1 of 1 peers notified"
 
 # --- abbandono con git restore (B-13) -------------------------------------------
 cd "$TRASH/C" || exit 1
@@ -149,7 +149,8 @@ change A-c b C-c2 d e
 git shared publish >/dev/null 2>&1
 T_C2=$(tip)
 cd "$TRASH/D" || exit 1
-expect_eq "B-17: T avanzata dal push" "$(tip)" "$T_C2"
+git shared status >/dev/null 2>&1 # D riceve (D-099)
+expect_eq "B-17: T avanzata, ricevuta da status" "$(tip)" "$T_C2"
 lines f.h a b C-cd2 d e
 git add f.h
 run git shared update -c
@@ -174,9 +175,9 @@ mv F.off F
 cd "$TRASH/F" || exit 1
 change a b c d F5
 run git shared publish
-expect_rc "peer: push rifiutato" 1
+expect_rc "peer: publish accettato, E notificato" 0
 T_F=$(tip)
-run git shared update
+run git shared update --all # l'avviso di E e' andato perso
 expect_rc "peer: codice 0" 0
 expect_out "peer: unite" "f.h: merged. Commit it to confirm"
 expect_eq "peer: contenuto" "$(tr '\n' ' ' <f.h)" "E1 b c d F5 "
@@ -200,17 +201,18 @@ cd "$TRASH/F" || exit 1
 expect_eq "B-46: F allineato dopo l'unione" "$(state)" "    state  aligned"
 change a b c d F5
 run git shared publish
-expect_out "B-46: F pubblica la rimozione" "sent to 1 of 1 peers"
+expect_out "B-46: F pubblica la rimozione" "1 of 1 peers notified"
 T_F2=$(tip)
 cd "$TRASH/E" || exit 1
 git reset -q --hard HEAD~1 # E torna al commit della sua versione T_E
+git shared status >/dev/null 2>&1 # E riceve (D-099)
 expect_eq "B-46: H di E e' la versione T_E" "$(git rev-parse HEAD:f.h)" \
 	"$(git rev-parse "$T_E:content")"
 expect_eq "B-46: T di E e' la versione di F" "$(tip)" "$T_F2"
 expect_eq "B-46: da applicare, non divergente" "$(state)" \
 	"    state  new version to apply"
 run git shared publish
-expect_no_out "B-46: publish non invia nulla" "sent to"
+expect_no_out "B-46: publish non invia nulla" "peers notified"
 run git shared update -c
 expect_rc "B-46: update codice 0" 0
 expect_out "B-46: applicata, non unita" "new version applied and committed"
@@ -242,7 +244,8 @@ git shared link -c ../L/f.h >/dev/null
 cd "$TRASH" && mv M M.off
 cd "$TRASH/L" || exit 1
 change L1 b c d e
-git shared publish >/dev/null 2>&1 # arriva solo a N
+git shared publish >/dev/null 2>&1 # avviso solo a N
+git -C "$TRASH/N" shared status >/dev/null 2>&1 # N riceve prima che L sparisca
 T_L=$(tip)
 cd "$TRASH" && mv L L.off
 cd "$TRASH/N" || exit 1
@@ -253,13 +256,13 @@ T_N=$(tip)
 cd "$TRASH" && mv L.off L && mv M.off M
 cd "$TRASH/M" || exit 1
 change a b c d M5
-git shared publish >/dev/null 2>&1 # rifiutata da L e da N
+git shared publish >/dev/null 2>&1 # notifica L e N
 T_M=$(tip)
 cd "$TRASH/L" || exit 1
 expect_eq "B-47: peer di L nell'ordine M, N" \
 	"$(git config --get-all "shared.$(shared_id f.h).peer" | sed 's|.*/||' | tr '\n' ' ')" \
 	"M N "
-run git shared update
+run git shared update --all # vN senza avviso: L era spostata
 expect_rc "B-47: codice 0" 0
 expect_out "B-47: versione ricevuta" "new version received"
 expect_ok "B-47: la T di prima e' antenata della nuova" \
@@ -282,9 +285,9 @@ T_O=$(tip)
 cd "$TRASH" && mv P.off P
 cd "$TRASH/P" || exit 1
 change P1 b c d e
-git shared publish >/dev/null 2>&1 # rifiutata da O
+git shared publish >/dev/null 2>&1 # notifica O
 T_P=$(tip)
-run git shared update
+run git shared update --all # l'avviso di O e' andato perso
 expect_rc "B-48: conflitto" 1
 expect_ok "B-48: unione registrata" has_marker
 git restore -s HEAD -SW -- f.h
@@ -349,7 +352,7 @@ expect_rc "abort <file> senza unione: codice 1" 1
 expect_err "abort <file> senza unione: messaggio" "f.h: no merge in progress"
 run git shared update --abort -c
 expect_rc "abort con -c: uso" 129
-expect_err "abort con -c: messaggio" "--abort cannot be used with -c, -m or -f"
+expect_err "abort con -c: messaggio" "--abort cannot be used with -c, -m, -f or --all"
 run git shared update -f --abort
 expect_rc "abort con -f: uso" 129
 
@@ -365,9 +368,9 @@ T_Q=$(tip)
 cd "$TRASH" && mv R.off R
 cd "$TRASH/R" || exit 1
 change R1 b c d e
-git shared publish >/dev/null 2>&1 # rifiutata da Q
+git shared publish >/dev/null 2>&1 # notifica Q
 T_R=$(tip)
-run git shared update
+run git shared update --all # l'avviso di Q e' andato perso
 expect_rc "B-49: conflitto" 1
 lines f.h QR1 b c d e
 git add f.h
@@ -380,7 +383,7 @@ expect_eq "B-49: contenuto della risoluzione" "$(git show HEAD:f.h | tr '\n' ' '
 	"QR1 b c d e "
 expect_eq "B-49: allineato" "$(state)" "    state  aligned"
 run git shared publish
-expect_out "B-49: inviata" "sent to 1 of 1 peers"
+expect_out "B-49: inviata" "1 of 1 peers notified"
 cd "$TRASH/Q" || exit 1
 run git shared update -c
 expect_out "B-49: Q applica" "new version applied and committed"
@@ -403,7 +406,7 @@ expect_out "squash: niente da committare" "f.h: merged, nothing to commit"
 expect_eq "squash: allineato" "$(state)" "    state  aligned"
 expect_eq "squash: file intatto" "$(tr '\n' ' ' <f.h)" "G1 b c d H5 "
 run git shared publish
-expect_out "squash: inviata" "sent to 1 of 1 peers"
+expect_out "squash: inviata" "1 of 1 peers notified"
 
 # --- amend dopo publish (B-34) ----------------------------------------------------
 cd "$TRASH/G" || exit 1

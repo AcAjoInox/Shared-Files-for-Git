@@ -14,8 +14,8 @@ DESCRIZIONE
     Un repository che esiste ma adesso non si riesce a leggere resta, con
     un avviso: prune non toglie mai cio' che potrebbe tornare.
 
-    Senza <path>, prune toglie anche i riferimenti rimasti di file non
-    piu' condivisi qui.
+    Senza <path>, prune toglie anche i riferimenti e gli avvisi di
+    versioni nuove rimasti di file non piu' condivisi qui.
 
 OPZIONI
     -n, --dry-run

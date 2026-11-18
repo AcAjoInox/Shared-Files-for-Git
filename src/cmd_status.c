@@ -5,6 +5,9 @@
  * file: tre in parallelo (radice, branch, config locale), poi .gitshared
  * e un solo cat-file per tutte le domande. La storia di un file si legge
  * solo quando H e T differiscono.
+ *
+ * Prima di ricavare lo stato si riceve (receive.h, D-099): senza avvisi
+ * nessun processo; con avvisi un fetch per repo annunciante, una volta.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,9 +20,23 @@
 #include "mem.h"
 #include "merge.h"
 #include "msg.h"
+#include "inbox.h"
 #include "peers.h"
+#include "receive.h"
 #include "shared.h"
 #include "state.h"
+
+/* Una nota per ogni repo dell'elenco (compatto). */
+static void print_notes(const Str_t *from, eMsgId_t what)
+{
+    const char *p;
+
+    for (p = str_znext(from, NULL); p != NULL; p = str_znext(from, p)) {
+        printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+        printf(msg(what), (*p != '\0') ? p : "?");
+        putchar('\n');
+    }
+}
 
 /* alt_path: path del file sul branch che lo dichiara, per un file non
  * dichiarato su questo (STATE_ABSENT); NULL altrimenti. */
@@ -58,7 +75,8 @@ static void print_entry(const Repo_t *r, const SharedEntry_t *e, eState_t st,
 /*
  * --peers (REQ-F-012, D-086): per ogni peer, se c'e', se condivide ancora
  * il file e com'e' la sua versione rispetto a T. Nessun fetch: si legge la
- * sua refs/shared/<id> e si confronta con la catena locale.
+ * sua refs/shared/<id> e si confronta con la catena locale. Un peer
+ * indietro che ha gia' l'avviso di T ricevera' da solo (D-099).
  */
 static void print_peers(const SharedEntry_t *e, GitBatch_t *b)
 {
@@ -107,6 +125,11 @@ static void print_peers(const SharedEntry_t *e, GitBatch_t *b)
                        ? MSG_PEER_BEHIND
                        : MSG_PEER_NEWER;
         }
+        /* Avviso di T gia' scritto nel peer: ricevera' da solo (D-099). */
+        if (((what == MSG_PEER_BEHIND) || (what == MSG_PEER_NO_VERSION)) &&
+            (t.len > 0U) && inbox_has(p, e->id, &t)) {
+            what = MSG_PEER_ANNOUNCED;
+        }
         if (k > 0U) {
             printf("    %-6s ", "");
         }
@@ -135,6 +158,8 @@ int cmd_status(int argc, char **argv)
     int found;
     int suspended;
     int with_peers = 0;
+    int received;
+    Received_t rv = RECEIVED_INIT;
     int rc = GS_EXIT_FATAL;
     eGsErr_t err;
 
@@ -177,6 +202,12 @@ int cmd_status(int argc, char **argv)
         if (e->in_gitshared && !e->valid) {
             msg_warning(MSG_WARN_BAD_ENTRY, str_cstr(&e->name));
         } else if (e->in_gitshared || e->in_config) {
+            /* Prima si riceve (D-099): lo stato e' quello giusto, non
+             * "allineato" con una nota. Senza avvisi resta tutto locale.
+             * Una catena assente la segnala lo stato. */
+            received = e->in_config && (e->pending == SHARED_PENDING_NONE) &&
+                       (e->id[0] != '\0') &&
+                       (receive_entry(&repo, e, &batch, 0, &rv) == GS_OK);
             if (state_derive(&repo, e, &batch, &st, NULL) != GS_OK) {
                 msg_fatal(MSG_ERR_PROC, "git");
                 rc = GS_EXIT_FATAL;
@@ -209,6 +240,14 @@ int cmd_status(int argc, char **argv)
                        e->in_gitshared ? str_cstr(&e->path) : e->id);
                 putchar('\n');
             }
+            /* Avvisi rimasti: versione non arrivata (fetch fallito) o da
+             * unire. Durante un'unione lo dice gia' lo stato. */
+            if (received) {
+                print_notes(&rv.missing, MSG_STATUS_ANNOUNCED);
+                if (st != STATE_MERGING) {
+                    print_notes(&rv.to_merge, MSG_STATUS_TO_MERGE);
+                }
+            }
             /* Peer: per i file collegati e non in attesa di set o link. */
             if (with_peers && e->in_config && (e->pending != SHARED_PENDING_SET) &&
                 (e->pending != SHARED_PENDING_LINK)) {
@@ -229,6 +268,7 @@ exit:
     }
     repo_close(&repo);
     branchnames_free(&names);
+    received_free(&rv);
     str_free(&alt_path);
     str_free(&elsewhere);
     str_free(&list);

@@ -39,8 +39,8 @@ Se `git shared` non viene trovato, aggiungi quella cartella al `PATH`. Su Window
 ## Le tre azioni
 | Azione | Cosa fa |
 |---|---|
-| **Pubblicare** | Crea una nuova versione del file e la invia ai peer raggiungibili |
-| **Ricevere** | Il peer registra che esiste una versione nuova. I suoi file **non vengono toccati** |
+| **Pubblicare** | Crea una nuova versione del file e la annuncia ai peer raggiungibili |
+| **Ricevere** | Il peer scarica la versione nuova nella propria storia delle versioni del file. I suoi file **non vengono toccati** |
 | **Applicare** | `git shared update` porta la versione nel tuo progetto; poi confermi con un commit |
 
 Ricevere e applicare sono separati di proposito: nessuno ti cambia un file sotto le mani mentre lavori.
@@ -56,6 +56,8 @@ Ricevere e applicare sono separati di proposito: nessuno ti cambia un file sotto
 Le repo stanno sulla stessa macchina e si conoscono tramite il loro path.
 
 **Quando si pubblica:** solo quando lo decidi tu, con `git shared publish`. Puoi committare, correggere, rifare il commit: i peer ricevono solo la versione che pubblichi. Il commit non costa nulla in più: git shared non interviene.
+
+**Come arriva:** `publish` lascia un piccolo avviso nella cartella `.git` delle altre repo, senza toccare altro. Ognuna scarica la versione da sé al suo primo comando `git shared` (di solito `status` o `update`). Se una repo non era raggiungibile (spostata, disco scollegato), rilancia `publish`, oppure lancia `git shared update --all` da quella repo. Se due repo pubblicano insieme arrivano entrambe le versioni, e `update` le unisce.
 
 ```bash
 # Nel progetto A: dichiaro shared l'header
@@ -120,8 +122,8 @@ Le repo stanno su un servizio di hosting. I peer non sono più path ma **URL**, 
 | `git shared link <file-in-altra-repo> [<destinazione>]` | Collega alla repo corrente un file shared di un'altra repo |
 | `git shared unlink <file>` | Toglie il file dalla condivisione; resta come file normale. Al commit gli altri progetti dimenticano questo |
 | `git shared status [--peers]` | Mostra lo stato di ogni file shared; con `--peers` anche se gli altri progetti hanno la stessa versione |
-| `git shared update [<file>]` | Prende le versioni dai peer e applica l'ultima; con `--abort` rinuncia a un'unione in corso |
-| `git shared publish [<file>]` | Crea la nuova versione e la invia ai peer |
+| `git shared update [--all] [<file>]` | Prende le versioni annunciate dai peer (con `--all` da tutti i peer) e applica l'ultima; con `--abort` rinuncia a un'unione in corso |
+| `git shared publish [<file>]` | Crea la nuova versione e la annuncia ai peer |
 | `git shared hook install` | Installa gli hook di avviso, per esempio in una repo i cui file shared non li hanno ancora |
 | `git shared mv <vecchio> <nuovo>` | Rinomina un file shared (non ancora nella prima versione) |
 | `git shared branch [<file>] [-a\|-rm <branch>]` | Mostra o modifica i branch su cui il file è shared (effetto immediato; `-a` e `-rm` sono le forme brevi di `--add` e `--remove`); con `--default` modifica l'elenco di default in `.gitshared`, con `--reset` lo ricopia in locale. Solo nomi esatti |

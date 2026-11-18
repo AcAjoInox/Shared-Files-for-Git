@@ -17,6 +17,7 @@
 #define CMD_OPT_FORCE  0x2U /* -f, --force */
 #define CMD_OPT_DRY_RUN 0x4U /* -n, --dry-run */
 #define CMD_OPT_ABORT  0x8U /* --abort (update, D-093) */
+#define CMD_OPT_ALL    0x10U /* --all (update, D-099) */
 
 typedef struct {
     const char *message; /* -m; NULL = messaggio standard */
@@ -24,6 +25,7 @@ typedef struct {
     unsigned force : 1U;
     unsigned dry_run : 1U;
     unsigned abort : 1U;
+    unsigned all : 1U;
 } CmdOpts_t;
 
 /*
@@ -93,11 +95,13 @@ int cmd_reopen(Repo_t *r, GitBatch_t *b);
 /*
  * Pubblica un file: con create != NULL crea prima la nuova versione (stato
  * "da pubblicare", la base e' T: D-065) dal blob di HEAD e dalla T che lo
- * stato ha usato (reportIdea B-31), poi invia T a tutti i peer.
- * GS_EXIT_OK, oppure GS_EXIT_ERROR se la versione non si crea o un peer
- * la rifiuta (messaggi stampati).
+ * stato ha usato (reportIdea B-31), poi scrive l'avviso di T in tutti i
+ * peer (D-099); un peer con .git file riceve con il push. tip = T come
+ * l'ha letta lo stato. GS_EXIT_OK, oppure GS_EXIT_ERROR se la versione non
+ * si crea o il push di ripiego e' rifiutato (messaggi stampati).
  */
-int cmd_publish_entry(const SharedEntry_t *e, const StateInfo_t *create);
+int cmd_publish_entry(const Repo_t *r, const SharedEntry_t *e,
+                      const StateInfo_t *create, const Oid_t *tip);
 
 /* Path dell'utente (relativo alla cartella corrente) -> relativo alla
  * radice. 0 se assoluto o fuori dalla repo. */

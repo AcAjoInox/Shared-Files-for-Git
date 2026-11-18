@@ -14,8 +14,8 @@ DESCRIPTION
     A repository that exists but cannot be read right now is kept, with
     a warning: prune never removes what may come back.
 
-    Without <path>, prune also removes the leftover references of files
-    no longer shared here.
+    Without <path>, prune also removes the leftover references, and the
+    notices of new versions, of files no longer shared here.
 
 OPTIONS
     -n, --dry-run

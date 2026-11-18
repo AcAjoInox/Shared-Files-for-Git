@@ -57,10 +57,13 @@ expect_out "irraggiungibile perche' spostato: non trovato" "$TOP_C: not found: i
 mv "$TRASH/C.off" "$TRASH/C"
 run git shared status --peers
 expect_out "indietro: publish" "$TOP_C: older version: run 'git shared publish'"
-expect_out "indietro: B allineato" "$TOP_B: same version"
+expect_out "indietro: B annunciata, non ancora ricevuta" "$TOP_B: announced, not received yet: nothing to do"
 git shared publish >/dev/null 2>&1
 run git shared status --peers
-expect_out "dopo publish: C allineato" "$TOP_C: same version"
+expect_out "dopo publish: C annunciata" "$TOP_C: announced, not received yet: nothing to do"
+for R in B C; do (cd "$TRASH/$R" && git shared status >/dev/null 2>&1); done # ricevono
+run git shared status --peers
+expect_out "dopo la ricezione: C allineato" "$TOP_C: same version"
 
 # --- peer avanti: ha una versione che qui non c'e' --------------------------------------
 mv "$TRASH/A" "$TRASH/A.off"
@@ -71,11 +74,11 @@ git shared publish >/dev/null 2>&1
 mv "$TRASH/A.off" "$TRASH/A"
 cd "$TRASH/A" || exit 1
 run git shared status --peers
-expect_out "avanti: update" "$TOP_B: newer or different version: run 'git shared update'"
-git shared update -c >/dev/null 2>&1
+expect_out "avanti: update" "$TOP_B: newer or different version: run 'git shared update --all'"
+git shared update --all -c >/dev/null 2>&1 # A era spostata: nessun avviso
 run git shared status --peers
 expect_out "dopo update: B allineato" "$TOP_B: same version"
-expect_out "dopo update: C ha la versione di B" "$TOP_C: same version"
+expect_out "dopo update: C annunciata da B" "$TOP_C: announced, not received yet: nothing to do"
 
 # --- divergenza tra peer: versione diversa ---------------------------------------------------
 mv "$TRASH/A" "$TRASH/A.off"
@@ -91,7 +94,7 @@ git shared publish >/dev/null 2>&1
 git -C ../C fetch -q "$TOP_A" "+refs/shared/$(shared_id p.h):refs/tmp-a" 2>/dev/null
 git fetch -q "$TOP_C" "+refs/shared/$(shared_id p.h):refs/tmp-c" 2>/dev/null
 run git shared status --peers
-expect_out "divergente (oggetto presente): update" "$TOP_C: newer or different version: run 'git shared update'"
+expect_out "divergente (oggetto presente): update" "$TOP_C: newer or different version: run 'git shared update --all'"
 
 # --- peer uscito, nessuna versione, illeggibile -----------------------------------------------
 group D E F G

@@ -10,6 +10,7 @@
 #include "chain.h"
 #include "mem.h"
 #include "path.h"
+#include "inbox.h"
 #include "peers.h"
 #include "sys.h"
 
@@ -30,6 +31,7 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
     o->force = 0U;
     o->dry_run = 0U;
     o->abort = 0U;
+    o->all = 0U;
     while ((i < argc) && (end_opts == 0) && (argv[i][0] == '-') &&
            (argv[i][1] != '\0')) {
         if (strcmp(argv[i], "--") == 0) {
@@ -58,6 +60,9 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
         } else if (((allowed & CMD_OPT_ABORT) != 0U) &&
                    (strcmp(argv[i], "--abort") == 0)) {
             o->abort = 1U;
+        } else if (((allowed & CMD_OPT_ALL) != 0U) &&
+                   (strcmp(argv[i], "--all") == 0)) {
+            o->all = 1U;
         } else {
             msg_error(MSG_ERR_UNKNOWN_OPT, argv[i]);
             goto exit;
@@ -342,7 +347,8 @@ int cmd_reopen(Repo_t *r, GitBatch_t *b)
 
 /* Nuova versione: blob di HEAD, genitore T, ref condizionata a T. H e T
  * sono quelli da cui e' stato ricavato lo stato (reportIdea B-31). */
-static eGsErr_t new_version(const SharedEntry_t *e, const StateInfo_t *si)
+static eGsErr_t new_version(const SharedEntry_t *e, const StateInfo_t *si,
+                            Oid_t *v_out)
 {
     Str_t ref = STR_INIT;
     Oid_t v;
@@ -354,19 +360,25 @@ static eGsErr_t new_version(const SharedEntry_t *e, const StateInfo_t *si)
         chain_ref(&ref, e->id);
         err = git_update_ref(str_cstr(&ref), &v, &si->tip, "git shared: publish");
     }
+    if (err == GS_OK) {
+        *v_out = v;
+    }
     str_free(&ref);
     return err;
 }
 
-int cmd_publish_entry(const SharedEntry_t *e, const StateInfo_t *create)
+int cmd_publish_entry(const Repo_t *r, const SharedEntry_t *e,
+                      const StateInfo_t *create, const Oid_t *tip)
 {
     PeerTally_t tally = { 0U, 0U, 0U };
+    Str_t push = STR_INIT; /* peer con .git file: ripiego sul push */
     const char *label = str_cstr(&e->path);
     unsigned npeers = (unsigned)str_zcount(&e->peers);
+    Oid_t t = *tip;
     int rc = GS_EXIT_OK;
 
     if (create != NULL) {
-        if (new_version(e, create) != GS_OK) {
+        if (new_version(e, create, &t) != GS_OK) {
             msg_error(MSG_ERR_PUBLISH, label);
             rc = GS_EXIT_ERROR;
             goto exit;
@@ -379,14 +391,19 @@ int cmd_publish_entry(const SharedEntry_t *e, const StateInfo_t *create)
         putchar('\n');
         goto exit;
     }
-    peers_push(label, e->id, &e->peers, &tally);
-    printf(msg(MSG_PUB_PUSHED), label, tally.ok, npeers);
+    /* In locale una notifica, non la catena (D-099): nessun processo. */
+    inbox_notify(label, e->id, &e->peers, str_cstr(&r->top), &t, &tally, &push);
+    if (push.len > 0U) {
+        peers_push(label, e->id, &push, &tally);
+    }
+    printf(msg(MSG_PUB_NOTIFIED), label, tally.ok, npeers);
     putchar('\n');
     if (tally.rejected > 0U) {
         rc = GS_EXIT_ERROR;
     }
 
 exit:
+    str_free(&push);
     return rc;
 }
 

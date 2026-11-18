@@ -5,6 +5,7 @@
 
 #include "sys.h"
 
+#include <dirent.h>
 #include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
@@ -128,4 +129,37 @@ int sys_is_dir(const char *path)
     struct stat st;
 
     return (stat(path, &st) == 0) && S_ISDIR(st.st_mode);
+}
+
+int sys_mkdir(const char *path)
+{
+    return ((mkdir(path, 0777) == 0) || sys_is_dir(path)) ? 0 : -1;
+}
+
+int sys_rmdir(const char *path)
+{
+    return rmdir(path);
+}
+
+int sys_rename(const char *from, const char *to)
+{
+    return rename(from, to);
+}
+
+eGsErr_t sys_list_dir(const char *path, Str_t *names)
+{
+    DIR *d = opendir(path);
+    const struct dirent *de;
+    eGsErr_t err = GS_ERR_SYS;
+
+    if (d != NULL) {
+        for (de = readdir(d); de != NULL; de = readdir(d)) {
+            if ((strcmp(de->d_name, ".") != 0) && (strcmp(de->d_name, "..") != 0)) {
+                str_addz(names, de->d_name);
+            }
+        }
+        (void)closedir(d);
+        err = GS_OK;
+    }
+    return err;
 }

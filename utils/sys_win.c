@@ -212,3 +212,63 @@ int sys_is_dir(const char *path)
     return (attr != INVALID_FILE_ATTRIBUTES) &&
            ((attr & FILE_ATTRIBUTE_DIRECTORY) != 0U);
 }
+
+int sys_mkdir(const char *path)
+{
+    wchar_t *wpath = win_utf8_to_wide(path);
+    BOOL made = CreateDirectoryW(wpath, NULL);
+
+    free(wpath);
+    return (made || sys_is_dir(path)) ? 0 : -1;
+}
+
+int sys_rmdir(const char *path)
+{
+    wchar_t *wpath = win_utf8_to_wide(path);
+    BOOL done = RemoveDirectoryW(wpath);
+
+    free(wpath);
+    return done ? 0 : -1;
+}
+
+int sys_rename(const char *from, const char *to)
+{
+    wchar_t *wfrom = win_utf8_to_wide(from);
+    wchar_t *wto = win_utf8_to_wide(to);
+    BOOL done = MoveFileExW(wfrom, wto, MOVEFILE_REPLACE_EXISTING);
+
+    free(wto);
+    free(wfrom);
+    return done ? 0 : -1;
+}
+
+eGsErr_t sys_list_dir(const char *path, Str_t *names)
+{
+    Str_t pattern = STR_INIT;
+    WIN32_FIND_DATAW fd;
+    HANDLE h;
+    wchar_t *wpat;
+    char *u8;
+    eGsErr_t err = GS_ERR_SYS;
+
+    str_addf(&pattern, "%s/*", path);
+    wpat = win_utf8_to_wide(str_cstr(&pattern));
+    h = FindFirstFileW(wpat, &fd);
+    free(wpat);
+    if (h == INVALID_HANDLE_VALUE) {
+        goto exit;
+    }
+    do {
+        if ((wcscmp(fd.cFileName, L".") != 0) && (wcscmp(fd.cFileName, L"..") != 0)) {
+            u8 = win_wide_to_utf8(fd.cFileName);
+            str_addz(names, u8);
+            free(u8);
+        }
+    } while (FindNextFileW(h, &fd));
+    (void)FindClose(h);
+    err = GS_OK;
+
+exit:
+    str_free(&pattern);
+    return err;
+}

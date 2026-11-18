@@ -99,7 +99,7 @@ static const char *const msg_en[] = {
     [MSG_USAGE_PUBLISH] =
         "usage: git shared publish [<path>]\n",
     [MSG_USAGE_UPDATE] =
-        "usage: git shared update [-f] [-c | -m <message>] [<path>]\n"
+        "usage: git shared update [-f] [--all] [-c | -m <message>] [<path>]\n"
         "   or: git shared update --abort [<path>]\n"
         "\n"
         "Diverged versions are merged. After a conflict: fix the file,\n"
@@ -107,6 +107,8 @@ static const char *const msg_en[] = {
         "'git shared update --abort'.\n"
         "\n"
         "    -f, --force       overwrite local changes\n"
+        "    --all             fetch from every peer, not only from the\n"
+        "                      ones that announced a new version\n"
         "    -c, --commit      commit the applied files right away\n"
         "    -m <message>      commit right away with <message>\n"
         "    --abort           give up the merge in progress\n",
@@ -216,7 +218,7 @@ static const char *const msg_en[] = {
         "'git shared update' (to give up: git shared update --abort '%s')",
     [MSG_ERR_NO_MERGE] = "%s: no merge in progress",
     [MSG_ERR_NO_MERGE_ANY] = "no merge in progress",
-    [MSG_ERR_ABORT_OPTS] = "--abort cannot be used with -c, -m or -f",
+    [MSG_ERR_ABORT_OPTS] = "--abort cannot be used with -c, -m, -f or --all",
 
     [MSG_WARN_BAD_ENTRY] = "ignoring invalid entry '%s' in .gitshared",
     [MSG_WARN_NOT_IN_HEAD] =
@@ -251,6 +253,8 @@ static const char *const msg_en[] = {
         "run 'git shared branch %s -a <branch>'",
     [MSG_WARN_RELOCATE_NOT_MEMBER] = "%s: %s does not share this file: skipped",
     [MSG_HOOK_NOT_ALIGNED] = "%s: %s (run 'git shared %s')",
+    [MSG_HOOK_ANNOUNCED] =
+        "%s: new version announced by a peer (run 'git shared update')",
     [MSG_HOOKS_INSTALLED] = "Hooks installed.",
 
     [MSG_SET_STAGED] =
@@ -294,7 +298,7 @@ static const char *const msg_en[] = {
     [MSG_LANG_CURRENT] = "%s",
     [MSG_LANG_SET] = "Manual language: %s.",
     [MSG_PUB_CREATED] = "%s: new version created",
-    [MSG_PUB_PUSHED] = "%s: sent to %u of %u peers",
+    [MSG_PUB_NOTIFIED] = "%s: %u of %u peers notified",
     [MSG_PUB_NO_PEERS] = "%s: no peers to send it to",
     [MSG_PUB_TO_APPLY] =
         "%s: a newer version exists: run 'git shared update' first",
@@ -302,6 +306,9 @@ static const char *const msg_en[] = {
         "%s: diverged from the latest version: run 'git shared update'",
     [MSG_PUB_MERGING] =
         "%s: merge in progress: run 'git shared update' first",
+    [MSG_PUB_TO_MERGE] =
+        "%s: a version from a peer does not follow this one: run "
+        "'git shared update' to merge it first",
     [MSG_SKIP_STATE] = "%s: %s, nothing to do",
     [MSG_UPD_RECEIVED] = "%s: new version received",
     [MSG_UPD_ABORTED] =
@@ -333,13 +340,20 @@ static const char *const msg_en[] = {
     [MSG_STATUS_FIELD_PEERS] = "peers",
     [MSG_PEER_SAME] = "same version",
     [MSG_PEER_BEHIND] = "older version: run 'git shared publish'",
-    [MSG_PEER_NEWER] = "newer or different version: run 'git shared update'",
+    [MSG_PEER_NEWER] =
+        "newer or different version: run 'git shared update --all'",
     [MSG_PEER_NO_VERSION] = "no version yet: run 'git shared publish'",
+    [MSG_PEER_ANNOUNCED] = "announced, not received yet: nothing to do",
     [MSG_PEER_LEFT] = "no longer shares the file: run 'git shared prune'",
     [MSG_PEER_GONE] = "not found: if it was deleted, run 'git shared prune'",
     [MSG_PEER_UNREACHABLE] = "cannot be read now",
     [MSG_STATUS_ELSEWHERE] =
         "shared on branch '%s', not on this one: nothing to do here",
+    [MSG_STATUS_ANNOUNCED] =
+        "new version announced by %s, not received: "
+        "run 'git shared update'",
+    [MSG_STATUS_TO_MERGE] =
+        "the version of %s must be merged: run 'git shared update'",
     [MSG_STATUS_BRANCHES_GONE] =
         "none of its active branches exists (%s): "
         "git shared branch %s -a <branch>",

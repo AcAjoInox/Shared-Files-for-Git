@@ -84,12 +84,12 @@ expect_eq "relocate: C conosce il nuovo path" "$(peers_of C "$ID")" "$(sorted "$
 expect_eq "relocate: selfPath aggiornato" "$(git config shared.selfPath)" "$TOP_B2"
 run git shared status
 expect_eq "relocate: nessun avviso dopo" "$ERR" ""
-run git shared update -c
+run git shared update --all -c # avviso perso: B era spostata (D-099)
 expect_out "relocate: update funziona" "new version applied and committed"
 cd "$TRASH/A" || exit 1
 put p.h v3
 run git shared publish
-expect_out "relocate: publish raggiunge tutti" "sent to 2 of 2 peers"
+expect_out "relocate: publish raggiunge tutti" "2 of 2 peers notified"
 
 # Ripetuto con il vecchio path esplicito, relativo: nessun doppione.
 cd "$TRASH/B2" || exit 1
@@ -118,7 +118,7 @@ expect_eq "--copy: nessun avviso dopo" "$ERR" ""
 cd "$TRASH/A" || exit 1
 put p.h v4
 run git shared publish
-expect_out "--copy: publish a tutte" "sent to 3 of 3 peers"
+expect_out "--copy: publish a tutte" "3 of 3 peers notified"
 
 cd "$TRASH/B2" || exit 1
 run git shared relocate --copy ../B
@@ -138,7 +138,7 @@ expect_out "--peer: messaggio" "p.h: peer $TOP_F is now $TOP_F2"
 expect_eq "--peer: elenco aggiornato" "$(peers_of E "$ID")" "$TOP_F2"
 put p.h v2
 run git shared publish
-expect_out "--peer: publish raggiunge il peer" "sent to 1 of 1 peers"
+expect_out "--peer: publish raggiunge il peer" "1 of 1 peers notified"
 run git shared relocate --peer ../F ../F2
 expect_rc "--peer ripetuto: nessun peer con quel path" 1
 expect_err "--peer ripetuto: errore" "no shared file here has $TOP_F as a peer"

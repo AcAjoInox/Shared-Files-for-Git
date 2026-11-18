@@ -61,7 +61,7 @@ expect_eq "default: A non riceve al commit" "$(git -C ../A rev-parse "refs/share
 run git shared status
 expect_out "default: B da pubblicare" "to publish"
 run git shared publish
-expect_out "publish: inviata ad A" "sent to 1 of 1 peers"
+expect_out "publish: inviata ad A" "1 of 1 peers notified"
 
 # --- shared.autoPublish rimasto in config: ignorato (D-074) ------------------
 git config shared.autoPublish true
@@ -76,7 +76,7 @@ expect_eq "autoPublish in config: commit senza output" "$OUT$ERR" ""
 expect_eq "autoPublish in config: A non riceve al commit" \
 	"$(git -C ../A rev-parse "refs/shared/$ID")" "$OLD_A"
 run git shared publish
-expect_out "autoPublish in config: si pubblica con publish" "sent to 1 of 1 peers"
+expect_out "autoPublish in config: si pubblica con publish" "1 of 1 peers notified"
 git config --unset shared.autoPublish
 
 # --- post-checkout: avviso solo sul branch attivo (REQ-F-013) -----------------
@@ -84,7 +84,7 @@ cd "$TRASH/A" || exit 1
 git checkout -q -b feature 2>/dev/null
 run git checkout -q main
 expect_err "post-checkout: avviso sul branch attivo" \
-	"breef.md: new version to apply (run 'git shared update')"
+	"breef.md: new version announced by a peer (run 'git shared update')"
 run git checkout -q feature
 case "$ERR" in
 *breef.md*) not_ok "post-checkout: nessun avviso sul branch sospeso" "$ERR" ;;
@@ -163,7 +163,7 @@ chmod +x .git/hooks/pre-push
 put p.h v2
 run git shared publish
 expect_rc "pre-push dell'utente: publish riuscito" 0
-expect_out "pre-push dell'utente: inviata" "sent to 1 of 1 peers"
+expect_out "pre-push dell'utente: inviata" "1 of 1 peers notified"
 expect_fail "pre-push dell'utente: non eseguito" test -f "$TRASH/prepush.log"
 run git -C ../PB shared status
 expect_out "pre-push dell'utente: il peer la riceve" "new version to apply"

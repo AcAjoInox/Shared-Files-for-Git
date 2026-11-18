@@ -8,14 +8,19 @@ SINTASSI
 
 DESCRIZIONE
     Per ogni file shared modificato e committato sopra l'ultima versione,
-    crea una versione nuova e la invia a tutti i peer. Un file gia'
-    allineato viene inviato di nuovo ai peer che non lo hanno.
+    crea una versione nuova e la annuncia a tutti i peer: un piccolo
+    avviso va nella cartella .git del peer, che scarica la versione da
+    se' al suo comando git shared successivo. Per un file gia' allineato
+    l'avviso si riscrive dove manca.
 
     Il commit non pubblica mai: questo e' l'unico modo.
 
-    Un peer che ha gia' una versione piu' nuova la rifiuta. Lancia
+    Prima publish riceve cio' che i peer hanno annunciato. Se un peer ha
+    pubblicato una versione che non segue la tua, lancia
     'git shared update' per unire le due versioni, committa e pubblica
-    di nuovo. Un peer che non si raggiunge viene saltato, con un avviso.
+    di nuovo. Un peer che non si raggiunge viene saltato, con un avviso:
+    pubblica di nuovo piu' tardi. Un peer la cui .git e' un file (un
+    worktree secondario) riceve la versione con git push.
 
     Senza <path>, tutti i file shared; con <path>, solo quello.
 

@@ -37,12 +37,20 @@ DESCRIZIONE
                           prima del set): la nota dice su quale branch e'
                           shared. Niente da fare.
 
+    Prima status riceve le versioni annunciate dai peer: non scarica
+    nulla se non c'e' niente di nuovo, e non tocca il working tree. Una
+    nota dice quando una versione annunciata non si e' potuta ricevere,
+    o quando la versione di un peer va unita: in entrambi i casi,
+    update.
+
 OPZIONI
     --peers
         Mostra anche, per ogni peer: stessa versione; versione piu'
-        vecchia (publish); versione piu' nuova o diversa (update); nessuna
-        versione (publish); non condivide piu' il file, o non trovato
-        (prune); non leggibile adesso. Non scarica e non cambia nulla.
+        vecchia (publish); annunciata, non ancora ricevuta (niente da
+        fare: la ricevera' da se'); versione piu' nuova o diversa
+        (update --all); nessuna versione (publish); non condivide piu' il
+        file, o non trovato (prune); non leggibile adesso. Dai peer non
+        scarica e non cambia nulla.
 
 VEDI ANCHE
     git shared update --help, git shared publish --help
