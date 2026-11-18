@@ -981,8 +981,8 @@ Non ancora decise. Ognuna diventa una decisione o viene scartata prima di entrar
 **Punti aperti.**
 1. `status` che riceve (stato giusto, un fetch quando ci sono novità) oppure `status` che mostra solo una nota (sempre locale, ma *allineato* insieme a una nota). Proposta: riceve.
 2. `update` fa oggi il fetch da tutti i peer, O(N) processi anche lui. Con gli avvisi potrebbe farlo solo dalle repo annuncianti, e da tutti con un'opzione. Da decidere con il punto 1.
-3. Messaggi: `publish` dice "notified N of N peers" invece di "sent".
-4. Test nuovi: invio, ricezione da `status`/`update`/`publish`, avviso perso, avviso divergente, path sconosciuto, ID sconosciuto, ripiego con `.git` file, `status --peers`, `prune`. Misura di `publish` verso 32 peer prima e dopo (REQ-NF-007).
+3. Messaggi: `publish` dice "peers notified" ("`<file>`: N of M peers notified") invece di "sent to N of M peers". **Accettato dall'autore** (2026-11-18).
+4. Test nuovi (**accettati dall'autore**, 2026-11-18): invio, ricezione da `status`/`update`/`publish`, avviso perso, avviso divergente, path sconosciuto, ID sconosciuto, ripiego con `.git` file, `status --peers`, `prune`. Misura di `publish` verso 32 peer prima e dopo (REQ-NF-007).
 
 **Stima del guadagno** (non misurata): `publish` ≈ la parte locale (tre processi) più N scritture di file piccoli, sotto il millisecondo l'una; il costo di ricezione lo paga una volta per novità chi riceve. Scartati: `publish` in background (stesso lavoro totale, rifiuti visti in ritardo) e processi git sempre vivi (servirebbe un demone per repo, contro D-012).
 
