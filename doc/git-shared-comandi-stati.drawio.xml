@@ -61,7 +61,7 @@
         <mxCell id="c18" value="&lt;b&gt;git commit&lt;/b&gt;, poi il primo comando git shared&lt;br&gt;(o subito con -c / -m):&lt;br&gt;catena creata, branch attivi, peer che si conoscono" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="1" source="c7" target="c12">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="c19" value="&lt;b&gt;git shared unlink&lt;/b&gt; + commit &amp;nbsp;&lt;i&gt;(fuori dalla v0)&lt;/i&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;strokeColor=#999999;fontColor=#666666;exitX=0.15;exitY=0;entryX=0;entryY=0.5;" edge="1" parent="1" source="c12" target="c5">
+        <mxCell id="c19" value="&lt;b&gt;git shared unlink&lt;/b&gt; + commit" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;strokeColor=#999999;fontColor=#666666;exitX=0.15;exitY=0;entryX=0;entryY=0.5;" edge="1" parent="1" source="c12" target="c5">
           <mxGeometry relative="1" as="geometry">
             <Array as="points">
               <mxPoint x="810" y="310"/>
@@ -73,10 +73,10 @@
         <mxCell id="c20" value="modifichi il file + &lt;b&gt;git commit&lt;/b&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.25;entryX=0;entryY=0.25;" edge="1" parent="1" source="c12" target="c13">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="c21" value="&lt;b&gt;git shared publish&lt;/b&gt;&lt;br&gt;nuova versione, inviata ai peer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.75;entryX=1;entryY=0.75;" edge="1" parent="1" source="c13" target="c12">
+        <mxCell id="c21" value="&lt;b&gt;git shared publish&lt;/b&gt;&lt;br&gt;nuova versione, annunciata ai peer" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.75;entryX=1;entryY=0.75;" edge="1" parent="1" source="c13" target="c12">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="c22" value="un peer pubblica:&lt;br&gt;T avanza, il tuo file non è toccato" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="c12" target="c14">
+        <mxCell id="c22" value="un peer pubblica (avviso): al tuo primo&lt;br&gt;comando git shared T avanza,&lt;br&gt;il tuo file non è toccato" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="c12" target="c14">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="c23" value="&lt;b&gt;git shared update&lt;/b&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.35;exitY=1;entryX=0.35;entryY=0;" edge="1" parent="1" source="c14" target="c15">
@@ -88,7 +88,7 @@
         <mxCell id="c25" value="&lt;b&gt;git commit&lt;/b&gt; &amp;nbsp;(o update -c)" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=1;exitY=0.25;entryX=0.5;entryY=1;" edge="1" parent="1" source="c15" target="c12">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="c26" value="un peer pubblica prima di te:&lt;br&gt;T avanza" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="c13" target="c16">
+        <mxCell id="c26" value="un peer pubblica prima di te:&lt;br&gt;ricevuta, T avanza" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="c13" target="c16">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="c27" value="modifichi e committi senza fare update" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0.9;exitY=1;entryX=0.2;entryY=0;" edge="1" parent="1" source="c14" target="c16">
@@ -105,7 +105,7 @@
         <mxCell id="c29" value="&lt;b&gt;git shared update&lt;/b&gt;:&lt;br&gt;le stesse righe cambiate da due parti" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;strokeColor=#b85450;exitX=0.35;exitY=1;entryX=1;entryY=0.3;" edge="1" parent="1" source="c16" target="c17">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="c30" value="rinunci: git restore -s HEAD -SW &amp;lt;file&amp;gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.75;entryX=0.75;entryY=1;" edge="1" parent="1" source="c17" target="c16">
+        <mxCell id="c30" value="rinunci: git shared update --abort" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;exitX=1;exitY=0.75;entryX=0.75;entryY=1;" edge="1" parent="1" source="c17" target="c16">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
         <mxCell id="c31" value="correggi il file, &lt;b&gt;git add&lt;/b&gt;,&lt;br&gt;poi &lt;b&gt;git shared update&lt;/b&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;exitX=0;exitY=0.5;entryX=0.5;entryY=1;" edge="1" parent="1" source="c17" target="c15">
@@ -114,8 +114,8 @@
         <mxCell id="c32" value="&lt;b&gt;Dopo un'unione&lt;/b&gt;: commit, poi &lt;b&gt;git shared publish&lt;/b&gt; per inviarla ai peer." style="shape=note;size=12;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=6;spacingRight=4;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="300" y="760" width="220" height="56" as="geometry"/>
         </mxCell>
-        <mxCell id="c33" value="&lt;b&gt;Publish rifiutato&lt;/b&gt; (un peer ha una versione che non hai): lancia &lt;b&gt;update&lt;/b&gt;. Le due versioni vengono unite, poi commit e di nuovo publish." style="shape=note;size=12;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=6;spacingRight=4;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;" vertex="1" parent="1">
-          <mxGeometry x="1250" y="300" width="300" height="70" as="geometry"/>
+        <mxCell id="c33" value="&lt;b&gt;Publish rifiutato&lt;/b&gt;: hai ricevuto una versione di un peer che non segue la tua. Lancia &lt;b&gt;update&lt;/b&gt;: le due versioni vengono unite, poi commit e di nuovo publish. &lt;b&gt;Avviso perso&lt;/b&gt; (repo spostata o irraggiungibile): chi ha pubblicato rilancia publish, oppure &lt;b&gt;update --all&lt;/b&gt;." style="shape=note;size=12;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=6;spacingRight=4;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="300" width="350" height="92" as="geometry"/>
         </mxCell>
         <mxCell id="c34" value="3. Branch e stati particolari" style="text;html=1;align=left;verticalAlign=middle;fontSize=14;fontStyle=1;fontColor=#555555;" vertex="1" parent="1">
           <mxGeometry x="1620" y="80" width="340" height="26" as="geometry"/>
@@ -165,7 +165,7 @@
         <mxCell id="c49" value="contenuto unito: base v1, tua H, loro v2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;endArrow=block;endFill=1;fontSize=11;labelBackgroundColor=#ffffff;dashed=1;endArrow=open;endFill=0;exitX=1;exitY=0.5;entryX=0.5;entryY=1;" edge="1" parent="1" source="c45" target="c44">
           <mxGeometry relative="1" as="geometry"/>
         </mxCell>
-        <mxCell id="c50" value="T passa da v2 a M (fast-forward): i peer la accettano al publish." style="shape=note;size=12;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=6;spacingRight=4;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;" vertex="1" parent="1">
+        <mxCell id="c50" value="T passa da v2 a M (fast-forward): i peer la ricevono in fast-forward dopo il publish." style="shape=note;size=12;whiteSpace=wrap;html=1;fontSize=11;align=left;spacingLeft=6;spacingRight=4;fillColor=#f5f5f5;strokeColor=#999999;fontColor=#333333;" vertex="1" parent="1">
           <mxGeometry x="680" y="1126" width="180" height="56" as="geometry"/>
         </mxCell>
         <mxCell id="c51" value="&lt;b&gt;b) Due peer hanno pubblicato senza vedersi&lt;/b&gt;: la tua T e la versione P del peer" style="text;html=1;align=left;fontSize=12;" vertex="1" parent="1">
