@@ -6,7 +6,7 @@
 
 . "$(dirname "$0")/lib.sh"
 
-BREEF="$TEST_DIR/report/breef.md"
+BREEF="$TEST_DIR/../report/breef.md"
 
 # top <repo>: radice come la scrive git (su Windows "C:/...")
 top() {
