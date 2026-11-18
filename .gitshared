@@ -1,0 +1,6 @@
+# Managed by 'git shared': do not edit by hand.
+# This repository shares files with other repositories: run 'git shared status'.
+[shared "test_shared_file.md"]
+	id = 40ac18666f204dd6b3afd0e7e8591dac
+	path = test_shared_file.md
+	branch = master
