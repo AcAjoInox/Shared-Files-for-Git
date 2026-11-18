@@ -149,6 +149,16 @@ mv "$TRASH/F2" "$TRASH/F3"
 run git shared relocate --peer ../F2 ../empty
 expect_rc "--peer verso una repo che non condivide: codice 1" 1
 expect_err "--peer verso una repo che non condivide: avviso" "does not share this file: skipped"
+run git shared relocate --peer ../F2 p.h
+expect_rc "--peer verso un file: rifiutato" 1
+expect_err "--peer verso un file: perche'" "'p.h' is not a folder: --peer wants the new path of a moved repository, not of a file"
+run git shared relocate --peer ../F2 ../manca
+expect_rc "--peer verso un path inesistente: rifiutato" 1
+expect_err "--peer verso un path inesistente: perche'" "'../manca' is not a folder"
+mkdir "$TRASH/nogit"
+run git shared relocate --peer ../F2 ../nogit
+expect_rc "--peer verso una cartella senza repo: rifiutato" 1
+expect_err "--peer verso una cartella senza repo: perche'" "'../nogit' is not a git repository: --peer wants the new path of a moved repository"
 
 # --- worktree secondario: nessun avviso ------------------------------------------------
 cd "$TRASH/A" || exit 1

@@ -79,6 +79,8 @@ typedef enum {
     MSG_ERR_RELOCATE_GONE,   /* vecchio path, vecchio path */
     MSG_ERR_RELOCATE_NOT_MOVED, /* path */
     MSG_ERR_RELOCATE_NO_PEER, /* path */
+    MSG_ERR_RELOCATE_NOT_DIR, /* path */
+    MSG_ERR_RELOCATE_NOT_REPO, /* path */
     MSG_ERR_WRITE_FILE,      /* path */
     MSG_ERR_NOT_SHARED_PATH, /* path */
     MSG_ERR_LOCAL_CHANGES,   /* path */

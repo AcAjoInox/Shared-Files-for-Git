@@ -198,6 +198,12 @@ static const char *const msg_en[] = {
         "run 'git shared relocate %s'",
     [MSG_ERR_RELOCATE_NOT_MOVED] = "%s still contains a repository: it was not moved",
     [MSG_ERR_RELOCATE_NO_PEER] = "no shared file here has %s as a peer",
+    [MSG_ERR_RELOCATE_NOT_DIR] =
+        "'%s' is not a folder: --peer wants the new path of a moved "
+        "repository, not of a file",
+    [MSG_ERR_RELOCATE_NOT_REPO] =
+        "'%s' is not a git repository: --peer wants the new path of a moved "
+        "repository",
     [MSG_ERR_BRANCH_DETACHED] =
         "%s: no default in .gitshared and HEAD is detached: "
         "use --add <branch>",

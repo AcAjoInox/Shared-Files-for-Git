@@ -276,9 +276,15 @@ int cmd_relocate(int argc, char **argv)
     }
 
     if (o.peer) {
-        /* Il nuovo path del peer nella forma di git (radice). */
+        /* Il nuovo path del peer nella forma di git (radice). Un file o
+         * un path che non c'e' a parte: git -C fallirebbe con lo stesso
+         * errore di una cartella fuori da ogni repo. */
+        if (!sys_is_dir(o.arg[1])) {
+            msg_error(MSG_ERR_RELOCATE_NOT_DIR, o.arg[1]);
+            goto exit;
+        }
         if (repo_locate(o.arg[1], &new_top, &prefix, &objfmt) != GS_OK) {
-            msg_error(MSG_ERR_SRC_NOT_REPO, o.arg[1]);
+            msg_error(MSG_ERR_RELOCATE_NOT_REPO, o.arg[1]);
             goto exit;
         }
         rc = relocate_peer(&repo, str_cstr(&old), str_cstr(&new_top));
