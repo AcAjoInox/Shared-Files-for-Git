@@ -1,6 +1,0 @@
-# Managed by 'git shared': do not edit by hand.
-# This repository shares files with other repositories: run 'git shared status'.
-[shared "breef.md"]
-	id = 8784c28fe52c4a1fab9e576681c47625
-	path = breef.md
-	branch = master
