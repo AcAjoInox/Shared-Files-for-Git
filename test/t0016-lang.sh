@@ -37,7 +37,7 @@ expect_eq "lang it: letta" "$(git shared lang)" "it"
 run git shared help
 expect_out "help in italiano" "NOME"
 expect_out "help in italiano: rimando ai comandi" "git shared <comando> --help"
-for c in set link unlink status publish update branch prune relocate lang hook; do
+for c in set link unlink mv status publish update branch prune relocate lang hook; do
 	C=$(echo "$c" | tr '[:lower:]' '[:upper:]')
 	run git shared "$c" --help
 	expect_out "$c --help in italiano" "GIT-SHARED-$C(1)"

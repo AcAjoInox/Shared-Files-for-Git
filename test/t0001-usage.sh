@@ -29,7 +29,7 @@ expect_rc "help status: codice 0" 0
 expect_out "help status: pagina di status" "GIT-SHARED-STATUS(1)"
 
 # Ogni comando ha la sua pagina (help/<comando>.txt), con --help e help.
-for c in set link unlink status publish update branch prune relocate lang hook; do
+for c in set link unlink mv status publish update branch prune relocate lang hook; do
 	C=$(echo "$c" | tr '[:lower:]' '[:upper:]')
 	run git shared "$c" --help
 	expect_rc "$c --help: codice 0" 0

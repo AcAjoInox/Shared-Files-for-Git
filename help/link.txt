@@ -4,7 +4,8 @@ NAME
     git shared link - link a file shared by another repository
 
 SYNOPSIS
-    git shared link [-c | -m <message>] [--] <source-file> [<destination>]
+    git shared link [-c | -m <message>] [-f | --merge] [--adopt]
+                    [--] <source-file> [<destination>]
 
 DESCRIPTION
     Links to this repository a file that another repository shares.
@@ -16,9 +17,25 @@ DESCRIPTION
     learns about the other and about the other peers. To cancel before
     the commit:
         git restore --staged --worktree .gitshared <destination>
+    (only .gitshared, if the destination already existed).
 
     The destination path is the same as in the source, unless
-    <destination> is given. It must not exist yet.
+    <destination> is given.
+
+    If the destination already exists (for example a copy made by hand)
+    the file is kept as it is, and only .gitshared is staged. After the
+    commit 'git shared status' tells how it compares with the shared
+    version: aligned, new version to apply, or diverged (update merges
+    it). It must be tracked by git, and it must have something in
+    common with the shared file: its content, or a past content, is one
+    of the shared versions. If not, link stops: --merge links it anyway
+    and 'git shared update' merges the two files, with conflicts where
+    they differ; -f overwrites it with the latest version.
+
+    If the destination is already shared with another ID (for example
+    'git shared set' was run in both repositories), link stops: --adopt
+    takes the ID of the source. The same commit unlinks the old ID, as
+    'git shared unlink' does, and links the new one.
 
     After a clone, the file is declared in .gitshared but not linked
     (status says "unlinked"): link it again from one of its peers. The
@@ -32,9 +49,22 @@ OPTIONS
     -m <message>
         Like -c, with <message>.
 
+    -f, --force
+        Overwrite an existing destination with the latest version.
+
+    --merge
+        Link an existing destination that has nothing in common with
+        the shared file. After the commit it is diverged: 'git shared
+        update' merges them.
+
+    --adopt
+        The destination is already shared with another ID: take the ID
+        of the source.
+
 EXAMPLES
     git shared link -c ../firmware-a/include/common.h
     git shared link -c ../firmware-a/include/common.h inc/common.h
+    git shared link --adopt -c ../firmware-a/include/common.h
 
 SEE ALSO
-    git shared set --help, git shared unlink --help
+    git shared set --help, git shared unlink --help, git shared mv --help

@@ -19,15 +19,16 @@ DESCRIZIONE
                           che unisce
     merge in progress     update ha trovato un conflitto: correggi il
                           file, git add, di nuovo update
-    pending commit        set, link o unlink non ancora committato:
+    pending commit        set, link, unlink o mv non ancora committato:
                           commit, oppure restore di .gitshared per
                           annullare
     unlinked              dichiarato qui ma non collegato (un clone): link
-    inconsistent          il file e' stato cancellato o rinominato, oppure
-                          .gitshared e' stato modificato a mano, oppure
-                          nessun branch dichiara piu' il file: unlink
-                          (con l'id, nell'ultimo caso), oppure restore di
-                          .gitshared
+    inconsistent          il file e' stato cancellato, o rinominato senza
+                          'git shared mv', oppure .gitshared e' stato
+                          modificato a mano, oppure nessun branch dichiara
+                          piu' il file: mv <vecchio> <nuovo> per una
+                          rinomina, unlink (con l'id, nell'ultimo caso),
+                          oppure restore di .gitshared
     suspended on this branch (...)
                           questo branch non e' tra i branch del file: qui
                           e' un file normale. Lo stato vero e' tra

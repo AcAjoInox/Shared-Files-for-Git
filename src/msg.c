@@ -13,6 +13,7 @@ static const char *const msg_en[] = {
         "    set       declare a file of this repository as shared\n"
         "    link      link a shared file of another repository\n"
         "    unlink    stop sharing a file\n"
+        "    mv        rename a shared file\n"
         "    status    show the shared files of this repository\n"
         "    publish   send new versions to the peers\n"
         "    update    get the new versions and apply them\n"
@@ -43,14 +44,28 @@ static const char *const msg_en[] = {
         "    -c, --commit      commit .gitshared right away\n"
         "    -m <message>      commit .gitshared right away with <message>\n",
     [MSG_USAGE_LINK] =
-        "usage: git shared link [-c | -m <message>] [--] <source-file> "
-        "[<destination>]\n"
+        "usage: git shared link [-c | -m <message>] [-f | --merge] [--adopt]\n"
+        "                       [--] <source-file> [<destination>]\n"
         "\n"
         "    <source-file>     the shared file in the other repository\n"
         "    <destination>     path in this repository "
         "(default: as in the source)\n"
         "    -c, --commit      commit right away\n"
-        "    -m <message>      commit right away with <message>\n",
+        "    -m <message>      commit right away with <message>\n"
+        "    -f, --force       overwrite an existing <destination> with the\n"
+        "                      shared version\n"
+        "    --merge           link an existing <destination> that has\n"
+        "                      nothing in common with the shared file;\n"
+        "                      'git shared update' merges them\n"
+        "    --adopt           <destination> is already shared with another\n"
+        "                      ID: take the ID of the source\n",
+    [MSG_USAGE_MV] =
+        "usage: git shared mv [-c | -m <message>] [--] <path> <destination>\n"
+        "\n"
+        "Rename a shared file. Only here: the peers keep their own path.\n"
+        "\n"
+        "    -c, --commit      commit the rename right away\n"
+        "    -m <message>      commit the rename right away with <message>\n",
     [MSG_USAGE_UNLINK] =
         "usage: git shared unlink [-c | -m <message>] [--] <path>\n"
         "\n"
@@ -132,6 +147,7 @@ static const char *const msg_en[] = {
     [MSG_ERR_OPT_VALUE] = "option '%s' requires a value",
     [MSG_ERR_TOO_MANY_ARGS] = "too many arguments",
     [MSG_ERR_MISSING_PATH] = "missing <path>",
+    [MSG_ERR_MISSING_DEST] = "missing <destination>",
     [MSG_ERR_NOT_REPO] =
         "not a git repository (or not inside its working tree)",
     [MSG_ERR_PROC] = "cannot run '%s'",
@@ -163,8 +179,7 @@ static const char *const msg_en[] = {
     [MSG_ERR_HASH_MISMATCH] =
         "the repositories use different hash algorithms (%s, %s)",
     [MSG_ERR_DEST_PATH] = "invalid destination path: '%s'",
-    [MSG_ERR_DEST_EXISTS] =
-        "'%s' already exists: linking an existing file is not supported yet",
+    [MSG_ERR_DEST_EXISTS] = "'%s' already exists",
     [MSG_ERR_ALREADY_LINKED] = "'%s' is already shared here (id %s)",
     [MSG_ERR_PENDING_OP] =
         "'%s' has a pending operation: commit .gitshared first, or restore it",
@@ -212,6 +227,26 @@ static const char *const msg_en[] = {
         "use --add <branch>",
     [MSG_ERR_RELINK_PATH] =
         "'%s' is declared here at '%s': run link without <destination>",
+    [MSG_ERR_RELINK_OPTS] =
+        "'%s' is already declared here and is linked as it is: "
+        "-f, --merge and --adopt are not used",
+    [MSG_ERR_DEST_SHARED] =
+        "'%s' is already shared here as '%s', with another ID: "
+        "use --adopt to take the ID of the source",
+    [MSG_ERR_ADOPT_NOT_SHARED] =
+        "'%s' is not shared here: --adopt is not needed",
+    [MSG_ERR_FORCE_MERGE] = "-f and --merge cannot be used together",
+    [MSG_ERR_LINK_NO_BASE] =
+        "'%s' already exists and has nothing in common with the shared "
+        "file: use --merge to link it and merge them with 'git shared "
+        "update', or -f to overwrite it",
+    [MSG_ERR_MV_SAME] = "'%s' is already there",
+    [MSG_ERR_MV_NO_DIR] = "the folder '%s' does not exist: create it first",
+    [MSG_ERR_MV_MERGING] =
+        "'%s' has a merge in progress: finish it with 'git shared update', "
+        "or give it up with 'git shared update --abort %s'",
+    [MSG_ERR_MV_MISSING] =
+        "'%s' is not in the index, and '%s' neither: nothing to rename",
     [MSG_ERR_WRITE_FILE] = "cannot write '%s'",
     [MSG_ERR_NOT_SHARED_PATH] = "'%s' is not a shared file",
     [MSG_ERR_LOCAL_CHANGES] =
@@ -277,6 +312,19 @@ static const char *const msg_en[] = {
         "'%s' linked as '%s' from %s. Commit it with .gitshared to confirm.",
     [MSG_LINK_DONE] = "'%s' linked as '%s' from %s.",
     [MSG_LINK_COMMIT_MSG] = "Link %s",
+    [MSG_LINK_KEPT] =
+        "%s: the existing file was kept ('git shared status' shows how it "
+        "compares with the shared version)",
+    [MSG_LINK_NO_BASE_NEXT] =
+        "%s: nothing in common with the shared file: once committed, "
+        "'git shared update' merges them (expect conflicts)",
+    [MSG_LINK_ADOPTED] =
+        "%s: takes the ID of the source; the old ID %s is unlinked by the "
+        "same commit",
+    [MSG_MV_STAGED] =
+        "'%s' renamed to '%s'. Commit it with .gitshared to confirm.",
+    [MSG_MV_DONE] = "'%s' renamed to '%s'.",
+    [MSG_MV_COMMIT_MSG] = "Rename %s to %s",
     [MSG_UNLINK_STAGED] =
         "'%s' is no longer shared. Commit .gitshared to confirm.",
     [MSG_UNLINK_DONE] = "'%s' is no longer shared: it is now a regular file.",
@@ -366,6 +414,8 @@ static const char *const msg_en[] = {
         "run 'git shared update'",
     [MSG_STATUS_TO_MERGE] =
         "the version of %s must be merged: run 'git shared update'",
+    [MSG_STATUS_RENAMED] =
+        "renamed from '%s': commit it with .gitshared to confirm",
     [MSG_STATUS_BRANCHES_GONE] =
         "none of its active branches exists (%s): "
         "git shared branch %s -a <branch>",

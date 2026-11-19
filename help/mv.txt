@@ -1,0 +1,39 @@
+GIT-SHARED-MV(1)
+
+NAME
+    git shared mv - rename a shared file
+
+SYNOPSIS
+    git shared mv [-c | -m <message>] [--] <path> <destination>
+
+DESCRIPTION
+    Renames a shared file with 'git mv' and writes the new path in
+    .gitshared; both are staged. If <destination> is a folder, the file
+    moves into it with its name, as with 'git mv'.
+
+    The rename is local: each peer keeps its own path, and the file
+    keeps its name in 'git shared status'. Publishing and updating go on
+    as before, also across the rename: .gitshared remembers the old path,
+    so the history of the file goes on from there.
+
+    Until the rename is committed the file is "pending commit". To
+    cancel, rename it back with 'git shared mv'.
+
+    A file already renamed with 'git mv' is "inconsistent": run
+    'git shared mv <old-path> <new-path>' to write the new path in
+    .gitshared. The file is not moved again.
+
+OPTIONS
+    -c, --commit
+        Commit the rename and .gitshared right away. Nothing else staged
+        goes into the commit.
+
+    -m <message>
+        Like -c, with <message>.
+
+EXAMPLES
+    git shared mv -c include/common.h include/project_common.h
+    git shared mv -c common.h lib/
+
+SEE ALSO
+    git shared status --help, git shared unlink --help

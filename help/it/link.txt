@@ -4,7 +4,8 @@ NOME
     git shared link - collega un file condiviso da un altro repository
 
 SINTASSI
-    git shared link [-c | -m <messaggio>] [--] <file-sorgente> [<destinazione>]
+    git shared link [-c | -m <messaggio>] [-f | --merge] [--adopt]
+                    [--] <file-sorgente> [<destinazione>]
 
 DESCRIZIONE
     Collega a questo repository un file condiviso da un altro.
@@ -15,9 +16,27 @@ DESCRIZIONE
     Quando vengono committati i repository diventano peer: ognuno
     conosce l'altro e gli altri peer. Per annullare prima del commit:
         git restore --staged --worktree .gitshared <destinazione>
+    (solo .gitshared, se la destinazione esisteva gia').
 
     Il path di destinazione e' lo stesso della sorgente, salvo che si
-    indichi <destinazione>. Non deve esistere ancora.
+    indichi <destinazione>.
+
+    Se la destinazione esiste gia' (per esempio una copia fatta a mano)
+    il file resta com'e', e in staging va solo .gitshared. Dopo il
+    commit 'git shared status' dice com'e' rispetto alla versione
+    condivisa: allineato, nuova versione da applicare, o divergente
+    (update lo unisce). Deve essere tracciato da git, e deve avere
+    qualcosa in comune con il file condiviso: il suo contenuto, o un
+    contenuto passato, e' una delle versioni condivise. Se no, link si
+    ferma: --merge lo collega lo stesso e 'git shared update' unisce i
+    due file, con conflitti dove sono diversi; -f lo sovrascrive con
+    l'ultima versione.
+
+    Se la destinazione e' gia' condivisa con un altro ID (per esempio
+    'git shared set' e' stato lanciato in entrambi i repository), link
+    si ferma: --adopt prende l'ID della sorgente. Lo stesso commit
+    scollega il vecchio ID, come fa 'git shared unlink', e collega il
+    nuovo.
 
     Dopo un clone il file e' dichiarato in .gitshared ma non collegato
     (status dice "unlinked"): collegalo di nuovo da uno dei suoi peer. Il
@@ -31,9 +50,22 @@ OPZIONI
     -m <messaggio>
         Come -c, con <messaggio>.
 
+    -f, --force
+        Sovrascrive una destinazione che esiste con l'ultima versione.
+
+    --merge
+        Collega una destinazione che esiste e non ha niente in comune
+        con il file condiviso. Dopo il commit e' divergente: 'git shared
+        update' li unisce.
+
+    --adopt
+        La destinazione e' gia' condivisa con un altro ID: prende l'ID
+        della sorgente.
+
 ESEMPI
     git shared link -c ../firmware-a/include/common.h
     git shared link -c ../firmware-a/include/common.h inc/common.h
+    git shared link --adopt -c ../firmware-a/include/common.h
 
 VEDI ANCHE
-    git shared set --help, git shared unlink --help
+    git shared set --help, git shared unlink --help, git shared mv --help

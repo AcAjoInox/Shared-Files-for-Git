@@ -56,7 +56,7 @@ git commit -m "update common.h"
 
 ## The rules
 
-1. **Only committed work counts.** An uncommitted change is never published. `set`, `link` and `unlink` take effect at the commit: until then you can cancel them with `git restore`.
+1. **Only committed work counts.** An uncommitted change is never published. `set`, `link`, `unlink` and `mv` take effect at the commit: until then you can cancel them with `git restore`.
 2. **You decide when.** Nothing is published except by `git shared publish`, and the commands never commit by themselves. With `-c` or `-m "message"` they commit right away, but only the shared file and `.gitshared`: the rest of the staging area stays out of the commit.
 3. **Your work is never lost.** `update` does not overwrite uncommitted changes, staged ones included. Forcing it takes `-f`.
 4. **No change is thrown away.** If two repositories change the file independently, `update` merges the versions like `git merge`. On a conflict, resolve the markers, `git add` and run `git shared update` again. To give up, use `git shared update --abort`.
@@ -67,8 +67,9 @@ git commit -m "update common.h"
 | Command | What it does |
 |---|---|
 | `git shared set <file>` | Makes a file of the repository shared |
-| `git shared link <file-in-other-repo> [<dest>]` | Links a file shared by another repository |
+| `git shared link <file-in-other-repo> [<dest>]` | Links a file shared by another repository; a copy that already exists is kept and `update` aligns it |
 | `git shared unlink <file>` | Stops sharing the file, which stays as a regular file |
+| `git shared mv <file> <dest>` | Renames a shared file, only in this repository |
 | `git shared status [--peers]` | State of each shared file; with `--peers`, also that of the peers |
 | `git shared publish [<file>]` | Creates a new version and notifies the peers |
 | `git shared update [--all] [<file>]` | Receives and applies the latest version; `--abort` gives up a merge |
@@ -89,17 +90,16 @@ Each command has its own page: `git shared <command> --help`. The same pages are
 | to publish | You have a change the peers don't have | `git shared publish` |
 | diverged | You and a peer changed the file separately | `git shared update` |
 | merge in progress | `update` found a conflict | Fix it, `git add`, `git shared update` |
-| pending commit | `set`, `link` or `unlink` not committed yet | `git commit` or `git restore` |
+| pending commit | `set`, `link`, `unlink` or `mv` not committed yet | `git commit` or `git restore` |
 | suspended on this branch | On this branch the file is not shared | Nothing, or `git shared branch` |
 | unlinked | The repository declares the file but doesn't know the peers (e.g. a clone) | `git shared link` |
-| inconsistent | File renamed or deleted, or `.gitshared` edited by hand | `git shared unlink` or `git restore .gitshared` |
+| inconsistent | File renamed without `git shared mv` or deleted, or `.gitshared` edited by hand | `git shared mv`, `git shared unlink` or `git restore .gitshared` |
 
 ## Limits of the first release
 
 - Only repositories on the same machine (Linux and Windows).
 - Only single text files: no folders, no binaries.
 - At most 32 peers per file.
-- Renaming a shared file (`git shared mv`) and `link` to a file that already exists at the destination are not available yet.
 - The extension must be installed on every machine that publishes or applies versions. Anyone without it uses the repository as usual.
 
 ## How it was made

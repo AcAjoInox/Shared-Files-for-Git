@@ -33,6 +33,8 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
     o->dry_run = 0U;
     o->abort = 0U;
     o->all = 0U;
+    o->merge = 0U;
+    o->adopt = 0U;
     while ((i < argc) && (end_opts == 0) && (argv[i][0] == '-') &&
            (argv[i][1] != '\0')) {
         if (strcmp(argv[i], "--") == 0) {
@@ -64,6 +66,12 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
         } else if (((allowed & CMD_OPT_ALL) != 0U) &&
                    (strcmp(argv[i], "--all") == 0)) {
             o->all = 1U;
+        } else if (((allowed & CMD_OPT_MERGE) != 0U) &&
+                   (strcmp(argv[i], "--merge") == 0)) {
+            o->merge = 1U;
+        } else if (((allowed & CMD_OPT_ADOPT) != 0U) &&
+                   (strcmp(argv[i], "--adopt") == 0)) {
+            o->adopt = 1U;
         } else {
             msg_error(MSG_ERR_UNKNOWN_OPT, argv[i]);
             goto exit;
@@ -217,6 +225,116 @@ exit:
     str_free(&key);
     str_free(&file);
     return err;
+}
+
+eGsErr_t cmd_drop_gitshared(const Repo_t *r, const char *name)
+{
+    const char *args[] = { "config", "-f", NULL, "--remove-section", NULL,
+                           NULL };
+    Repo_t left = REPO_INIT;
+    Str_t file = STR_INIT;
+    Str_t section = STR_INIT;
+    eGsErr_t err;
+
+    str_addf(&file, "%s/.gitshared", str_cstr(&r->top));
+    str_addf(&section, "shared.%s", name);
+    args[2] = str_cstr(&file);
+    args[4] = str_cstr(&section);
+    err = git_run(args, 0U, NULL);
+    if (err == GS_OK) {
+        err = repo_load_gitshared(&left, str_cstr(&file), 0, 0);
+    }
+    if ((err == GS_OK) && (left.n == 0U) && (sys_remove(str_cstr(&file)) != 0)) {
+        err = GS_ERR_SYS;
+    }
+    if (err == GS_OK) {
+        err = cmd_stage(r, ".gitshared");
+    }
+    repo_close(&left);
+    str_free(&section);
+    str_free(&file);
+    return err;
+}
+
+/*
+ * Un solo processo (ls-files), con i pathspec letterali: "*.h" non e' un
+ * glob. Con -z il path arriva cosi' com'e': senza, git mette tra virgolette
+ * e in ottale i path con caratteri non ASCII (core.quotePath, reportIdea
+ * C-01).
+ */
+eGsErr_t cmd_resolve_tracked(const char *dir, const char *path, Str_t *full)
+{
+    const char *args[] = { "-C", ".", "--literal-pathspecs", "ls-files", "-s",
+                           "-z", "--full-name", "--", NULL, NULL };
+    Str_t out = STR_INIT;
+    Str_t on_disk = STR_INIT;
+    const char *line;
+    const char *tab;
+    size_t rec_len;
+    eGsErr_t err = GS_ERR_USAGE;
+
+    if (strchr(path, '\n') != NULL) {
+        msg_error(MSG_ERR_PATH_NEWLINE);
+        goto exit;
+    }
+    if (dir != NULL) {
+        args[1] = dir;
+        str_addf(&on_disk, "%s/%s", dir, path);
+    } else {
+        str_add(&on_disk, path);
+    }
+    if (sys_is_dir(str_cstr(&on_disk))) {
+        msg_error(MSG_ERR_IS_DIR, path);
+        goto exit;
+    }
+    args[8] = path;
+    if (git_run(args, 0U, &out) != GS_OK) {
+        msg_fatal(MSG_ERR_PROC, "git ls-files");
+        err = GS_ERR_GIT;
+        goto exit;
+    }
+    /* Record: "<modo> <oid> <stage>\t<path>\0"; piu' record = stage di
+     * conflitto. str_cstr vede solo il primo record. */
+    line = str_cstr(&out);
+    rec_len = strlen(line);
+    tab = strchr(line, '\t');
+    if ((out.len == 0U) || (tab == NULL)) {
+        msg_error(MSG_ERR_NOT_TRACKED, path);
+    } else if (((rec_len + 1U) < out.len) || (tab[-1] != '0')) {
+        msg_error(MSG_ERR_CONFLICT, path);
+    } else if ((strncmp(line, "100644 ", 7U) != 0) &&
+               (strncmp(line, "100755 ", 7U) != 0)) {
+        msg_error(MSG_ERR_NOT_REGULAR, path);
+    } else {
+        str_add(full, tab + 1);
+        err = GS_OK;
+    }
+
+exit:
+    str_free(&on_disk);
+    str_free(&out);
+    return err;
+}
+
+int cmd_path_exists(const Repo_t *r, GitBatch_t *b, const char *path)
+{
+    Str_t full = STR_INIT;
+    Str_t name = STR_INIT;
+    Oid_t oid;
+    FILE *f;
+    int exists;
+
+    str_addf(&full, "%s/%s", str_cstr(&r->top), path);
+    str_addf(&name, ":%s", path); /* ":<path>" = voce dell'index */
+    f = sys_fopen(str_cstr(&full), "rb");
+    exists = (f != NULL) || sys_is_dir(str_cstr(&full)) ||
+             (git_batch_query(b, str_cstr(&name), &oid) != GIT_OBJ_MISSING);
+    if (f != NULL) {
+        (void)fclose(f);
+    }
+    str_free(&name);
+    str_free(&full);
+    return exists;
 }
 
 eGsErr_t cmd_stage(const Repo_t *r, const char *path)

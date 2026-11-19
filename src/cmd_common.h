@@ -18,6 +18,8 @@
 #define CMD_OPT_DRY_RUN 0x4U /* -n, --dry-run */
 #define CMD_OPT_ABORT  0x8U /* --abort (update, D-093) */
 #define CMD_OPT_ALL    0x10U /* --all (update, D-099) */
+#define CMD_OPT_MERGE  0x20U /* --merge (link, D-029, D-102) */
+#define CMD_OPT_ADOPT  0x40U /* --adopt (link, D-064) */
 
 typedef struct {
     const char *message; /* -m; NULL = messaggio standard */
@@ -26,6 +28,8 @@ typedef struct {
     unsigned dry_run : 1U;
     unsigned abort : 1U;
     unsigned all : 1U;
+    unsigned merge : 1U;
+    unsigned adopt : 1U;
 } CmdOpts_t;
 
 /*
@@ -65,6 +69,26 @@ eGsErr_t cmd_set_pending(const Repo_t *r, const char *id, const char *op,
  */
 eGsErr_t cmd_write_gitshared(const Repo_t *r, const char *name,
                              const char *id, const char *path);
+
+/*
+ * Toglie la sezione [shared "<name>"] da .gitshared; se non resta nessuna
+ * sezione, toglie il file. Poi lo mette in staging (anche la
+ * cancellazione). Usata da unlink e da link --adopt.
+ */
+eGsErr_t cmd_drop_gitshared(const Repo_t *r, const char *name);
+
+/*
+ * Controlla che `path` sia un file tracciato, senza conflitti, regolare
+ * (100644 o 100755), con un solo processo (ls-files). dir = NULL: path
+ * dell'utente, relativo alla cartella corrente; altrimenti la cartella da
+ * cui leggerlo (la radice, per un path relativo alla radice). Se va bene
+ * scrive in full il path relativo alla radice; altrimenti stampa l'errore
+ * (con `path` com'e' scritto) e ritorna GS_ERR_USAGE.
+ */
+eGsErr_t cmd_resolve_tracked(const char *dir, const char *path, Str_t *full);
+
+/* 1 se il path (relativo alla radice) esiste: su disco o nell'index. */
+int cmd_path_exists(const Repo_t *r, GitBatch_t *b, const char *path);
 
 /* Mette in staging un path relativo alla radice (update-index), anche
  * la sua cancellazione se non c'e' piu' nel working tree. */

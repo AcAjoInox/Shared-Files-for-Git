@@ -30,6 +30,7 @@ COMANDI
     set        condivide un file di questo repository
     link       collega un file condiviso da un altro repository
     unlink     smette di condividere un file
+    mv         rinomina un file condiviso
     status     mostra lo stato di ogni file shared e dei suoi peer
     publish    invia la versione nuova ai peer
     update     riceve le versioni nuove e le applica, unendo se serve

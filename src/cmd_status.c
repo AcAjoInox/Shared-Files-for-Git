@@ -234,6 +234,14 @@ int cmd_status(int argc, char **argv)
                 printf(msg(MSG_STATUS_ELSEWHERE), str_cstr(&elsewhere));
                 putchar('\n');
             }
+            /* Rinomina di git shared mv non committata (D-101). */
+            if ((st == STATE_PENDING) && (e->pending == SHARED_PENDING_NONE) &&
+                (state_renamed(&batch, e, &alt_path, &found) == GS_OK) &&
+                (found != 0)) {
+                printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+                printf(msg(MSG_STATUS_RENAMED), str_cstr(&alt_path));
+                putchar('\n');
+            }
             /* Sospeso perche' nessun suo branch esiste piu' (B-21). */
             if (suspended && shared_branches_gone(&names, e, &list)) {
                 printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));

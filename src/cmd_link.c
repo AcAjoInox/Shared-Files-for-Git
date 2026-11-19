@@ -1,6 +1,6 @@
 /*
- * cmd_link.c - "git shared link [-c | -m <msg>] [--] <sorgente> [<dest>]"
- * (REQ-F-002, D-005, D-028, D-059).
+ * cmd_link.c - "git shared link [-c | -m <msg>] [-f | --merge] [--adopt]
+ * [--] <sorgente> [<dest>]" (REQ-F-002, D-005, D-028, D-059).
  *
  * Al comando: fetch della catena dalla sorgente in una ref temporanea,
  * file scritto dal blob dell'ultima versione, sezione in .gitshared, tutto
@@ -11,8 +11,17 @@
  * Una sorgente con il set (o il link) ancora in attesa lo completa prima
  * del fetch (D-100): il suo post-commit puo' non essere girato.
  *
- * v0: la destinazione non deve esistere (D-062, riuso della storia, e
- * D-064, --adopt, non sono ancora implementati).
+ * Destinazione che esiste gia' (D-062): il file non si tocca e lo stato si
+ * ricava dopo il commit come per ogni file shared. Si controlla solo che
+ * una base ci sia: il contenuto nell'index e' una versione della catena, o
+ * una versione compare nella storia del file. Senza base (D-029, D-102):
+ * errore; -f sovrascrive con l'ultima versione; --merge collega lo stesso,
+ * il file entra *divergente* e update lo unisce con la base vuota.
+ *
+ * Destinazione gia' shared con un altro ID (D-064): errore; con --adopt la
+ * repo prende l'ID della sorgente. Due attese chiuse dallo stesso commit:
+ * unlink della vecchia identita' (se collegata) e link della nuova. Il file
+ * non si tocca, come per una destinazione che esiste.
  *
  * Ri-aggancio (D-043, D-079): se .gitshared dichiara gia' lo stesso ID ma
  * la repo non ha dati locali ("scollegato": un clone, o un'attesa scartata
@@ -24,11 +33,13 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "chain.h"
 #include "cmd.h"
 #include "cmd_common.h"
 #include "hooks.h"
 #include "path.h"
 #include "peers.h"
+#include "state.h"
 #include "sys.h"
 
 /* La sorgente: repo, path relativo e voce in .gitshared. */
@@ -38,6 +49,14 @@ typedef struct {
     Str_t objfmt;
     Repo_t shared; /* solo le voci del suo .gitshared */
 } Source_t;
+
+/* La vecchia identita' della destinazione, per --adopt (D-064). */
+typedef struct {
+    Str_t name;
+    char id[GS_ID_HEX_LEN + 1U];
+    char head[OID_HEX_SIZE]; /* HEAD al comando: commit dell'unlink */
+    int linked;              /* ha dati locali: serve un unlink in attesa */
+} Adopt_t;
 
 static void source_free(Source_t *s)
 {
@@ -127,26 +146,95 @@ static int source_settle(const Source_t *s, const char *id)
     return !source_pending(s, id);
 }
 
-/* 1 se il path esiste gia' nella destinazione: su disco o nell'index. */
-static int dest_exists(const Repo_t *r, GitBatch_t *b, const char *path)
+/*
+ * --adopt (D-064): la vecchia identita' non deve avere attese; se ha dati
+ * locali, HEAD deve dichiararla, perche' il suo unlink si confermi con un
+ * commit che discende da HEAD (D-081). GS_EXIT_OK o il codice di uscita.
+ */
+static int prepare_adopt(GitBatch_t *b, const SharedEntry_t *old, Adopt_t *a)
 {
+    Oid_t head;
+    int declared = 0;
+
+    if (old->pending != SHARED_PENDING_NONE) {
+        msg_error(MSG_ERR_PENDING_OP, str_cstr(&old->path));
+        return GS_EXIT_ERROR;
+    }
+    if (!old->valid) {
+        msg_error(MSG_ERR_ALREADY_SHARED, str_cstr(&old->path),
+                  str_cstr(&old->name));
+        return GS_EXIT_ERROR;
+    }
+    str_add(&a->name, str_cstr(&old->name));
+    memcpy(a->id, old->id, sizeof a->id);
+    a->linked = old->in_config;
+    if (a->linked) {
+        if ((git_batch_query(b, "HEAD", &head) != GIT_OBJ_COMMIT) ||
+            (repo_rev_declares(b, "HEAD", a->id, &declared) != GS_OK) ||
+            (declared == 0)) {
+            msg_error(MSG_ERR_UNLINK_UNCOMMITTED, str_cstr(&old->path));
+            return GS_EXIT_ERROR;
+        }
+        oid_to_hex(&head, a->head);
+    }
+    return GS_EXIT_OK;
+}
+
+/*
+ * Destinazione che esiste (D-062): un file tracciato e regolare, con una
+ * base nella catena appena ricevuta (refs/shared-incoming/<id>/0). Il
+ * contenuto nell'index e' quello che il commit di conferma portera': se e'
+ * una versione la base c'e'; se no la si cerca nella storia del file.
+ * Senza base: errore, salvo --merge (*no_base = 1, D-102). GS_EXIT_OK o il
+ * codice di uscita (messaggio stampato).
+ */
+static int check_existing(const Repo_t *r, GitBatch_t *b, const char *id,
+                          const char *dest, int merge, int *no_base)
+{
+    OidList_t chain = OIDLIST_INIT;
     Str_t full = STR_INIT;
     Str_t name = STR_INIT;
-    Oid_t oid;
-    FILE *f;
-    int exists;
+    Oid_t local;
+    size_t base = 0U;
+    int found = 0;
+    int rc = GS_EXIT_ERROR;
 
-    str_addf(&full, "%s/%s", str_cstr(&r->top), path);
-    str_addf(&name, ":%s", path); /* ":<path>" = voce dell'index */
-    f = sys_fopen(str_cstr(&full), "rb");
-    exists = (f != NULL) || sys_is_dir(str_cstr(&full)) ||
-             (git_batch_query(b, str_cstr(&name), &oid) != GIT_OBJ_MISSING);
-    if (f != NULL) {
-        (void)fclose(f);
+    *no_base = 0;
+    if (cmd_resolve_tracked(str_cstr(&r->top), dest, &full) != GS_OK) {
+        goto exit; /* cartella, non tracciato, in conflitto, non regolare */
     }
+    str_addf(&name, ":%s", dest);
+    if (!git_batch_blob(b, str_cstr(&name), &local)) {
+        msg_error(MSG_ERR_NOT_TRACKED, dest);
+        goto exit;
+    }
+    peers_incoming_ref(&name, id, 0U);
+    if ((chain_blobs_ref(b, str_cstr(&name), &chain) != GS_OK) ||
+        (chain.n == 0U)) {
+        msg_error(MSG_ERR_CHAIN, dest);
+        goto exit;
+    }
+    found = oidlist_has(&chain, &local);
+    if ((found == 0) &&
+        (state_find_base(r, dest, NULL, &chain, &base, &found) != GS_OK)) {
+        msg_fatal(MSG_ERR_PROC, "git log");
+        rc = GS_EXIT_FATAL;
+        goto exit;
+    }
+    if (found != 0) {
+        rc = GS_EXIT_OK;
+    } else if (merge != 0) {
+        *no_base = 1;
+        rc = GS_EXIT_OK;
+    } else {
+        msg_error(MSG_ERR_LINK_NO_BASE, dest);
+    }
+
+exit:
+    oidlist_free(&chain);
     str_free(&name);
     str_free(&full);
-    return exists;
+    return rc;
 }
 
 int cmd_link(int argc, char **argv)
@@ -155,9 +243,11 @@ int cmd_link(int argc, char **argv)
     Repo_t repo = REPO_INIT;
     GitBatch_t batch;
     Source_t src = { STR_INIT, STR_INIT, STR_INIT, REPO_INIT };
+    Adopt_t old = { STR_INIT, "", "", 0 };
     PeerTally_t tally = { 0U, 0U, 0U };
     const SharedEntry_t *se;
     SharedEntry_t *e;
+    SharedEntry_t *other;
     Str_t dest = STR_INIT;
     Str_t name = STR_INIT;
     Str_t id = STR_INIT;
@@ -169,17 +259,28 @@ int cmd_link(int argc, char **argv)
     uint8_t fetched = 0U;
     int first;
     int relink = 0;
+    int adopt = 0;
+    int existing = 0; /* la destinazione c'e' gia' (D-062) */
+    int no_base = 0;  /* --merge senza base (D-102) */
+    int write = 1;    /* il file si scrive dall'ultima versione */
     int dest_new = 1; /* il file non e' in HEAD: entra nel commit */
     int opened = 0;
     int hooks = 0;
     int rc = GS_EXIT_USAGE;
 
-    first = cmd_parse(argc, argv, CMD_OPT_COMMIT, MSG_USAGE_LINK, &o);
+    first = cmd_parse(argc, argv,
+                      CMD_OPT_COMMIT | CMD_OPT_FORCE | CMD_OPT_MERGE | CMD_OPT_ADOPT,
+                      MSG_USAGE_LINK, &o);
     if (first < 0) {
         goto exit;
     }
     if ((first >= argc) || ((argc - first) > 2)) {
         msg_error((first >= argc) ? MSG_ERR_MISSING_PATH : MSG_ERR_TOO_MANY_ARGS);
+        fputs(msg(MSG_USAGE_LINK), stderr);
+        goto exit;
+    }
+    if ((o.force != 0U) && (o.merge != 0U)) {
+        msg_error(MSG_ERR_FORCE_MERGE);
         fputs(msg(MSG_USAGE_LINK), stderr);
         goto exit;
     }
@@ -211,33 +312,58 @@ int cmd_link(int argc, char **argv)
     e = repo_find_id(&repo, str_cstr(&id));
     relink = (e != NULL) && e->in_gitshared && e->valid && !e->in_config;
     if (relink) {
-        /* Ri-aggancio: vale la sezione che c'e' (nome e path locali). */
+        /* Ri-aggancio: vale la sezione che c'e' (nome e path locali). Il
+         * file non si tocca mai: -f, --merge e --adopt non c'entrano. */
         if (((argc - first) == 2) && !str_eq(&e->path, str_cstr(&dest))) {
             msg_error(MSG_ERR_RELINK_PATH, str_cstr(&e->name),
                       str_cstr(&e->path));
+            goto exit;
+        }
+        if ((o.force != 0U) || (o.merge != 0U) || (o.adopt != 0U)) {
+            msg_error(MSG_ERR_RELINK_OPTS, str_cstr(&e->path));
             goto exit;
         }
         str_reset(&dest);
         str_add(&dest, str_cstr(&e->path));
         str_reset(&name);
         str_add(&name, str_cstr(&e->name));
+        write = 0;
     } else if ((e != NULL) && (e->in_gitshared || e->in_config)) {
         msg_error(MSG_ERR_ALREADY_LINKED, str_cstr(&name), str_cstr(&id));
         goto exit;
     } else {
+        /* Destinazione gia' shared con un altro ID (D-064). */
         e = repo_find_path(&repo, str_cstr(&dest));
-        if (e != NULL) {
-            msg_error(MSG_ERR_ALREADY_SHARED, str_cstr(&dest), str_cstr(&e->name));
+        if ((e != NULL) && (o.adopt == 0U)) {
+            msg_error(MSG_ERR_DEST_SHARED, str_cstr(&dest), str_cstr(&e->name));
             goto exit;
         }
-        if (repo_find_name(&repo, str_cstr(&name)) != NULL) {
+        if ((e == NULL) && (o.adopt != 0U)) {
+            msg_error(MSG_ERR_ADOPT_NOT_SHARED, str_cstr(&dest));
+            goto exit;
+        }
+        if (e != NULL) {
+            rc = prepare_adopt(&batch, e, &old);
+            if (rc != GS_EXIT_OK) {
+                goto exit;
+            }
+            rc = GS_EXIT_ERROR;
+            adopt = 1;
+        }
+        /* Il nome della vecchia identita' si libera con --adopt. */
+        other = repo_find_name(&repo, str_cstr(&name));
+        if ((other != NULL) && !(adopt && str_eq(&old.name, str_cstr(&name)))) {
             msg_error(MSG_ERR_NAME_USED, str_cstr(&name));
             goto exit;
         }
-        if (dest_exists(&repo, &batch, str_cstr(&dest))) {
-            msg_error(MSG_ERR_DEST_EXISTS, str_cstr(&dest));
+        existing = cmd_path_exists(&repo, &batch, str_cstr(&dest));
+        str_reset(&text);
+        str_addf(&text, "%s/%s", str_cstr(&repo.top), str_cstr(&dest));
+        if (existing && sys_is_dir(str_cstr(&text))) {
+            msg_error(MSG_ERR_IS_DIR, str_cstr(&dest));
             goto exit;
         }
+        write = !existing || (o.force != 0U);
     }
 
     /* --- sorgente in attesa: la si completa (D-100) ------------------- */
@@ -256,33 +382,55 @@ int cmd_link(int argc, char **argv)
         goto exit;
     }
 
+    /* --- destinazione che esiste: serve una base (D-062, D-029) -------- */
+    if (existing && (write == 0)) {
+        rc = check_existing(&repo, &batch, str_cstr(&id), str_cstr(&dest),
+                            (int)o.merge, &no_base);
+        if (rc != GS_EXIT_OK) {
+            goto exit;
+        }
+        rc = GS_EXIT_ERROR;
+    }
+    str_reset(&text);
+    str_addf(&text, "HEAD:%s", str_cstr(&dest));
+    dest_new = !git_batch_blob(&batch, str_cstr(&text), &head_blob);
+
     /* --- scrittura: attesa per prima (come set) ------------------------- */
     if (cmd_set_pending(&repo, str_cstr(&id), "link", str_cstr(&dest),
                         str_cstr(&src.top), NULL) != GS_OK) {
         msg_error(MSG_ERR_PENDING);
         goto exit;
     }
-    if (!relink) {
-        if (cmd_write_gitshared(&repo, str_cstr(&name), str_cstr(&id),
-                                str_cstr(&dest)) != GS_OK) {
+    if (adopt) {
+        /* La vecchia identita' esce con lo stesso commit (D-064). */
+        if (old.linked &&
+            (cmd_set_pending(&repo, old.id, "unlink", str_cstr(&dest), NULL,
+                             old.head) != GS_OK)) {
+            msg_error(MSG_ERR_PENDING);
+            goto exit;
+        }
+        if (cmd_drop_gitshared(&repo, str_cstr(&old.name)) != GS_OK) {
             msg_error(MSG_ERR_WRITE_GITSHARED);
             goto exit;
         }
-        if (cmd_write_file(&repo, str_cstr(&dest), &blob) != GS_OK) {
-            msg_error(MSG_ERR_WRITE_FILE, str_cstr(&dest));
-            goto exit;
-        }
-    } else {
-        /* Il file non si tocca. Se non e' in HEAD (attesa scartata da uno
-         * stash, poi stash pop) torna in staging con .gitshared; se c'e',
-         * eventuali modifiche dell'utente restano fuori dal commit. */
-        str_reset(&text);
-        str_addf(&text, "HEAD:%s", str_cstr(&dest));
-        dest_new = !git_batch_blob(&batch, str_cstr(&text), &head_blob);
-        if (dest_new && (cmd_stage(&repo, str_cstr(&dest)) != GS_OK)) {
-            msg_error(MSG_ERR_WRITE_FILE, str_cstr(&dest));
-            goto exit;
-        }
+    }
+    if (!relink && (cmd_write_gitshared(&repo, str_cstr(&name), str_cstr(&id),
+                                        str_cstr(&dest)) != GS_OK)) {
+        msg_error(MSG_ERR_WRITE_GITSHARED);
+        goto exit;
+    }
+    if (write && (cmd_write_file(&repo, str_cstr(&dest), &blob) != GS_OK)) {
+        msg_error(MSG_ERR_WRITE_FILE, str_cstr(&dest));
+        goto exit;
+    }
+    /* Ri-aggancio: il file non si tocca. Se non e' in HEAD (attesa
+     * scartata da uno stash, poi stash pop) torna in staging con
+     * .gitshared; se c'e', eventuali modifiche dell'utente restano fuori
+     * dal commit. Una destinazione che esiste e' gia' nell'index
+     * (check_existing): quello che c'e' in staging resta com'e'. */
+    if (relink && dest_new && (cmd_stage(&repo, str_cstr(&dest)) != GS_OK)) {
+        msg_error(MSG_ERR_WRITE_FILE, str_cstr(&dest));
+        goto exit;
     }
     if (cmd_stage(&repo, ".gitshared") != GS_OK) {
         msg_error(MSG_ERR_STAGE_GITSHARED);
@@ -290,6 +438,19 @@ int cmd_link(int argc, char **argv)
     }
     hooks = 1; /* REQ-F-016: installati alla fine, vedi exit */
 
+    /* --- la repo in memoria, per gli hook ------------------------------ */
+    if (adopt) {
+        e = repo_find_id(&repo, old.id);
+        if (e != NULL) {
+            e->in_gitshared = 0U;
+            if (old.linked) {
+                str_add(&e->pending_path, str_cstr(&dest));
+                str_add(&e->pending_branch, str_cstr(&repo.branch));
+                str_add(&e->pending_commit, old.head);
+                e->pending = SHARED_PENDING_UNLINK;
+            }
+        }
+    }
     if (!relink) {
         e = repo_add(&repo);
         str_add(&e->name, str_cstr(&name));
@@ -328,7 +489,7 @@ int cmd_link(int argc, char **argv)
                str_cstr(&src.top));
         putchar('\n');
         rc = GS_EXIT_OK;
-        goto exit;
+        goto exit; /* note sotto, in exit */
     }
 
     /* --- commit dedicato: .gitshared e il file (D-007) ------------------ */
@@ -338,7 +499,7 @@ int cmd_link(int argc, char **argv)
         o.message = str_cstr(&text);
     }
     str_addz(&paths, ".gitshared");
-    if (dest_new) {
+    if (dest_new || write) {
         str_addz(&paths, str_cstr(&dest));
     }
     if (cmd_commit(&repo, o.message, &paths) != GS_OK) {
@@ -359,6 +520,16 @@ int cmd_link(int argc, char **argv)
     rc = GS_EXIT_OK;
 
 exit:
+    /* Che cosa succede al file, dopo il messaggio del collegamento. */
+    if ((rc == GS_EXIT_OK) && adopt) {
+        printf(msg(MSG_LINK_ADOPTED), str_cstr(&dest), old.id);
+        putchar('\n');
+    }
+    if ((rc == GS_EXIT_OK) && existing && (write == 0)) {
+        printf(msg(no_base ? MSG_LINK_NO_BASE_NEXT : MSG_LINK_KEPT),
+               str_cstr(&dest));
+        putchar('\n');
+    }
     /* Hook alla fine, quando l'attesa e' aperta o gia' chiusa: il
      * post-commit serve solo se resta aperta (D-100). Un errore e' solo un
      * avviso. */
@@ -370,6 +541,7 @@ exit:
         repo_close(&repo);
     }
     source_free(&src);
+    str_free(&old.name);
     str_free(&paths);
     str_free(&text);
     str_free(&peers);

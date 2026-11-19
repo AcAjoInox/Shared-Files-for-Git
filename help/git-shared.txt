@@ -30,6 +30,7 @@ COMMANDS
     set        share a file of this repository
     link       link a file shared by another repository
     unlink     stop sharing a file
+    mv         rename a shared file
     status     show the state of each shared file, and of its peers
     publish    send the new version to the peers
     update     get the new versions and apply them, merging if needed

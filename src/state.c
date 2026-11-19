@@ -20,9 +20,11 @@
  */
 #include "state.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "chain.h"
+#include "mem.h"
 #include "merge.h"
 #include "msg.h"
 
@@ -80,9 +82,15 @@ static int raw_new_blob(const char *line, Oid_t *oid)
  *
  * Un solo processo git log. Se la versione piu' recente che compare e' T,
  * la base e' T comunque: ci si ferma subito senza leggere il resto.
+ *
+ * La storia e' quella del path e dei path di prima delle rinomine fatte
+ * con git shared mv (old_paths, D-101): nel commit della rinomina il file
+ * nasce al path nuovo, e da solo la storia comincerebbe li'. I path sono
+ * scritti in .gitshared, non indovinati per somiglianza come fa --follow.
  */
-static eGsErr_t find_base(const Repo_t *r, const char *path,
-                          const OidList_t *chain, size_t *base, int *found)
+eGsErr_t state_find_base(const Repo_t *r, const char *path,
+                         const Str_t *old_paths, const OidList_t *chain,
+                         size_t *base, int *found)
 {
     /* git log e' porcelain: ogni opzione che la configurazione dell'utente
      * puo' cambiare e' fissata qui (reportIdea B-32, D-094). --root contro
@@ -90,11 +98,16 @@ static eGsErr_t find_base(const Repo_t *r, const char *path,
      * rinomine anche con --no-renames), --diff-merges=off contro
      * log.diffMerges, --no-show-signature contro log.showSignature (un gpg
      * per commit). Provato con git 2.34 e 2.43. */
-    const char *args[] = { "--literal-pathspecs", "-C", NULL, "log",
-                           "--format=", "--raw", "--no-abbrev",
-                           "--no-renames", "--root", "--no-follow",
-                           "--diff-merges=off", "--no-show-signature",
-                           "--", NULL, NULL };
+    static const char *const fixed[] = { "--literal-pathspecs", "-C", NULL,
+                                         "log", "--format=", "--raw",
+                                         "--no-abbrev", "--no-renames",
+                                         "--root", "--no-follow",
+                                         "--diff-merges=off",
+                                         "--no-show-signature", "--" };
+    const size_t nfixed = sizeof fixed / sizeof fixed[0];
+    size_t nold = (old_paths != NULL) ? str_zcount(old_paths) : 0U;
+    const char **args = xmalloc((nfixed + nold + 2U) * sizeof *args);
+    const char *op;
     OidList_t occ = OIDLIST_INIT; /* blob-versione nella storia, dal recente */
     Str_t line = STR_INIT;
     Oid_t blob;
@@ -108,9 +121,18 @@ static eGsErr_t find_base(const Repo_t *r, const char *path,
     int code = 0;
     eGsErr_t err;
 
-    *found = 0;
+    for (j = 0U; j < nfixed; j++) {
+        args[j] = fixed[j];
+    }
     args[2] = str_cstr(&r->top);
-    args[(sizeof args / sizeof args[0]) - 2U] = path; /* dopo "--" */
+    args[j++] = path; /* dopo "--" */
+    for (op = (nold > 0U) ? str_znext(old_paths, NULL) : NULL; op != NULL;
+         op = str_znext(old_paths, op)) {
+        args[j++] = op;
+    }
+    args[j] = NULL;
+
+    *found = 0;
     /* stderr scartato: chiudendo presto, git puo' lamentare la pipe chiusa */
     err = git_start(&p, args, PROC_STDERR_NULL);
     if (err != GS_OK) {
@@ -149,6 +171,7 @@ static eGsErr_t find_base(const Repo_t *r, const char *path,
     *found = have;
 
 exit:
+    free((void *)args);
     oidlist_free(&occ);
     str_free(&line);
     return err;
@@ -178,6 +201,29 @@ static eGsErr_t undeclared_state(GitBatch_t *b, const char *id, eState_t *st)
         }
     }
     str_free(&branch);
+    return err;
+}
+
+eGsErr_t state_renamed(GitBatch_t *b, const SharedEntry_t *e, Str_t *from,
+                       int *found)
+{
+    Str_t path = STR_INIT;
+    Str_t name = STR_INIT;
+    Oid_t oid;
+    int declared = 0;
+    eGsErr_t err = repo_rev_path(b, "HEAD", e->id, &path, &declared);
+
+    *found = 0;
+    if ((err == GS_OK) && (declared != 0) && !str_eq(&path, str_cstr(&e->path))) {
+        str_addf(&name, "HEAD:%s", str_cstr(&path));
+        *found = git_batch_blob(b, str_cstr(&name), &oid);
+    }
+    if ((*found != 0) && (from != NULL)) {
+        str_reset(from);
+        str_add(from, str_cstr(&path));
+    }
+    str_free(&name);
+    str_free(&path);
     return err;
 }
 
@@ -215,7 +261,15 @@ eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     }
     str_addf(&name, "HEAD:%s", str_cstr(&e->path));
     if (git_batch_blob(b, str_cstr(&name), &si.h) == 0) {
-        goto exit; /* file cancellato o rinominato (REQ-F-020) */
+        /* Rinomina di git shared mv non ancora committata: in attesa di
+         * commit (D-101). Altrimenti file cancellato o rinominato senza
+         * git shared mv: incoerente (REQ-F-020). */
+        si.h.len = 0U;
+        err = state_renamed(b, e, NULL, &found);
+        if ((err == GS_OK) && (found != 0)) {
+            *st = STATE_PENDING;
+        }
+        goto exit;
     }
     /* Prima il commit, poi il suo blob: T e il suo contenuto sono della
      * stessa versione anche se un peer invia mentre si legge (B-31). */
@@ -263,7 +317,8 @@ eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     if ((err != GS_OK) || (chain.n == 0U)) {
         goto exit;
     }
-    err = find_base(r, str_cstr(&e->path), &chain, &base, &found);
+    err = state_find_base(r, str_cstr(&e->path), &e->old_paths, &chain, &base,
+                          &found);
     if (err != GS_OK) {
         goto exit;
     }

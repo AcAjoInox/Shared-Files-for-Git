@@ -23,37 +23,6 @@
 #include "hooks.h"
 #include "sys.h"
 
-/* Toglie la sezione da .gitshared; se non resta nessuna sezione, toglie
- * il file. Poi lo mette in staging (anche la cancellazione). */
-static eGsErr_t drop_section(const Repo_t *r, const char *name)
-{
-    const char *args[] = { "config", "-f", NULL, "--remove-section", NULL,
-                           NULL };
-    Repo_t left = REPO_INIT;
-    Str_t file = STR_INIT;
-    Str_t section = STR_INIT;
-    eGsErr_t err;
-
-    str_addf(&file, "%s/.gitshared", str_cstr(&r->top));
-    str_addf(&section, "shared.%s", name);
-    args[2] = str_cstr(&file);
-    args[4] = str_cstr(&section);
-    err = git_run(args, 0U, NULL);
-    if (err == GS_OK) {
-        err = repo_load_gitshared(&left, str_cstr(&file), 0, 0);
-    }
-    if ((err == GS_OK) && (left.n == 0U) && (sys_remove(str_cstr(&file)) != 0)) {
-        err = GS_ERR_SYS;
-    }
-    if (err == GS_OK) {
-        err = cmd_stage(r, ".gitshared");
-    }
-    repo_close(&left);
-    str_free(&section);
-    str_free(&file);
-    return err;
-}
-
 /* <arg> e' l'ID di una sezione locale che nessun .gitshared dichiara:
  * dati locali tolti subito. Ritorna il codice di uscita. */
 static int unlink_orphan(Repo_t *r, GitBatch_t *b, SharedEntry_t *e)
@@ -160,7 +129,7 @@ int cmd_unlink(int argc, char **argv)
     }
 
     /* --- .gitshared ---------------------------------------------------- */
-    if (drop_section(&repo, str_cstr(&name)) != GS_OK) {
+    if (cmd_drop_gitshared(&repo, str_cstr(&name)) != GS_OK) {
         msg_error(MSG_ERR_WRITE_GITSHARED);
         goto exit;
     }

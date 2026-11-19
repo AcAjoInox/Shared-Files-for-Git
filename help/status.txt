@@ -24,13 +24,14 @@ DESCRIPTION
                           update, which merges
     merge in progress     update found a conflict: fix the file, git add,
                           update again
-    pending commit        set, link or unlink not committed yet: commit,
-                          or restore .gitshared to cancel
+    pending commit        set, link, unlink or mv not committed yet:
+                          commit, or restore .gitshared to cancel
     unlinked              declared here but not linked (a clone): link
-    inconsistent          the file was deleted or renamed, or .gitshared
-                          was edited by hand, or no branch declares the
-                          file any more: unlink (with the id, for the
-                          last case), or restore .gitshared
+    inconsistent          the file was deleted, or renamed without
+                          'git shared mv', or .gitshared was edited by
+                          hand, or no branch declares the file any more:
+                          mv <old> <new> for a rename, unlink (with the
+                          id, for the last case), or restore .gitshared
     suspended on this branch (...)
                           this branch is not one of the file's branches:
                           it is a regular file here. The real state is

@@ -26,6 +26,8 @@ typedef enum {
 typedef struct {
     Str_t name;        /* nome della sezione in .gitshared */
     Str_t path;        /* da .gitshared: relativo alla radice, separatore '/' */
+    Str_t old_paths;   /* da .gitshared: path di prima delle rinomine (mv,
+                        * D-101), elenco compatto */
     Str_t branches;    /* branch attivi (o default), elenco compatto */
     Str_t peers;       /* radici dei peer, elenco compatto */
     Str_t pending_src; /* link in attesa: radice della repo sorgente */
@@ -133,6 +135,11 @@ int repo_has_pending(const Repo_t *r);
 /* *declared = 1 se il .gitshared committato in <rev> dichiara l'ID. */
 eGsErr_t repo_rev_declares(GitBatch_t *b, const char *rev, const char *id,
                            int *declared);
+
+/* Come repo_rev_declares; se lo dichiara, in path il path del file in
+ * quel .gitshared (path puo' essere NULL). */
+eGsErr_t repo_rev_path(GitBatch_t *b, const char *rev, const char *id,
+                       Str_t *path, int *declared);
 
 /* Un branch locale il cui .gitshared committato dichiara l'ID (D-079):
  * *found = 1 e il nome in branch (senza "refs/heads/"); in path, se non

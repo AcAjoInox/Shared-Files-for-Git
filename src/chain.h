@@ -38,4 +38,8 @@ eGsErr_t chain_create_first(const char *id, const Oid_t *blob,
  */
 eGsErr_t chain_blobs(GitBatch_t *b, const char *id, OidList_t *out);
 
+/* Come chain_blobs, a partire da una ref qualunque (es. la ref temporanea
+ * del fetch di link, D-062). */
+eGsErr_t chain_blobs_ref(GitBatch_t *b, const char *ref, OidList_t *out);
+
 #endif /* GS_CHAIN_H */

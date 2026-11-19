@@ -1,0 +1,39 @@
+GIT-SHARED-MV(1)
+
+NOME
+    git shared mv - rinomina un file condiviso
+
+SINTASSI
+    git shared mv [-c | -m <messaggio>] [--] <path> <destinazione>
+
+DESCRIZIONE
+    Rinomina un file condiviso con 'git mv' e scrive il path nuovo in
+    .gitshared; entrambi vanno in staging. Se <destinazione> e' una
+    cartella, il file ci va dentro con il suo nome, come con 'git mv'.
+
+    La rinomina e' locale: ogni peer tiene il suo path, e il file tiene
+    il suo nome in 'git shared status'. Pubblicare e aggiornare
+    funzionano come prima, anche attraverso la rinomina: .gitshared
+    ricorda il path di prima, e la storia del file continua da li'.
+
+    Finche' la rinomina non e' committata il file e' "pending commit".
+    Per annullare, rinominalo di nuovo con 'git shared mv'.
+
+    Un file gia' rinominato con 'git mv' e' "inconsistent": lancia
+    'git shared mv <path-vecchio> <path-nuovo>' per scrivere il path
+    nuovo in .gitshared. Il file non viene spostato di nuovo.
+
+OPZIONI
+    -c, --commit
+        Committa subito la rinomina e .gitshared. Nient'altro di cio' che
+        e' in staging entra nel commit.
+
+    -m <messaggio>
+        Come -c, con <messaggio>.
+
+ESEMPI
+    git shared mv -c include/common.h include/project_common.h
+    git shared mv -c common.h lib/
+
+VEDI ANCHE
+    git shared status --help, git shared unlink --help

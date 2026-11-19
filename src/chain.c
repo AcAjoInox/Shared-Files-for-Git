@@ -151,6 +151,17 @@ static eGsErr_t push_parent(GitBatch_t *b, ChainStack_t *s, const char *hex,
  */
 eGsErr_t chain_blobs(GitBatch_t *b, const char *id, OidList_t *out)
 {
+    Str_t ref = STR_INIT;
+    eGsErr_t err;
+
+    chain_ref(&ref, id);
+    err = chain_blobs_ref(b, str_cstr(&ref), out);
+    str_free(&ref);
+    return err;
+}
+
+eGsErr_t chain_blobs_ref(GitBatch_t *b, const char *ref, OidList_t *out)
+{
     char hex[OID_HEX_SIZE];
     ChainStack_t stack = { NULL, 0U, 0U };
     OidList_t seen = OIDLIST_INIT; /* versioni gia' espanse */
@@ -164,8 +175,7 @@ eGsErr_t chain_blobs(GitBatch_t *b, const char *id, OidList_t *out)
     eGsErr_t err = GS_OK;
 
     out->n = 0U;
-    chain_ref(&name, id);
-    type = git_batch_query(b, str_cstr(&name), &commit);
+    type = git_batch_query(b, ref, &commit);
     if (type == GIT_OBJ_COMMIT) {
         stack_push(&stack, &commit, NULL, 0);
     } else if (type == GIT_OBJ_ERROR) {

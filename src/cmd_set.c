@@ -20,59 +20,6 @@
 #include "hooks.h"
 #include "sys.h"
 
-/*
- * Path relativo alla radice del file indicato dall'utente, controllando
- * che sia tracciato, senza conflitti, e un file regolare. Un solo processo
- * (ls-files), con i pathspec letterali: "*.h" non e' un glob. Con -z il
- * path arriva cosi' com'e': senza, git mette tra virgolette e in ottale i
- * path con caratteri non ASCII (core.quotePath, reportIdea C-01).
- */
-static eGsErr_t resolve_path(const char *user_path, Str_t *full)
-{
-    const char *args[] = { "--literal-pathspecs", "ls-files", "-s", "-z",
-                           "--full-name", "--", NULL, NULL };
-    Str_t out = STR_INIT;
-    const char *line;
-    const char *tab;
-    size_t rec_len;
-    eGsErr_t err = GS_ERR_USAGE;
-
-    if (strchr(user_path, '\n') != NULL) {
-        msg_error(MSG_ERR_PATH_NEWLINE);
-        goto exit;
-    }
-    if (sys_is_dir(user_path)) {
-        msg_error(MSG_ERR_IS_DIR, user_path);
-        goto exit;
-    }
-    args[6] = user_path;
-    if (git_run(args, 0U, &out) != GS_OK) {
-        msg_fatal(MSG_ERR_PROC, "git ls-files");
-        err = GS_ERR_GIT;
-        goto exit;
-    }
-    /* Record: "<modo> <oid> <stage>\t<path>\0"; piu' record = stage di
-     * conflitto. str_cstr vede solo il primo record. */
-    line = str_cstr(&out);
-    rec_len = strlen(line);
-    tab = strchr(line, '\t');
-    if ((out.len == 0U) || (tab == NULL)) {
-        msg_error(MSG_ERR_NOT_TRACKED, user_path);
-    } else if (((rec_len + 1U) < out.len) || (tab[-1] != '0')) {
-        msg_error(MSG_ERR_CONFLICT, user_path);
-    } else if ((strncmp(line, "100644 ", 7U) != 0) &&
-               (strncmp(line, "100755 ", 7U) != 0)) {
-        msg_error(MSG_ERR_NOT_REGULAR, user_path);
-    } else {
-        str_add(full, tab + 1);
-        err = GS_OK;
-    }
-
-exit:
-    str_free(&out);
-    return err;
-}
-
 int cmd_set(int argc, char **argv)
 {
     CmdOpts_t o;
@@ -108,7 +55,7 @@ int cmd_set(int argc, char **argv)
     opened = 1;
 
     rc = GS_EXIT_ERROR;
-    if (resolve_path(argv[first], &full) != GS_OK) {
+    if (cmd_resolve_tracked(NULL, argv[first], &full) != GS_OK) {
         goto exit;
     }
     e = repo_find_path(&repo, str_cstr(&full));

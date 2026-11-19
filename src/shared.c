@@ -33,6 +33,7 @@ static void entry_init(SharedEntry_t *e)
 {
     str_init(&e->name);
     str_init(&e->path);
+    str_init(&e->old_paths);
     str_init(&e->branches);
     str_init(&e->peers);
     str_init(&e->pending_src);
@@ -50,6 +51,7 @@ static void entry_free(SharedEntry_t *e)
 {
     str_free(&e->name);
     str_free(&e->path);
+    str_free(&e->old_paths);
     str_free(&e->branches);
     str_free(&e->peers);
     str_free(&e->pending_src);
@@ -292,6 +294,8 @@ static void parse_gitshared_rec(Repo_t *r, const char *rec, int with_branches)
         } else if (field_is(&k, "path")) {
             str_reset(&e->path);
             str_add(&e->path, k.value);
+        } else if (field_is(&k, "oldpath")) {
+            str_addz(&e->old_paths, k.value); /* D-101 */
         } else if (with_branches && field_is(&k, "branch")) {
             str_addz(&e->branches, k.value);
         } else {
@@ -890,11 +894,12 @@ eGsErr_t repo_declaring_branch(const char *id, GitBatch_t *b, Str_t *branch,
 
 /* ---- unlink (REQ-F-003, D-081) ------------------------------------------ */
 
-eGsErr_t repo_rev_declares(GitBatch_t *b, const char *rev, const char *id,
-                           int *declared)
+eGsErr_t repo_rev_path(GitBatch_t *b, const char *rev, const char *id,
+                       Str_t *path, int *declared)
 {
     Repo_t d = REPO_INIT;
     Str_t name = STR_INIT;
+    const SharedEntry_t *e = NULL;
     Oid_t oid;
     eGsErr_t err = GS_OK;
 
@@ -902,11 +907,22 @@ eGsErr_t repo_rev_declares(GitBatch_t *b, const char *rev, const char *id,
     str_addf(&name, "%s:.gitshared", rev);
     if (git_batch_blob(b, str_cstr(&name), &oid)) {
         err = repo_load_gitshared(&d, str_cstr(&name), 1, 0);
-        *declared = (err == GS_OK) && (repo_find_id(&d, id) != NULL);
+        e = (err == GS_OK) ? repo_find_id(&d, id) : NULL;
+        *declared = (e != NULL);
+    }
+    if ((e != NULL) && (path != NULL)) {
+        str_reset(path);
+        str_add(path, str_cstr(&e->path));
     }
     repo_close(&d);
     str_free(&name);
     return err;
+}
+
+eGsErr_t repo_rev_declares(GitBatch_t *b, const char *rev, const char *id,
+                           int *declared)
+{
+    return repo_rev_path(b, rev, id, NULL, declared);
 }
 
 eGsErr_t repo_forget(const Repo_t *r, SharedEntry_t *e, GitBatch_t *b)

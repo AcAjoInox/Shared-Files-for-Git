@@ -16,6 +16,7 @@ typedef enum {
     MSG_USAGE_SET,
     MSG_USAGE_LINK,
     MSG_USAGE_UNLINK,
+    MSG_USAGE_MV,
     MSG_USAGE_PRUNE,
     MSG_USAGE_BRANCH,
     MSG_USAGE_RELOCATE,
@@ -31,6 +32,7 @@ typedef enum {
     MSG_ERR_OPT_VALUE,       /* opzione */
     MSG_ERR_TOO_MANY_ARGS,
     MSG_ERR_MISSING_PATH,
+    MSG_ERR_MISSING_DEST,
     MSG_ERR_NOT_REPO,
     MSG_ERR_PROC,            /* programma */
     MSG_ERR_READ_GITSHARED,
@@ -57,6 +59,15 @@ typedef enum {
     MSG_ERR_DEST_EXISTS,     /* path */
     MSG_ERR_ALREADY_LINKED,  /* nome, id */
     MSG_ERR_RELINK_PATH,     /* nome, path */
+    MSG_ERR_RELINK_OPTS,     /* path */
+    MSG_ERR_DEST_SHARED,     /* path, nome */
+    MSG_ERR_ADOPT_NOT_SHARED, /* path */
+    MSG_ERR_FORCE_MERGE,
+    MSG_ERR_LINK_NO_BASE,    /* path */
+    MSG_ERR_MV_SAME,         /* path */
+    MSG_ERR_MV_NO_DIR,       /* cartella */
+    MSG_ERR_MV_MERGING,      /* path, path */
+    MSG_ERR_MV_MISSING,      /* path, destinazione */
     MSG_ERR_PENDING_OP,      /* path */
     MSG_ERR_UNLINK_UNCOMMITTED, /* path */
     MSG_ERR_UNLINK_ELSEWHERE, /* id, branch */
@@ -121,6 +132,12 @@ typedef enum {
     MSG_LINK_STAGED,         /* path, nome, repo sorgente */
     MSG_LINK_DONE,           /* path, nome, repo sorgente */
     MSG_LINK_COMMIT_MSG,     /* path */
+    MSG_LINK_KEPT,           /* path */
+    MSG_LINK_NO_BASE_NEXT,   /* path */
+    MSG_LINK_ADOPTED,        /* path, vecchio id */
+    MSG_MV_STAGED,           /* path, destinazione */
+    MSG_MV_DONE,             /* path, destinazione */
+    MSG_MV_COMMIT_MSG,       /* path, destinazione */
     MSG_UNLINK_STAGED,       /* path */
     MSG_UNLINK_DONE,         /* path */
     MSG_UNLINK_COMMIT_MSG,   /* path */
@@ -192,6 +209,7 @@ typedef enum {
     MSG_STATUS_ELSEWHERE,    /* branch */
     MSG_STATUS_ANNOUNCED,    /* repo che ha annunciato */
     MSG_STATUS_TO_MERGE,     /* repo che ha annunciato */
+    MSG_STATUS_RENAMED,      /* path di prima */
 
     MSG_STATE_ALIGNED,
     MSG_STATE_TO_APPLY,

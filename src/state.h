@@ -45,4 +45,24 @@ typedef struct {
 eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
                       eState_t *st, StateInfo_t *info);
 
+/*
+ * Base nella storia del file (path e old_paths, che puo' essere NULL) tra
+ * le versioni di chain (v[0] = T, indici crescenti = piu' vecchie):
+ * *found = 0 se nessuna versione compare; altrimenti *base e' il suo
+ * indice in chain. Serve anche a link su una destinazione che esiste
+ * (D-062), con la catena appena ricevuta.
+ */
+eGsErr_t state_find_base(const Repo_t *r, const char *path,
+                         const Str_t *old_paths, const OidList_t *chain,
+                         size_t *base, int *found);
+
+/*
+ * Rinomina con git shared mv non ancora committata (D-101): il file non e'
+ * in HEAD al path di .gitshared, ma il .gitshared di HEAD lo dichiara a un
+ * altro path, che in HEAD c'e'. *found = 1 e, se from non e' NULL, quel
+ * path. Un processo (il .gitshared di HEAD), solo quando serve.
+ */
+eGsErr_t state_renamed(GitBatch_t *b, const SharedEntry_t *e, Str_t *from,
+                       int *found);
+
 #endif /* GS_STATE_H */
