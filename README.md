@@ -13,7 +13,9 @@ The file stays a regular file: anyone using the repository without the extension
 
 ## Installation
 
-You need git 2.34 or later, `make` and `gcc` (MinGW-w64 on Windows).
+**Windows, without compiling.** Download [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (built from the latest tag, v0.4.0) and put it in a folder of your `PATH`, for example `%USERPROFILE%\bin`. It needs only git 2.34 or later. Check with `git shared -h`; the manual is in `git shared help`. The file is not signed, so Windows may warn you the first time you run it.
+
+**From the sources.** You need git 2.34 or later, `make` and `gcc` (MinGW-w64 on Windows).
 
 ```bash
 make            # build
