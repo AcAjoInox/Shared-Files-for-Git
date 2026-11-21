@@ -13,7 +13,7 @@ The file stays a regular file: anyone using the repository without the extension
 
 ## Installation
 
-**Windows, without compiling.** Download [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (built from the latest tag, v0.4.0) and put it in a folder of your `PATH`, for example `%USERPROFILE%\bin`. It needs only git 2.34 or later. Check with `git shared -h`; the manual is in `git shared help`. The file is not signed, so Windows may warn you the first time you run it.
+**Windows, without compiling.** Download [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (built from the latest tag, v0.5.0-alpha) and put it in a folder of your `PATH`, for example `%USERPROFILE%\bin`. It needs only git 2.34 or later. Check with `git shared -h`; the manual is in `git shared help`. The file is not signed, so Windows may warn you the first time you run it.
 
 **From the sources.** You need git 2.34 or later, `make` and `gcc` (MinGW-w64 on Windows).
 
@@ -99,7 +99,7 @@ Each command has its own page: `git shared <command> --help`. The same pages are
 
 ## Remote repositories (alpha)
 
-A first prototype, not yet tried on a real hosting service: expect changes. Build it from the sources (the Windows executable in `dist/windows/` does not include it yet).
+A first prototype, not yet tried on a real hosting service: expect changes. It is in the Windows executable of `dist/windows/` (v0.5.0-alpha) and in the sources.
 
 Each file gets a **creator**: the remote repository of its first remote publish. Its URL is stored in the version history of the file, so whoever has the file knows where new versions come from. Only that history is pushed and fetched, never the project.
 
