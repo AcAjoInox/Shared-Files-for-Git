@@ -39,6 +39,9 @@ typedef struct {
     unsigned in_config : 1U;    /* sezione [shared "<id>"] in .git/config */
     unsigned valid : 1U;        /* id e path ben formati */
     unsigned pending : 2U;      /* ePending_t */
+    unsigned pending_remote_key : 1U; /* chiave pendingRemote presente */
+    unsigned pending_remote : 1U; /* link remoto in attesa: pending_src e'
+                                   * un URL, nessuna membership (D-106) */
 } SharedEntry_t;
 
 typedef struct {
@@ -105,6 +108,9 @@ typedef struct {
  */
 int shared_branches_gone(BranchNames_t *bn, const SharedEntry_t *e, Str_t *list);
 void branchnames_free(BranchNames_t *bn);
+
+/* 1 se s e' un ID valido: 32 cifre esadecimali minuscole (D-006). */
+int shared_id_is_valid(const char *s);
 
 /* Nuovo ID casuale: UUID v4 in 32 cifre esadecimali minuscole (D-006). */
 eGsErr_t shared_new_id(char id[GS_ID_HEX_LEN + 1U]);

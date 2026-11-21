@@ -15,7 +15,8 @@ void chain_ref(Str_t *ref, const char *id)
 }
 
 eGsErr_t chain_commit(const Oid_t *blob, const Oid_t *parent,
-                      const Oid_t *parent2, const char *name, Oid_t *out)
+                      const Oid_t *parent2, const Oid_t *creator,
+                      const char *name, Oid_t *out)
 {
     static const char *const a_mktree[] = { "mktree", NULL };
     const char *a_commit[] = { "commit-tree", NULL, "-m", NULL, NULL, NULL,
@@ -30,7 +31,8 @@ eGsErr_t chain_commit(const Oid_t *blob, const Oid_t *parent,
     int code = 0;
     eGsErr_t err;
 
-    /* 1. Tree con la sola voce "content" (mktree legge lo stdin). */
+    /* 1. Tree con la voce "content" e, in remoto, "creator" (D-103).
+     * mktree legge lo stdin e ordina le voci da se'. */
     oid_to_hex(blob, hex);
     err = git_start(&p, a_mktree, PROC_STDIN_PIPE);
     if (err != GS_OK) {
@@ -38,6 +40,12 @@ eGsErr_t chain_commit(const Oid_t *blob, const Oid_t *parent,
     }
     if (fprintf(p.in, "100644 blob %s\tcontent\n", hex) < 0) {
         err = GS_ERR_GIT;
+    }
+    if ((creator != NULL) && (creator->len > 0U)) {
+        oid_to_hex(creator, hex);
+        if (fprintf(p.in, "100644 blob %s\tcreator\n", hex) < 0) {
+            err = GS_ERR_GIT;
+        }
     }
     proc_close_in(&p);
     if (proc_collect(&p, &tree, &code) != GS_OK) {
@@ -80,7 +88,7 @@ eGsErr_t chain_create_first(const char *id, const Oid_t *blob,
 {
     Str_t ref = STR_INIT;
     Oid_t commit;
-    eGsErr_t err = chain_commit(blob, NULL, NULL, name, &commit);
+    eGsErr_t err = chain_commit(blob, NULL, NULL, NULL, name, &commit);
 
     if (err == GS_OK) {
         chain_ref(&ref, id);
@@ -89,6 +97,29 @@ eGsErr_t chain_create_first(const char *id, const Oid_t *blob,
     }
     str_free(&ref);
     return err;
+}
+
+void chain_creator(GitBatch_t *b, const Oid_t *v1, const Oid_t *v2, Oid_t *out)
+{
+    const Oid_t *v[2];
+    char hex[OID_HEX_SIZE];
+    Str_t name = STR_INIT;
+    unsigned i;
+
+    v[0] = v1;
+    v[1] = v2;
+    out->len = 0U;
+    for (i = 0U; (i < 2U) && (out->len == 0U); i++) {
+        if ((v[i] != NULL) && (v[i]->len > 0U)) {
+            oid_to_hex(v[i], hex);
+            str_reset(&name);
+            str_addf(&name, "%s:creator", hex);
+            if (git_batch_blob(b, str_cstr(&name), out) == 0) {
+                out->len = 0U;
+            }
+        }
+    }
+    str_free(&name);
 }
 
 /* Voce della pila della visita in profondita' di chain_blobs. */

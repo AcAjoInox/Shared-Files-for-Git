@@ -12,12 +12,14 @@
 #include "mem.h"
 #include "merge.h"
 #include "peers.h"
+#include "remote.h"
 
 void received_free(Received_t *rv)
 {
     oidlist_free(&rv->heads);
     str_free(&rv->missing);
     str_free(&rv->to_merge);
+    str_free(&rv->creator);
 }
 
 static void add_once(Str_t *list, const char *s)
@@ -77,6 +79,53 @@ static void fetch_from(const SharedEntry_t *e, GitBatch_t *b, const Str_t *from,
     }
     str_free(&incoming);
     free(ok);
+}
+
+/*
+ * In remoto (D-105): ls-remote della sola ref sul creatore; se la sua
+ * punta manca qui, fetch in refs/shared-incoming/<id>/creator. La punta
+ * va tra le candidate e, con l'URL come provenienza, in tips: se e' da
+ * unire, remember ne fa un avviso come per un peer.
+ */
+static void from_creator(const SharedEntry_t *e, GitBatch_t *b, const Oid_t *t,
+                         OidList_t *cand, Tips_t *tips, Str_t *fetched,
+                         Received_t *rv)
+{
+    const char *url = str_cstr(&rv->creator);
+    Str_t ref = STR_INIT;
+    Oid_t tip;
+
+    if (remote_tip(url, e->id, &tip) != GS_OK) {
+        rv->creator_unreachable = 1;
+        goto exit;
+    }
+    rv->creator_tip = tip;
+    if ((tip.len == 0U) || oid_eq(&tip, t)) {
+        goto exit; /* nessuna versione sul creatore, o la stessa di qui */
+    }
+    if (!have_commit(b, &tip)) {
+        remote_incoming_ref(&ref, e->id);
+        if (remote_fetch(url, e->id, str_cstr(&ref)) != GS_OK) {
+            rv->creator_unreachable = 1;
+            goto exit;
+        }
+        str_addz(fetched, str_cstr(&ref));
+        /* il creatore puo' essere avanzato tra ls-remote e fetch */
+        if (git_batch_query(b, str_cstr(&ref), &tip) != GIT_OBJ_COMMIT) {
+            goto exit;
+        }
+        rv->creator_tip = tip;
+    }
+    if (!oid_eq(&tip, t)) {
+        if (!oidlist_has(cand, &tip)) {
+            oidlist_add(cand, &tip);
+        }
+        oidlist_add(&tips->oids, &tip);
+        str_addz(&tips->src, url);
+    }
+
+exit:
+    str_free(&ref);
 }
 
 /*
@@ -204,8 +253,11 @@ eGsErr_t receive_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
 
     rv->advanced = 0;
     rv->heads.n = 0U;
+    rv->creator_unreachable = 0;
+    rv->creator_tip.len = 0U;
     str_reset(&rv->missing);
     str_reset(&rv->to_merge);
+    str_reset(&rv->creator);
 
     chain_ref(&ref, e->id);
     if (git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) {
@@ -213,7 +265,14 @@ eGsErr_t receive_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         goto exit;
     }
     inbox_read(r, e->id, &in);
-    if ((in.oids.n == 0U) && (all == 0)) {
+
+    /* 0. In remoto, il creatore (D-105). Senza la voce "creator" nessun
+     * processo. */
+    if ((remote_creator_url(b, &t, &rv->creator) == GS_OK) &&
+        (rv->creator.len > 0U)) {
+        from_creator(e, b, &t, &cand, &tips, &fetched, rv);
+    }
+    if ((in.oids.n == 0U) && (all == 0) && (cand.n == 0U)) {
         goto exit; /* il caso comune: nessun processo */
     }
     done = xmalloc((in.oids.n > 0U) ? in.oids.n : 1U);
@@ -231,6 +290,8 @@ eGsErr_t receive_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
             }
         } else if (str_zhas(&e->peers, who)) {
             add_once(&from, who);
+        } else if ((rv->creator.len > 0U) && str_eq(&rv->creator, who)) {
+            /* versione del creatore: la chiede gia' from_creator */
         } else {
             fetch_all = 1; /* repo sconosciuta: da tutti i peer */
         }
@@ -276,6 +337,12 @@ eGsErr_t receive_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         } else {
             add_once(&rv->to_merge, who); /* contenuta in una da unire */
         }
+    }
+
+    /* T e' avanzata su una versione arrivata in remoto: da qui il file ha
+     * un creatore (lo mostra status; il prossimo comando lo interroga). */
+    if (rv->advanced && (rv->creator.len == 0U)) {
+        (void)remote_creator_url(b, &t, &rv->creator);
     }
 
 exit:

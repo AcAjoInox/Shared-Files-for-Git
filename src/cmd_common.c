@@ -28,6 +28,7 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
     int rc = -1;
 
     o->message = NULL;
+    o->remote = NULL;
     o->commit = 0U;
     o->force = 0U;
     o->dry_run = 0U;
@@ -72,6 +73,18 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
         } else if (((allowed & CMD_OPT_ADOPT) != 0U) &&
                    (strcmp(argv[i], "--adopt") == 0)) {
             o->adopt = 1U;
+        } else if (((allowed & CMD_OPT_REMOTE) != 0U) &&
+                   (strncmp(argv[i], "--remote=", 9U) == 0) &&
+                   (argv[i][9] != '\0')) {
+            o->remote = argv[i] + 9;
+        } else if (((allowed & CMD_OPT_REMOTE) != 0U) &&
+                   (strcmp(argv[i], "--remote") == 0)) {
+            if ((i + 1) >= argc) {
+                msg_error(MSG_ERR_OPT_VALUE, argv[i]);
+                goto exit;
+            }
+            i++;
+            o->remote = argv[i];
         } else {
             msg_error(MSG_ERR_UNKNOWN_OPT, argv[i]);
             goto exit;
@@ -138,7 +151,7 @@ static eGsErr_t set_key(const char *id, const char *field, const char *value)
 }
 
 eGsErr_t cmd_set_pending(const Repo_t *r, const char *id, const char *op,
-                         const char *path, const char *src,
+                         const char *path, const char *src, int remote,
                          const char *commit)
 {
     /* "pending" per ultima: senza di lei le altre chiavi sono ignorate,
@@ -150,6 +163,11 @@ eGsErr_t cmd_set_pending(const Repo_t *r, const char *id, const char *op,
     }
     if ((err == GS_OK) && (src != NULL)) {
         err = set_key(id, "pendingSource", src);
+    }
+    /* Sempre scritta per un link: un valore rimasto da un'attesa
+     * interrotta non deve valere per quella nuova (D-106). */
+    if ((err == GS_OK) && (src != NULL)) {
+        err = set_key(id, "pendingRemote", (remote != 0) ? "true" : "false");
     }
     if ((err == GS_OK) && (commit != NULL)) {
         err = set_key(id, "pendingCommit", commit);
@@ -467,14 +485,19 @@ int cmd_reopen(Repo_t *r, GitBatch_t *b)
     return cmd_open(r, b);
 }
 
-/* Nuova versione: blob di HEAD, genitore T, ref condizionata a T. H e T
- * sono quelli da cui e' stato ricavato lo stato (reportIdea B-31). */
-static eGsErr_t new_version(const SharedEntry_t *e, const StateInfo_t *si,
-                            Oid_t *v_out)
+/* Nuova versione: blob di HEAD, genitore T, creatore di T (D-103), ref
+ * condizionata a T. H e T sono quelli da cui e' stato ricavato lo stato
+ * (reportIdea B-31). */
+static eGsErr_t new_version(const SharedEntry_t *e, GitBatch_t *b,
+                            const StateInfo_t *si, Oid_t *v_out)
 {
     Str_t ref = STR_INIT;
+    Oid_t creator;
     Oid_t v;
-    eGsErr_t err = chain_commit(&si->h, &si->tip, NULL, str_cstr(&e->name), &v);
+    eGsErr_t err;
+
+    chain_creator(b, &si->tip, NULL, &creator);
+    err = chain_commit(&si->h, &si->tip, NULL, &creator, str_cstr(&e->name), &v);
 
     if (err == GS_OK) {
         /* Condizionata: se nel frattempo un peer ha cambiato T, non si
@@ -489,28 +512,35 @@ static eGsErr_t new_version(const SharedEntry_t *e, const StateInfo_t *si,
     return err;
 }
 
-int cmd_publish_entry(const Repo_t *r, const SharedEntry_t *e,
-                      const StateInfo_t *create, const Oid_t *tip)
+int cmd_publish_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
+                      const StateInfo_t *create, Oid_t *tip)
 {
     PeerTally_t tally = { 0U, 0U, 0U };
     Str_t push = STR_INIT; /* peer con .git file: ripiego sul push */
     const char *label = str_cstr(&e->path);
     unsigned npeers = (unsigned)str_zcount(&e->peers);
     Oid_t t = *tip;
+    Oid_t creator;
     int rc = GS_EXIT_OK;
 
     if (create != NULL) {
-        if (new_version(e, create, &t) != GS_OK) {
+        if (new_version(e, b, create, &t) != GS_OK) {
             msg_error(MSG_ERR_PUBLISH, label);
             rc = GS_EXIT_ERROR;
             goto exit;
         }
+        *tip = t;
         printf(msg(MSG_PUB_CREATED), label);
         putchar('\n');
     }
     if (npeers == 0U) {
-        printf(msg(MSG_PUB_NO_PEERS), label);
-        putchar('\n');
+        /* Con un creatore le versioni vanno in remoto: niente da dire qui
+         * (D-104). */
+        chain_creator(b, &t, NULL, &creator);
+        if (creator.len == 0U) {
+            printf(msg(MSG_PUB_NO_PEERS), label);
+            putchar('\n');
+        }
         goto exit;
     }
     /* In locale una notifica, non la catena (D-099): nessun processo. */

@@ -20,9 +20,11 @@
 #define CMD_OPT_ALL    0x10U /* --all (update, D-099) */
 #define CMD_OPT_MERGE  0x20U /* --merge (link, D-029, D-102) */
 #define CMD_OPT_ADOPT  0x40U /* --adopt (link, D-064) */
+#define CMD_OPT_REMOTE 0x80U /* --remote <remote> (publish, D-104) */
 
 typedef struct {
     const char *message; /* -m; NULL = messaggio standard */
+    const char *remote;  /* --remote; NULL = non data */
     unsigned commit : 1U;
     unsigned force : 1U;
     unsigned dry_run : 1U;
@@ -55,11 +57,12 @@ int cmd_open(Repo_t *r, GitBatch_t *b);
 
 /* Operazione in attesa in .git/config (REQ-F-023, D-077): op = "set" |
  * "link" | "unlink"; path = path del file (per i messaggi); src = radice
- * della sorgente per link, NULL altrimenti; commit = HEAD al comando per
- * unlink (D-081), NULL altrimenti. Registra anche il branch corrente, su
- * cui si cerchera' il commit di conferma. */
+ * della sorgente per link, NULL altrimenti; remote = 1 se src e' l'URL di
+ * una repo remota (link remoto, D-106: nessuna membership); commit = HEAD
+ * al comando per unlink (D-081), NULL altrimenti. Registra anche il branch
+ * corrente, su cui si cerchera' il commit di conferma. */
 eGsErr_t cmd_set_pending(const Repo_t *r, const char *id, const char *op,
-                         const char *path, const char *src,
+                         const char *path, const char *src, int remote,
                          const char *commit);
 
 /*
@@ -126,13 +129,14 @@ int cmd_reopen(Repo_t *r, GitBatch_t *b);
 /*
  * Pubblica un file: con create != NULL crea prima la nuova versione (stato
  * "da pubblicare", la base e' T: D-065) dal blob di HEAD e dalla T che lo
- * stato ha usato (reportIdea B-31), poi scrive l'avviso di T in tutti i
- * peer (D-099); un peer con .git file riceve con il push. tip = T come
- * l'ha letta lo stato. GS_EXIT_OK, oppure GS_EXIT_ERROR se la versione non
- * si crea o il push di ripiego e' rifiutato (messaggi stampati).
+ * stato ha usato (reportIdea B-31), con il creatore di T (D-103), poi
+ * scrive l'avviso di T in tutti i peer (D-099); un peer con .git file
+ * riceve con il push. tip = T come l'ha letta lo stato; all'uscita, la T
+ * pubblicata. GS_EXIT_OK, oppure GS_EXIT_ERROR se la versione non si crea
+ * o il push di ripiego e' rifiutato (messaggi stampati).
  */
-int cmd_publish_entry(const Repo_t *r, const SharedEntry_t *e,
-                      const StateInfo_t *create, const Oid_t *tip);
+int cmd_publish_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
+                      const StateInfo_t *create, Oid_t *tip);
 
 /* Path dell'utente (relativo alla cartella corrente) -> relativo alla
  * radice. 0 se assoluto o fuori dalla repo. */

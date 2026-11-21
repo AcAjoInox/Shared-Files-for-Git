@@ -82,7 +82,7 @@ int cmd_set(int argc, char **argv)
     }
 
     /* 1. Attesa (locale): per prima, vedi intestazione. */
-    if (cmd_set_pending(&repo, id, "set", str_cstr(&full), NULL, NULL) != GS_OK) {
+    if (cmd_set_pending(&repo, id, "set", str_cstr(&full), NULL, 0, NULL) != GS_OK) {
         msg_error(MSG_ERR_PENDING);
         goto exit;
     }

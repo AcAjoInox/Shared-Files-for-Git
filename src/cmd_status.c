@@ -8,6 +8,8 @@
  *
  * Prima di ricavare lo stato si riceve (receive.h, D-099): senza avvisi
  * nessun processo; con avvisi un fetch per repo annunciante, una volta.
+ * Per un file con creatore (remoto, D-105) anche ls-remote sul creatore
+ * e, se serve, il fetch: la riga "creator" dice da dove arrivano.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -228,6 +230,17 @@ int cmd_status(int argc, char **argv)
             }
             print_entry(&repo, e, st, suspended,
                         (found != 0) ? str_cstr(&alt_path) : NULL);
+            /* In remoto: da dove arrivano le versioni (D-105). */
+            if (received && (rv.creator.len > 0U)) {
+                printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_CREATOR),
+                       str_cstr(&rv.creator));
+                if (rv.creator_unreachable != 0) {
+                    printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+                    printf(msg(MSG_STATUS_CREATOR_UNREACHABLE),
+                           str_cstr(&rv.creator));
+                    putchar('\n');
+                }
+            }
             /* Non dichiarato qui: dove lo e' (B-16, D-095). */
             if (found != 0) {
                 printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));

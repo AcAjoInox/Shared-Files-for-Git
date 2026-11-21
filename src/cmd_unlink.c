@@ -121,7 +121,7 @@ int cmd_unlink(int argc, char **argv)
             goto exit;
         }
         oid_to_hex(&head, head_hex);
-        if (cmd_set_pending(&repo, id, "unlink", str_cstr(&full), NULL,
+        if (cmd_set_pending(&repo, id, "unlink", str_cstr(&full), NULL, 0,
                             head_hex) != GS_OK) {
             msg_error(MSG_ERR_PENDING);
             goto exit;

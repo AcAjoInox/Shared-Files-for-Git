@@ -46,8 +46,12 @@ static const char *const msg_en[] = {
     [MSG_USAGE_LINK] =
         "usage: git shared link [-c | -m <message>] [-f | --merge] [--adopt]\n"
         "                       [--] <source-file> [<destination>]\n"
+        "   or: git shared link [-c | -m <message>] [-f | --merge] [--adopt]\n"
+        "                       [--] <url> <id> [<destination>]\n"
         "\n"
         "    <source-file>     the shared file in the other repository\n"
+        "    <url> <id>        a file published to a remote: its creator\n"
+        "                      (or a copy) and the ID of the file\n"
         "    <destination>     path in this repository "
         "(default: as in the source)\n"
         "    -c, --commit      commit right away\n"
@@ -112,7 +116,11 @@ static const char *const msg_en[] = {
         "Show or choose the language of the manual, for all your\n"
         "repositories. Messages stay in English for now.\n",
     [MSG_USAGE_PUBLISH] =
-        "usage: git shared publish [<path>]\n",
+        "usage: git shared publish [--remote <remote>] [<path>]\n"
+        "\n"
+        "    --remote <remote>  push the versions to this remote; the first\n"
+        "                       time, it becomes the creator of the file\n"
+        "                       (default for the copy: origin)\n",
     [MSG_USAGE_UPDATE] =
         "usage: git shared update [-f] [--all] [-c | -m <message>] [<path>]\n"
         "   or: git shared update --abort [<path>]\n"
@@ -263,6 +271,21 @@ static const char *const msg_en[] = {
     [MSG_ERR_NO_MERGE] = "%s: no merge in progress",
     [MSG_ERR_NO_MERGE_ANY] = "no merge in progress",
     [MSG_ERR_ABORT_OPTS] = "--abort cannot be used with -c, -m, -f or --all",
+    [MSG_ERR_NO_REMOTE] = "no remote named '%s' in this repository",
+    [MSG_ERR_REMOTE_FETCH] =
+        "cannot get '%s' from %s: is the file shared there, and can the "
+        "repository be reached?",
+    [MSG_ERR_NO_CREATOR] =
+        "'%s' in %s was never published to a remote: link it with the path "
+        "of the file",
+    [MSG_ERR_BAD_ID] = "'%s' is not a valid ID",
+    [MSG_ERR_CREATOR_PUSH] =
+        "%s: cannot push to %s: this repository did not become the creator",
+    [MSG_ERR_CREATOR_NEWER] =
+        "%s: the creator %s has a newer version: run 'git shared update'",
+    [MSG_ERR_CREATOR_REFUSED] =
+        "%s: not accepted by the creator %s (no write access, or not "
+        "reachable): the version stays here as a proposal",
 
     [MSG_WARN_BAD_ENTRY] = "ignoring invalid entry '%s' in .gitshared",
     [MSG_WARN_NOT_IN_HEAD] =
@@ -299,6 +322,9 @@ static const char *const msg_en[] = {
         "%s: none of its active branches exists (%s): "
         "run 'git shared branch %s -a <branch>'",
     [MSG_WARN_RELOCATE_NOT_MEMBER] = "%s: %s does not share this file: skipped",
+    [MSG_WARN_CREATOR_UNREACHABLE] =
+        "%s: creator %s not reachable: using the versions in this repository",
+    [MSG_WARN_COPY_FAILED] = "%s: cannot copy the versions to %s",
     [MSG_HOOK_NOT_ALIGNED] = "%s: %s (run 'git shared %s')",
     [MSG_HOOK_ANNOUNCED] =
         "%s: new version announced by a peer (run 'git shared update')",
@@ -369,6 +395,11 @@ static const char *const msg_en[] = {
     [MSG_PUB_TO_MERGE] =
         "%s: a version from a peer does not follow this one: run "
         "'git shared update' to merge it first",
+    [MSG_PUB_CREATOR_NEW] =
+        "%s: published to %s, which is now the creator of the file",
+    [MSG_PUB_COPIED] = "%s: versions copied to %s",
+    [MSG_PUB_TO_CREATOR] = "%s: published to the creator %s",
+    [MSG_PUB_CREATOR_HAS] = "%s: the creator %s already has this version",
     [MSG_SKIP_STATE] = "%s: %s, nothing to do",
     [MSG_UPD_RECEIVED] = "%s: new version received",
     [MSG_UPD_ABORTED] =
@@ -398,6 +429,7 @@ static const char *const msg_en[] = {
     [MSG_STATUS_PENDING_ON] = "%s (on branch %s)",
     [MSG_STATUS_FIELD_NOTE] = "note",
     [MSG_STATUS_FIELD_PEERS] = "peers",
+    [MSG_STATUS_FIELD_CREATOR] = "creator",
     [MSG_PEER_SAME] = "same version",
     [MSG_PEER_BEHIND] = "older version: run 'git shared publish'",
     [MSG_PEER_NEWER] =
@@ -414,6 +446,8 @@ static const char *const msg_en[] = {
         "run 'git shared update'",
     [MSG_STATUS_TO_MERGE] =
         "the version of %s must be merged: run 'git shared update'",
+    [MSG_STATUS_CREATOR_UNREACHABLE] =
+        "creator %s not reachable: state from the versions in this repository",
     [MSG_STATUS_RENAMED] =
         "renamed from '%s': commit it with .gitshared to confirm",
     [MSG_STATUS_BRANCHES_GONE] =

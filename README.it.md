@@ -9,7 +9,7 @@ Un header comune, un file di configurazione, uno script: spesso servono a più p
 
 Il file resta un file normale: chi usa la repo senza l'estensione lo vede, lo compila e lo usa come sempre.
 
-> **Stato:** prima versione, tra repository sulla **stessa macchina**. L'uso tra repository remote (GitHub, GitLab) è in sviluppo.
+> **Stato:** prima versione, tra repository sulla **stessa macchina**. L'uso tra repository remote (GitHub, GitLab) è in **alpha**: vedi [Repository remote](#repository-remote-alpha).
 
 ## Installazione
 
@@ -97,9 +97,31 @@ Ogni comando ha la sua pagina: `git shared <comando> --help`. Le stesse pagine s
 | scollegato | La repo dichiara il file ma non conosce i peer (es. un clone) | `git shared link` |
 | incoerente | File rinominato senza `git shared mv` o cancellato, o `.gitshared` modificato a mano | `git shared mv`, `git shared unlink` o `git restore .gitshared` |
 
+## Repository remote (alpha)
+
+Un primo prototipo, non ancora provato su un hosting vero: può cambiare. Va compilato dai sorgenti (l'eseguibile Windows in `dist/windows/` non lo contiene ancora).
+
+Ogni file ha un **creatore**: la repository remota del suo primo publish in remoto. Il suo URL sta nella storia delle versioni del file, quindi chi ha il file sa da dove arrivano le versioni nuove. Si inviano e si scaricano solo quella storia, mai il progetto.
+
+```bash
+# Repository A: il suo remote diventa il creatore di common.h
+git shared publish --remote origin
+
+# Qualsiasi altra repository: collega il file dal creatore, per ID
+# (l'ID lo mostra 'git shared status')
+git shared link -c https://github.com/tu/A 0f8c3e5a9b2d4c71a6e0d9b8c7f61234 inc/common.h
+
+# Da qui in poi: status chiede al creatore se ci sono versioni nuove,
+# publish invia al creatore (se puoi scriverci) e al tuo remote
+git shared status
+git shared publish
+```
+
+Chi non può scrivere sul creatore tiene la sua versione come proposta. Non c'è ancora: collegare per nome, ricevere una proposta con un comando, le firme.
+
 ## Limiti della prima versione
 
-- Solo repository sulla stessa macchina (Linux e Windows).
+- Repository sulla stessa macchina (Linux e Windows); repository remote solo in alpha.
 - Solo singoli file di testo: niente cartelle, niente binari.
 - Al massimo 32 peer per file.
 - L'estensione va installata su ogni macchina che pubblica o applica versioni. Chi non ce l'ha usa la repo normalmente.

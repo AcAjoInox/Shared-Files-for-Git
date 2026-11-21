@@ -104,6 +104,13 @@ typedef enum {
     MSG_ERR_NO_MERGE,        /* file */
     MSG_ERR_NO_MERGE_ANY,
     MSG_ERR_ABORT_OPTS,
+    MSG_ERR_NO_REMOTE,       /* remote */
+    MSG_ERR_REMOTE_FETCH,    /* id, url */
+    MSG_ERR_NO_CREATOR,      /* id, url */
+    MSG_ERR_BAD_ID,          /* id */
+    MSG_ERR_CREATOR_PUSH,    /* file, url */
+    MSG_ERR_CREATOR_NEWER,   /* file, url */
+    MSG_ERR_CREATOR_REFUSED, /* file, url */
 
     MSG_WARN_BAD_ENTRY,      /* nome della sezione */
     MSG_WARN_NOT_IN_HEAD,    /* path */
@@ -122,6 +129,8 @@ typedef enum {
     MSG_WARN_MOVED,          /* path ricordato */
     MSG_WARN_BRANCHES_GONE,  /* file, branch attivi, path */
     MSG_WARN_RELOCATE_NOT_MEMBER, /* file, path */
+    MSG_WARN_CREATOR_UNREACHABLE, /* file, url */
+    MSG_WARN_COPY_FAILED,    /* file, url */
     MSG_HOOK_NOT_ALIGNED,    /* file, stato, comando */
     MSG_HOOK_ANNOUNCED,      /* file */
     MSG_HOOKS_INSTALLED,
@@ -175,6 +184,10 @@ typedef enum {
     MSG_PUB_DIVERGED,        /* file */
     MSG_PUB_MERGING,         /* file */
     MSG_PUB_TO_MERGE,        /* file */
+    MSG_PUB_CREATOR_NEW,     /* file, url */
+    MSG_PUB_COPIED,          /* file, url */
+    MSG_PUB_TO_CREATOR,      /* file, url */
+    MSG_PUB_CREATOR_HAS,     /* file, url */
     MSG_SKIP_STATE,          /* file, stato */
     MSG_UPD_RECEIVED,        /* file */
     MSG_UPD_APPLIED,         /* file */
@@ -197,6 +210,7 @@ typedef enum {
     MSG_STATUS_PENDING_ON,   /* stato, branch */
     MSG_STATUS_FIELD_NOTE,
     MSG_STATUS_FIELD_PEERS,
+    MSG_STATUS_FIELD_CREATOR,
     MSG_PEER_SAME,
     MSG_PEER_BEHIND,
     MSG_PEER_NEWER,
@@ -210,6 +224,7 @@ typedef enum {
     MSG_STATUS_ANNOUNCED,    /* repo che ha annunciato */
     MSG_STATUS_TO_MERGE,     /* repo che ha annunciato */
     MSG_STATUS_RENAMED,      /* path di prima */
+    MSG_STATUS_CREATOR_UNREACHABLE, /* url */
 
     MSG_STATE_ALIGNED,
     MSG_STATE_TO_APPLY,

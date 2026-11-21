@@ -9,7 +9,7 @@ A common header, a configuration file, a script: they are often needed by more t
 
 The file stays a regular file: anyone using the repository without the extension sees it, builds it and uses it as always.
 
-> **Status:** first release, for repositories on the **same machine**. Support for remote repositories (GitHub, GitLab) is in development.
+> **Status:** first release, for repositories on the **same machine**. Support for remote repositories (GitHub, GitLab) is in **alpha**: see [Remote repositories](#remote-repositories-alpha).
 
 ## Installation
 
@@ -97,9 +97,31 @@ Each command has its own page: `git shared <command> --help`. The same pages are
 | unlinked | The repository declares the file but doesn't know the peers (e.g. a clone) | `git shared link` |
 | inconsistent | File renamed without `git shared mv` or deleted, or `.gitshared` edited by hand | `git shared mv`, `git shared unlink` or `git restore .gitshared` |
 
+## Remote repositories (alpha)
+
+A first prototype, not yet tried on a real hosting service: expect changes. Build it from the sources (the Windows executable in `dist/windows/` does not include it yet).
+
+Each file gets a **creator**: the remote repository of its first remote publish. Its URL is stored in the version history of the file, so whoever has the file knows where new versions come from. Only that history is pushed and fetched, never the project.
+
+```bash
+# Repository A: its remote becomes the creator of common.h
+git shared publish --remote origin
+
+# Any other repository: link the file from the creator, by ID
+# (the ID is shown by 'git shared status')
+git shared link -c https://github.com/you/A 0f8c3e5a9b2d4c71a6e0d9b8c7f61234 inc/common.h
+
+# From then on: status asks the creator for new versions,
+# publish pushes to the creator (if you can write there) and to your own remote
+git shared status
+git shared publish
+```
+
+Who cannot write to the creator keeps their version as a proposal. Not there yet: linking by name, receiving a proposal with a command, signatures.
+
 ## Limits of the first release
 
-- Only repositories on the same machine (Linux and Windows).
+- Repositories on the same machine (Linux and Windows); remote repositories only in alpha.
 - Only single text files: no folders, no binaries.
 - At most 32 peers per file.
 - The extension must be installed on every machine that publishes or applies versions. Anyone without it uses the repository as usual.

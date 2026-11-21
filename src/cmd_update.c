@@ -117,6 +117,7 @@ static eStep_t merge_step(const Repo_t *r, const SharedEntry_t *e,
     const char *path = str_cstr(&e->path);
     Str_t ref = STR_INIT;
     Oid_t empty;
+    Oid_t creator;
     Oid_t v;
     int conflict = 0;
     eGsErr_t err = GS_OK;
@@ -150,7 +151,7 @@ static eStep_t merge_step(const Repo_t *r, const SharedEntry_t *e,
      * per genitori le versioni che si stanno unendo. */
     if (conflict != 0) {
         merge_ref(&ref, e->id);
-        if ((chain_commit(theirs, tip, p2, str_cstr(&e->name), &v) != GS_OK) ||
+        if ((chain_commit(theirs, tip, p2, NULL, str_cstr(&e->name), &v) != GS_OK) ||
             (git_set_ref(str_cstr(&ref), &v, "git shared: merge") != GS_OK)) {
             msg_error(MSG_ERR_MERGE, path);
             goto exit;
@@ -163,8 +164,11 @@ static eStep_t merge_step(const Repo_t *r, const SharedEntry_t *e,
     /* 3. Unione pulita: la versione nasce prima del commit, cosi' dopo lo
      * stato e' "da committare" senza altri dati salvati. */
     if ((p2 != NULL) || !oid_eq(result, tip_blob)) {
+        /* Il creatore passa alla versione di unione: quello di T, o della
+         * versione unita se T non l'ha ancora (D-103). */
+        chain_creator(b, tip, p2, &creator);
         chain_ref(&ref, e->id);
-        if ((chain_commit(result, tip, p2, str_cstr(&e->name), &v) != GS_OK) ||
+        if ((chain_commit(result, tip, p2, &creator, str_cstr(&e->name), &v) != GS_OK) ||
             (git_update_ref(str_cstr(&ref), &v, tip, "git shared: merge") != GS_OK)) {
             /* es. un peer ha inviato una versione nel frattempo: il
              * risultato resta nell'index, il prossimo update riparte */
@@ -316,6 +320,9 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         msg_error(MSG_ERR_CHAIN, str_cstr(&e->name));
         *rc = GS_EXIT_ERROR;
         goto exit;
+    }
+    if (rv.creator_unreachable != 0) {
+        msg_warning(MSG_WARN_CREATOR_UNREACHABLE, label, str_cstr(&rv.creator));
     }
     if (rv.advanced != 0) {
         printf(msg(MSG_UPD_RECEIVED), label);

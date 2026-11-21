@@ -6,6 +6,8 @@ NAME
 SYNOPSIS
     git shared link [-c | -m <message>] [-f | --merge] [--adopt]
                     [--] <source-file> [<destination>]
+    git shared link [-c | -m <message>] [-f | --merge] [--adopt]
+                    [--] <url> <id> [<destination>]
 
 DESCRIPTION
     Links to this repository a file that another repository shares.
@@ -41,6 +43,21 @@ DESCRIPTION
     (status says "unlinked"): link it again from one of its peers. The
     file is not touched, and the link works at once, without a commit.
 
+REMOTE (PROTOTYPE)
+    With <url> <id> you link a file published to a remote (see
+    'git shared publish --help'): <url> is its creator, or a repository
+    that has a copy; <id> is the ID of the file, which 'git shared status'
+    shows in every repository that uses it. Only the version chain is
+    fetched, not the project. The default destination is the name of
+    the file.
+
+    This repository becomes nobody's peer and the creator records
+    nothing: new versions come from the creator, which 'git shared
+    status', 'publish' and 'update' ask every time.
+
+    After cloning a repository that uses a remote file, link it again
+    from the URL of the clone: the chain there tells who the creator is.
+
 OPTIONS
     -c, --commit
         Commit .gitshared and the file right away. Nothing else staged
@@ -65,6 +82,8 @@ EXAMPLES
     git shared link -c ../firmware-a/include/common.h
     git shared link -c ../firmware-a/include/common.h inc/common.h
     git shared link --adopt -c ../firmware-a/include/common.h
+    git shared link -c https://github.com/luca/A \
+                    0f8c3e5a9b2d4c71a6e0d9b8c7f61234 inc/common.h
 
 SEE ALSO
     git shared set --help, git shared unlink --help, git shared mv --help

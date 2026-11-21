@@ -6,6 +6,8 @@ NOME
 SINTASSI
     git shared link [-c | -m <messaggio>] [-f | --merge] [--adopt]
                     [--] <file-sorgente> [<destinazione>]
+    git shared link [-c | -m <messaggio>] [-f | --merge] [--adopt]
+                    [--] <url> <id> [<destinazione>]
 
 DESCRIZIONE
     Collega a questo repository un file condiviso da un altro.
@@ -42,6 +44,21 @@ DESCRIZIONE
     (status dice "unlinked"): collegalo di nuovo da uno dei suoi peer. Il
     file non viene toccato e il collegamento vale subito, senza commit.
 
+REMOTO (PROTOTIPO)
+    Con <url> <id> si collega un file pubblicato in remoto (vedi
+    'git shared publish --help'): <url> e' il suo creatore, o un
+    repository che ne ha una copia; <id> e' l'ID del file, che
+    'git shared status' mostra in ogni repository che lo usa. Si scarica
+    solo la catena delle versioni, non il progetto. La destinazione di
+    default e' il nome del file.
+
+    Il repository non diventa peer di nessuno e il creatore non registra
+    nulla: le versioni nuove arrivano dal creatore, che 'git shared
+    status', 'publish' e 'update' interrogano ogni volta.
+
+    Dopo un clone di un repository che usa un file remoto, ricollegalo
+    dall'URL del clone: la catena che c'e' dice qual e' il creatore.
+
 OPZIONI
     -c, --commit
         Committa subito .gitshared e il file. Nient'altro di cio' che e'
@@ -66,6 +83,8 @@ ESEMPI
     git shared link -c ../firmware-a/include/common.h
     git shared link -c ../firmware-a/include/common.h inc/common.h
     git shared link --adopt -c ../firmware-a/include/common.h
+    git shared link -c https://github.com/luca/A \
+                    0f8c3e5a9b2d4c71a6e0d9b8c7f61234 inc/common.h
 
 VEDI ANCHE
     git shared set --help, git shared unlink --help, git shared mv --help

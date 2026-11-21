@@ -15,6 +15,12 @@ DESCRIPTION
     received, or when the version of a peer must be merged: in both
     cases, update.
 
+    For a file published to a remote (prototype) a "creator" line shows
+    the repository the versions come from: status asks it whether there
+    is a new version, and fetches only the version chain. If it cannot
+    be reached a note says so, and the state uses the versions already
+    here.
+
     aligned               you have the latest version: nothing to do
     new version to apply  a peer published a newer one: update
     applied, to commit    update applied it: commit

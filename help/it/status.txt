@@ -44,6 +44,12 @@ DESCRIZIONE
     o quando la versione di un peer va unita: in entrambi i casi,
     update.
 
+    Per un file pubblicato in remoto (prototipo) una riga "creator"
+    mostra il repository da cui arrivano le versioni: status gli chiede
+    se c'e' una versione nuova e scarica solo la catena delle versioni.
+    Se non risponde lo dice una nota, e lo stato si ricava dalle versioni
+    che ci sono gia'.
+
 OPZIONI
     --peers
         Mostra anche, per ogni peer: stessa versione; versione piu'

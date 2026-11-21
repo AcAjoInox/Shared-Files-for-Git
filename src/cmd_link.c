@@ -29,6 +29,15 @@
  * sezione, rifa' fetch, attesa e hook, e non tocca il file: lo stato si
  * ricava poi come per ogni file shared. Se la sezione e' gia' committata
  * il collegamento vale subito.
+ *
+ * Forma remota (D-106): "link <url> <id> [<dest>]", riconosciuta dal
+ * secondo argomento, che e' un ID. Fetch della sola catena dalla repo
+ * remota (il creatore, o una sua copia: dentro c'e' scritto il creatore);
+ * la catena deve avere la voce "creator", cioe' essere stata pubblicata in
+ * remoto. Il nome viene dal messaggio delle versioni ("shared: <nome>"),
+ * la destinazione di default e' il nome. Al commit solo la catena: nessuna
+ * membership, il creatore non registra nulla. Vale anche come ri-aggancio
+ * dopo un clone, con l'URL di origin (ideeRemote §4.4).
  */
 #include <stdio.h>
 #include <string.h>
@@ -39,6 +48,7 @@
 #include "hooks.h"
 #include "path.h"
 #include "peers.h"
+#include "remote.h"
 #include "state.h"
 #include "sys.h"
 
@@ -107,6 +117,75 @@ exit:
     str_free(&prefix);
     str_free(&dir);
     return e;
+}
+
+/*
+ * Nome del file shared dal messaggio di una versione: "shared: <nome>"
+ * (chain_commit). Si legge con cat-file (plumbing). Senza il prefisso, o
+ * con un nome vuoto, vale l'ID.
+ */
+static void version_name(const Oid_t *v, const char *id, Str_t *name)
+{
+    static const char prefix[] = "shared: ";
+    const char *args[] = { "cat-file", "commit", NULL, NULL };
+    char hex[OID_HEX_SIZE];
+    Str_t out = STR_INIT;
+    const char *subj;
+    const char *end;
+
+    oid_to_hex(v, hex);
+    args[2] = hex;
+    str_reset(name);
+    if (git_run(args, 0U, &out) == GS_OK) {
+        subj = strstr(str_cstr(&out), "\n\n");
+        if ((subj != NULL) &&
+            (strncmp(subj + 2, prefix, sizeof prefix - 1U) == 0)) {
+            subj += 2U + (sizeof prefix - 1U);
+            end = strchr(subj, '\n');
+            str_addn(name, subj, (end != NULL) ? (size_t)(end - subj) : strlen(subj));
+        }
+    }
+    if (name->len == 0U) {
+        str_add(name, id);
+    }
+    str_free(&out);
+}
+
+/*
+ * Forma remota (D-106): catena da <url> in refs/shared-incoming/<id>/0,
+ * che deve avere un creatore; nome dal messaggio della versione. src->top
+ * riceve l'URL: e' la sorgente per i messaggi e per l'attesa. GS_EXIT_OK o
+ * il codice di uscita (messaggio stampato).
+ */
+static int remote_source(GitBatch_t *b, const char *url, const char *id,
+                         Source_t *s, Str_t *name)
+{
+    Str_t ref = STR_INIT;
+    Str_t creator = STR_INIT;
+    Oid_t tip;
+    int rc = GS_EXIT_ERROR;
+
+    peers_incoming_ref(&ref, id, 0U);
+    if ((remote_fetch(url, id, str_cstr(&ref)) != GS_OK) ||
+        (git_batch_query(b, str_cstr(&ref), &tip) != GIT_OBJ_COMMIT)) {
+        msg_error(MSG_ERR_REMOTE_FETCH, id, url);
+        goto exit;
+    }
+    if ((remote_creator_url(b, &tip, &creator) != GS_OK) || (creator.len == 0U)) {
+        msg_error(MSG_ERR_NO_CREATOR, id, url);
+        str_reset(&creator);
+        str_addz(&creator, str_cstr(&ref));
+        (void)git_delete_refs(&creator);
+        goto exit;
+    }
+    version_name(&tip, id, name);
+    str_add(&s->top, url);
+    rc = GS_EXIT_OK;
+
+exit:
+    str_free(&creator);
+    str_free(&ref);
+    return rc;
 }
 
 /* 1 se la sorgente ha un'operazione in attesa per l'ID (set o link). */
@@ -258,6 +337,8 @@ int cmd_link(int argc, char **argv)
     Oid_t head_blob;
     uint8_t fetched = 0U;
     int first;
+    int npos;
+    int remote = 0;   /* forma remota: <url> <id> [<dest>] (D-106) */
     int relink = 0;
     int adopt = 0;
     int existing = 0; /* la destinazione c'e' gia' (D-062) */
@@ -274,8 +355,10 @@ int cmd_link(int argc, char **argv)
     if (first < 0) {
         goto exit;
     }
-    if ((first >= argc) || ((argc - first) > 2)) {
-        msg_error((first >= argc) ? MSG_ERR_MISSING_PATH : MSG_ERR_TOO_MANY_ARGS);
+    npos = argc - first;
+    remote = (npos >= 2) && shared_id_is_valid(argv[first + 1]);
+    if ((npos < 1) || (npos > (remote ? 3 : 2))) {
+        msg_error((npos < 1) ? MSG_ERR_MISSING_PATH : MSG_ERR_TOO_MANY_ARGS);
         fputs(msg(MSG_USAGE_LINK), stderr);
         goto exit;
     }
@@ -292,18 +375,43 @@ int cmd_link(int argc, char **argv)
     rc = GS_EXIT_ERROR;
 
     /* --- sorgente ----------------------------------------------------- */
-    se = find_source(&repo, argv[first], &src);
-    if (se == NULL) {
-        goto exit;
+    if (remote) {
+        /* Un file gia' collegato non si tocca: il fetch sovrascriverebbe
+         * la ref temporanea di un link in attesa. */
+        e = repo_find_id(&repo, argv[first + 1]);
+        if ((e != NULL) && e->in_config) {
+            msg_error(MSG_ERR_ALREADY_LINKED,
+                      e->in_gitshared ? str_cstr(&e->name) : argv[first + 1],
+                      argv[first + 1]);
+            goto exit;
+        }
+        if (remote_source(&batch, argv[first], argv[first + 1], &src, &name) !=
+            GS_EXIT_OK) {
+            goto exit;
+        }
+        str_add(&id, argv[first + 1]);
+    } else {
+        se = find_source(&repo, argv[first], &src);
+        if (se == NULL) {
+            goto exit;
+        }
+        str_add(&name, str_cstr(&se->name));
+        str_add(&id, se->id);
     }
-    str_add(&name, str_cstr(&se->name));
-    str_add(&id, se->id);
 
     /* --- destinazione (D-028) ----------------------------------------- */
-    if ((argc - first) == 2) {
-        if (!cmd_repo_path(&repo, argv[first + 1], &dest) ||
-            (strchr(argv[first + 1], '\n') != NULL)) {
-            msg_error(MSG_ERR_DEST_PATH, argv[first + 1]);
+    if (npos == (remote ? 3 : 2)) {
+        if (!cmd_repo_path(&repo, argv[argc - 1], &dest) ||
+            (strchr(argv[argc - 1], '\n') != NULL)) {
+            msg_error(MSG_ERR_DEST_PATH, argv[argc - 1]);
+            goto exit;
+        }
+    } else if (remote) {
+        /* il path nel creatore non si conosce: il nome del file, dalla
+         * radice come in locale */
+        if (path_is_absolute(str_cstr(&name)) ||
+            !path_join_norm("", str_cstr(&name), &dest)) {
+            msg_error(MSG_ERR_DEST_PATH, str_cstr(&name));
             goto exit;
         }
     } else {
@@ -314,7 +422,7 @@ int cmd_link(int argc, char **argv)
     if (relink) {
         /* Ri-aggancio: vale la sezione che c'e' (nome e path locali). Il
          * file non si tocca mai: -f, --merge e --adopt non c'entrano. */
-        if (((argc - first) == 2) && !str_eq(&e->path, str_cstr(&dest))) {
+        if ((npos == (remote ? 3 : 2)) && !str_eq(&e->path, str_cstr(&dest))) {
             msg_error(MSG_ERR_RELINK_PATH, str_cstr(&e->name),
                       str_cstr(&e->path));
             goto exit;
@@ -367,14 +475,19 @@ int cmd_link(int argc, char **argv)
     }
 
     /* --- sorgente in attesa: la si completa (D-100) ------------------- */
-    if (!source_settle(&src, str_cstr(&id))) {
+    if (!remote && !source_settle(&src, str_cstr(&id))) {
         msg_error(MSG_ERR_SRC_PENDING, argv[first], str_cstr(&src.top));
         goto exit;
     }
 
-    /* --- catena: fetch in refs/shared-incoming/<id>/0 (D-040) ---------- */
-    str_addz(&peers, str_cstr(&src.top));
-    peers_fetch(str_cstr(&dest), str_cstr(&id), &peers, &fetched, &tally);
+    /* --- catena: fetch in refs/shared-incoming/<id>/0 (D-040); in
+     * remoto e' gia' arrivata (remote_source) ---------------------------- */
+    if (remote) {
+        fetched = 1U;
+    } else {
+        str_addz(&peers, str_cstr(&src.top));
+        peers_fetch(str_cstr(&dest), str_cstr(&id), &peers, &fetched, &tally);
+    }
     peers_incoming_ref(&text, str_cstr(&id), 0U);
     str_add(&text, ":content");
     if ((fetched == 0U) || (git_batch_blob(&batch, str_cstr(&text), &blob) == 0)) {
@@ -397,14 +510,14 @@ int cmd_link(int argc, char **argv)
 
     /* --- scrittura: attesa per prima (come set) ------------------------- */
     if (cmd_set_pending(&repo, str_cstr(&id), "link", str_cstr(&dest),
-                        str_cstr(&src.top), NULL) != GS_OK) {
+                        str_cstr(&src.top), remote, NULL) != GS_OK) {
         msg_error(MSG_ERR_PENDING);
         goto exit;
     }
     if (adopt) {
         /* La vecchia identita' esce con lo stesso commit (D-064). */
         if (old.linked &&
-            (cmd_set_pending(&repo, old.id, "unlink", str_cstr(&dest), NULL,
+            (cmd_set_pending(&repo, old.id, "unlink", str_cstr(&dest), NULL, 0,
                              old.head) != GS_OK)) {
             msg_error(MSG_ERR_PENDING);
             goto exit;
@@ -466,6 +579,8 @@ int cmd_link(int argc, char **argv)
     str_add(&e->pending_branch, str_cstr(&repo.branch));
     e->in_config = 1U;
     e->pending = SHARED_PENDING_LINK;
+    e->pending_remote_key = 1U;
+    e->pending_remote = (remote != 0) ? 1U : 0U;
 
     /* Ri-aggancio con la sezione gia' committata (es. un clone): niente
      * da committare, il collegamento vale subito. */

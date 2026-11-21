@@ -45,6 +45,8 @@ static void entry_init(SharedEntry_t *e)
     e->in_config = 0U;
     e->valid = 0U;
     e->pending = SHARED_PENDING_NONE;
+    e->pending_remote_key = 0U;
+    e->pending_remote = 0U;
 }
 
 static void entry_free(SharedEntry_t *e)
@@ -202,6 +204,11 @@ static int id_is_valid(const char *s, size_t len)
     return ok;
 }
 
+int shared_id_is_valid(const char *s)
+{
+    return id_is_valid(s, strlen(s));
+}
+
 /* Path relativo (D-003): non vuoto, senza '/' o '\' iniziale ne' "C:". */
 static int path_is_valid(const Str_t *p)
 {
@@ -339,6 +346,9 @@ static void parse_local_rec(Repo_t *r, const char *rec)
         } else if (field_is(&k, "pendingcommit")) {
             str_reset(&e->pending_commit);
             str_add(&e->pending_commit, k.value);
+        } else if (field_is(&k, "pendingremote")) {
+            e->pending_remote_key = 1U;
+            e->pending_remote = (strcmp(k.value, "true") == 0) ? 1U : 0U;
         } else if (field_is(&k, "branch")) {
             str_addz(&e->branches, k.value);
         } else if (field_is(&k, "peer")) {
@@ -629,7 +639,12 @@ static eGsErr_t end_pending(SharedEntry_t *e)
     if ((err == GS_OK) && (e->pending_commit.len > 0U)) {
         err = config_unset(e->id, "pendingcommit");
     }
+    if ((err == GS_OK) && (e->pending_remote_key != 0U)) {
+        err = config_unset(e->id, "pendingremote");
+    }
     if (err == GS_OK) {
+        e->pending_remote_key = 0U;
+        e->pending_remote = 0U;
         e->pending = SHARED_PENDING_NONE;
         e->in_config = 1U;
         str_reset(&e->pending_src);
@@ -667,7 +682,7 @@ static eGsErr_t complete_set(const Repo_t *r, SharedEntry_t *e,
 /*
  * Completa un link (REQ-F-002, D-059): catena dalla ref temporanea del
  * fetch fatto al comando, membership (peer della sorgente + la sorgente),
- * annuncio ai peer.
+ * annuncio ai peer. Per un link remoto (D-106) solo la catena.
  */
 static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
                               const SharedEntry_t *committed, GitBatch_t *b)
@@ -714,6 +729,14 @@ static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
     if (git_batch_query(b, str_cstr(&incoming), &tip) == GIT_OBJ_COMMIT) {
         str_addz(&del, str_cstr(&incoming));
         (void)git_delete_refs(&del);
+    }
+
+    /* Link remoto (D-106): chi riceve dal creatore non e' un peer di
+     * nessuno e il creatore non registra nulla. Le versioni arrivano dal
+     * creatore, al primo comando che ricava lo stato. */
+    if (e->pending_remote != 0U) {
+        err = end_pending(e);
+        goto exit;
     }
 
     /* 2. Membership: i peer della sorgente piu' la sorgente, senza se'. */
