@@ -5,7 +5,7 @@
 
 . "$(dirname "$0")/lib.sh"
 
-BREEF="$TEST_DIR/../report/breef.md"
+SRC_FILE="$TEST_DIR/../test_shared_file.md"
 WARN_HOOKS="post-checkout post-merge post-rewrite"
 
 top() {
@@ -22,9 +22,9 @@ make_repo A
 cd "$TRASH/A" || exit 1
 printf '#!/bin/sh\necho "hook-utente" >&2\nexit 0\n' >.git/hooks/pre-commit
 chmod +x .git/hooks/pre-commit
-put breef.md "$(cat "$BREEF")"
-run git shared set breef.md
-ID=$(shared_id breef.md)
+put test_shared_file.md "$(cat "$SRC_FILE")"
+run git shared set test_shared_file.md
+ID=$(shared_id test_shared_file.md)
 for h in $WARN_HOOKS; do
 	expect_ok "default: blocco in $h" has_block "$h"
 done
@@ -36,7 +36,7 @@ expect_eq "hook nuovo: inizia con #!/bin/sh" "$(head -n 1 .git/hooks/post-merge)
 
 # Il commit completa il set (D-100) e il blocco del post-commit sparisce:
 # l'hook l'aveva creato git shared, quindi il file si cancella.
-run git commit -q -m "share breef.md"
+run git commit -q -m "share test_shared_file.md"
 expect_err "commit: l'hook dell'utente gira" "hook-utente"
 expect_ok "commit: la catena c'e' subito" git rev-parse -q --verify "refs/shared/$ID"
 expect_fail "commit: attesa chiusa" git config "shared.$ID.pending"
@@ -55,10 +55,10 @@ expect_fail "secondo set: post-commit tolto al commit" test -e .git/hooks/post-c
 make_repo B
 cd "$TRASH/B" || exit 1
 put x.c x
-git shared link -c ../A/breef.md >/dev/null
+git shared link -c ../A/test_shared_file.md >/dev/null
 expect_eq "link -c: A conosce B" "$(git -C ../A config --get-all "shared.$ID.peer")" "$(top B)"
 OLD_A=$(git -C ../A rev-parse "refs/shared/$ID")
-printf 'riga di B\n' >>breef.md
+printf 'riga di B\n' >>test_shared_file.md
 run git commit -q -a -m "B modifica"
 expect_eq "default: commit senza output di git shared" "$OUT$ERR" ""
 expect_eq "default: A non riceve al commit" "$(git -C ../A rev-parse "refs/shared/$ID")" "$OLD_A"
@@ -74,7 +74,7 @@ expect_rc "hook install: codice 0" 0
 expect_out "hook install: messaggio" "Hooks installed."
 expect_fail "autoPublish in config: nessun blocco nel post-commit" has_block post-commit
 OLD_A=$(git -C ../A rev-parse "refs/shared/$ID")
-printf 'seconda riga di B\n' >>breef.md
+printf 'seconda riga di B\n' >>test_shared_file.md
 run git commit -q -a -m "B modifica ancora"
 expect_eq "autoPublish in config: commit senza output" "$OUT$ERR" ""
 expect_eq "autoPublish in config: A non riceve al commit" \
@@ -88,10 +88,10 @@ cd "$TRASH/A" || exit 1
 git checkout -q -b feature 2>/dev/null
 run git checkout -q main
 expect_err "post-checkout: avviso sul branch attivo" \
-	"breef.md: new version announced by a peer (run 'git shared update')"
+	"test_shared_file.md: new version announced by a peer (run 'git shared update')"
 run git checkout -q feature
 case "$ERR" in
-*breef.md*) not_ok "post-checkout: nessun avviso sul branch sospeso" "$ERR" ;;
+*test_shared_file.md*) not_ok "post-checkout: nessun avviso sul branch sospeso" "$ERR" ;;
 *) ok "post-checkout: nessun avviso sul branch sospeso" ;;
 esac
 git checkout -q main 2>/dev/null
@@ -116,7 +116,7 @@ old_hook() {
 # Il blocco rimasto nel post-commit senza attese non pubblica nulla al
 # commit, e si toglie da solo (D-100).
 old_hook post-commit
-printf 'terza riga di B\n' >>breef.md
+printf 'terza riga di B\n' >>test_shared_file.md
 OLD_A=$(git -C ../A rev-parse "refs/shared/$ID")
 run git commit -q -a -m "B con il vecchio post-commit"
 expect_eq "vecchio post-commit: commit senza output" "$OUT$ERR" ""

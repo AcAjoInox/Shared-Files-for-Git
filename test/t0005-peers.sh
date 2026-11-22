@@ -2,11 +2,13 @@
 # t0005-peers.sh - link, publish, update tra repo locali (M2).
 # REQ-F-002, REQ-F-004..REQ-F-010, D-028, D-040, D-059.
 #
-# Il file condiviso e' breef.md del progetto, copiato nella repo sorgente.
+# Il file condiviso e' test_shared_file.md (radice del progetto), copiato nella
+# repo sorgente.
 
 . "$(dirname "$0")/lib.sh"
 
-BREEF="$TEST_DIR/../report/breef.md"
+TEST_FILE="test_shared_file.md"
+SRC_FILE="$TEST_DIR/../$TEST_FILE"
 
 # top <repo>: radice come la scrive git (su Windows "C:/...")
 top() {
@@ -16,11 +18,11 @@ top() {
 # --- A: sorgente ---------------------------------------------------------------
 make_repo A
 cd "$TRASH/A" || exit 1
-cp "$BREEF" breef.md
-git add breef.md
+cp "$SRC_FILE" "$TEST_FILE"
+git add "$TEST_FILE"
 git commit -q -m init
-git shared set -c breef.md >/dev/null
-ID=$(shared_id breef.md)
+git shared set -c "$TEST_FILE" >/dev/null
+ID=$(shared_id "$TEST_FILE")
 TOP_A=$(top A)
 
 make_repo B
@@ -31,7 +33,7 @@ TOP_B=$(top B)
 # --- argomenti ----------------------------------------------------------------
 run git shared link
 expect_rc "link senza argomenti: codice 129" 129
-run git shared link ../A/breef.md a b
+run git shared link "../A/$TEST_FILE" a b
 expect_rc "link con tre argomenti: codice 129" 129
 run git shared link ../A/x.md
 expect_rc "sorgente non shared: codice 1" 1
@@ -44,13 +46,13 @@ expect_rc "stessa repo: codice 1" 1
 expect_err "stessa repo: errore" "same repository"
 
 # --- link senza commit: tutto in attesa ---------------------------------------
-run git shared link ../A/breef.md
+run git shared link "../A/$TEST_FILE"
 expect_rc "link: codice 0" 0
-expect_out "link: messaggio" "'breef.md' linked as 'breef.md' from"
-expect_ok "link: contenuto uguale alla sorgente" cmp -s breef.md ../A/breef.md
+expect_out "link: messaggio" "'$TEST_FILE' linked as '$TEST_FILE' from"
+expect_ok "link: contenuto uguale alla sorgente" cmp -s "$TEST_FILE" "../A/$TEST_FILE"
 expect_eq "link: .gitshared e file in staging" \
-	"$(git diff --cached --name-only | tr '\n' ' ')" ".gitshared breef.md "
-expect_eq "link: stesso ID della sorgente" "$(shared_id breef.md)" "$ID"
+	"$(git diff --cached --name-only | tr '\n' ' ')" ".gitshared $TEST_FILE "
+expect_eq "link: stesso ID della sorgente" "$(shared_id "$TEST_FILE")" "$ID"
 expect_eq "link: attesa" "$(git config "shared.$ID.pending")" link
 expect_eq "link: sorgente registrata" "$(git config "shared.$ID.pendingSource")" "$TOP_A"
 expect_ok "link: catena ricevuta in una ref temporanea" \
@@ -59,11 +61,11 @@ expect_fail "link: refs/shared non ancora creata" git rev-parse -q --verify "ref
 expect_fail "link: la sorgente non sa ancora nulla" git -C ../A config "shared.$ID.peer"
 run git shared status
 expect_out "link: in attesa di commit" "pending commit"
-run git shared link ../A/breef.md
+run git shared link "../A/$TEST_FILE"
 expect_rc "link ripetuto: codice 1" 1
 
 # --- commit: completamento, membership, annuncio ------------------------------
-git commit -q -m "link breef.md"
+git commit -q -m "link $TEST_FILE"
 run git shared status
 expect_out "dopo il commit: allineato" "aligned"
 expect_eq "catena uguale alla sorgente" \
@@ -79,14 +81,14 @@ make_repo C
 cd "$TRASH/C" || exit 1
 put c.c c
 TOP_C=$(top C)
-run git shared link -c ../A/breef.md "docs/breef copy.md"
+run git shared link -c "../A/$TEST_FILE" "docs/shared copy.md"
 expect_rc "link -c con destinazione: codice 0" 0
-expect_out "link -c: confermato" "'docs/breef copy.md' linked as 'breef.md' from"
+expect_out "link -c: confermato" "'docs/shared copy.md' linked as '$TEST_FILE' from"
 expect_eq "link -c: path in .gitshared" \
-	"$(git config -f .gitshared shared.breef.md.path)" "docs/breef copy.md"
-expect_eq "link -c: messaggio standard" "$(git log -1 --format=%s)" "Link docs/breef copy.md"
+	"$(git config -f .gitshared "shared.$TEST_FILE.path")" "docs/shared copy.md"
+expect_eq "link -c: messaggio standard" "$(git log -1 --format=%s)" "Link docs/shared copy.md"
 expect_eq "link -c: il commit contiene .gitshared e il file" \
-	"$(git show --name-only --format= HEAD | tr '\n' ' ')" ".gitshared docs/breef copy.md "
+	"$(git show --name-only --format= HEAD | tr '\n' ' ')" ".gitshared docs/shared copy.md "
 PEERS_C=$(git config --get-all "shared.$ID.peer" | tr '\n' ' ')
 case "$PEERS_C" in
 *"$TOP_A"*"$TOP_B"* | *"$TOP_B"*"$TOP_A"*) ok "C conosce A e B (peer della sorgente)" ;;
@@ -97,15 +99,15 @@ expect_ok "B conosce C" sh -c "git -C '$TRASH/B' config --get-all shared.$ID.pee
 
 make_repo D
 cd "$TRASH/D" || exit 1
-put breef.md altro
-run git shared link ../A/breef.md
+put "$TEST_FILE" altro
+run git shared link "../A/$TEST_FILE"
 expect_rc "destinazione esistente: codice 1" 1
 expect_err "destinazione esistente: errore" "already exists"
 
 # --- publish da B ---------------------------------------------------------------
 cd "$TRASH/B" || exit 1
-printf 'riga aggiunta da B\n' >>breef.md
-git commit -q -a -m "B modifica breef.md"
+printf 'riga aggiunta da B\n' >>"$TEST_FILE"
+git commit -q -a -m "B modifica $TEST_FILE"
 run git shared status
 expect_out "B: da pubblicare" "to publish"
 run git shared publish
@@ -124,18 +126,18 @@ expect_rc "publish di un file non shared: codice 1" 1
 
 # --- update in A (ricevere non e' applicare) -------------------------------------
 cd "$TRASH/A" || exit 1
-expect_fail "A: file non toccato dalla ricezione" grep -q "riga aggiunta da B" breef.md
+expect_fail "A: file non toccato dalla ricezione" grep -q "riga aggiunta da B" "$TEST_FILE"
 run git shared status
 expect_out "A: da applicare" "new version to apply"
 expect_eq "A: ricevuta da status" "$(git rev-parse "refs/shared/$ID")" "$T_B"
-expect_fail "A: ricevere non e' applicare" grep -q "riga aggiunta da B" breef.md
+expect_fail "A: ricevere non e' applicare" grep -q "riga aggiunta da B" "$TEST_FILE"
 run git shared update
 expect_rc "update: codice 0" 0
 expect_out "update: applicata, da committare" "new version applied. Commit it to confirm."
-expect_ok "update: contenuto di B" grep -q "riga aggiunta da B" breef.md
+expect_ok "update: contenuto di B" grep -q "riga aggiunta da B" "$TEST_FILE"
 expect_eq "update: file in staging, nessun commit" \
-	"$(git diff --cached --name-only)" breef.md
-git commit -q -m "aggiorno breef.md"
+	"$(git diff --cached --name-only)" "$TEST_FILE"
+git commit -q -m "aggiorno $TEST_FILE"
 run git shared status
 expect_out "A dopo il commit: allineato" "aligned"
 
@@ -144,7 +146,7 @@ run git shared update -c
 expect_rc "update -c: codice 0" 0
 expect_out "update -c: applicata e committata" "new version applied and committed."
 expect_no_out "update -c: nessun invito a committare" "Commit it to confirm"
-expect_eq "update -c: messaggio standard" "$(git log -1 --format=%s)" "Update docs/breef copy.md"
+expect_eq "update -c: messaggio standard" "$(git log -1 --format=%s)" "Update docs/shared copy.md"
 run git shared status
 expect_out "update -c: allineato" "aligned"
 run git shared update
@@ -152,23 +154,23 @@ expect_out "update senza novita': aggiornato" "up to date"
 
 # --- modifiche locali (REQ-F-010) --------------------------------------------------
 cd "$TRASH/B" || exit 1
-printf 'seconda riga di B\n' >>breef.md
+printf 'seconda riga di B\n' >>"$TEST_FILE"
 git commit -q -a -m "B modifica ancora"
 git shared publish >/dev/null
 cd "$TRASH/A" || exit 1
-printf 'modifica locale\n' >>breef.md
+printf 'modifica locale\n' >>"$TEST_FILE"
 run git shared update
 expect_rc "modifiche locali: codice 1" 1
 expect_err "modifiche locali: rifiuto" "has local changes"
-expect_ok "modifiche locali: file non toccato" grep -q "modifica locale" breef.md
+expect_ok "modifiche locali: file non toccato" grep -q "modifica locale" "$TEST_FILE"
 run git shared update -f
 expect_rc "update -f: codice 0" 0
-expect_fail "update -f: modifica locale sovrascritta" grep -q "modifica locale" breef.md
-git commit -q -a -m "aggiorno breef.md"
+expect_fail "update -f: modifica locale sovrascritta" grep -q "modifica locale" "$TEST_FILE"
+git commit -q -a -m "aggiorno $TEST_FILE"
 
 # --- divergenza locale: C modifica da una base vecchia --------------------------
 cd "$TRASH/C" || exit 1
-printf 'modifica di C\n' >>"docs/breef copy.md"
+printf 'modifica di C\n' >>"docs/shared copy.md"
 git commit -q -a -m "C modifica da base vecchia"
 run git shared status
 expect_out "C: divergente" "diverged"
@@ -184,7 +186,7 @@ expect_err "update divergente: conflitto da risolvere" "merge conflict"
 cd "$TRASH" || exit 1
 mv B B.off
 cd "$TRASH/A" || exit 1
-printf 'modifica di A\n' >>breef.md
+printf 'modifica di A\n' >>"$TEST_FILE"
 git commit -q -a -m "A modifica"
 run git shared publish
 expect_rc "peer irraggiungibile: codice 0" 0
@@ -193,7 +195,7 @@ expect_err "peer irraggiungibile: avviso" "not reachable"
 cd "$TRASH" || exit 1
 mv B.off B
 cd "$TRASH/B" || exit 1
-printf 'modifica concorrente di B\n' >>breef.md
+printf 'modifica concorrente di B\n' >>"$TEST_FILE"
 git commit -q -a -m "B modifica senza aver visto A"
 run git shared publish
 expect_rc "avviso perso: B pubblica" 0
