@@ -3,7 +3,7 @@
 
 # Shared Files for Git
 
-The same file in several git repositories, always aligned.
+A **shared file** in several Git™ repositories, always aligned.
 
 A common header, a configuration file, a script: they are often needed by more than one project, and copying them by hand sooner or later leaves you with different copies. `git shared` is a git extension that keeps **the same file aligned across several repositories**. You change the file in any of the projects and publish it; the other projects learn that a new version exists and adopt it when they want, with one command.
 
@@ -134,6 +134,6 @@ The code was written entirely by an AI model, under human supervision. Ideas, re
 
 Released under the [MIT](LICENSE) license.
 
-"Shared Files per Git" is an independent project and is not affiliated with or endorsed by the Git project. Git and the Git logo are either registered trademarks or trademarks of Software Freedom Conservancy, Inc., corporate home of the Git project, in the United States and/or other countries.
+"Shared Files for Git" is an independent project and is not affiliated with or endorsed by the Git project. Git and the Git logo are either registered trademarks or trademarks of Software Freedom Conservancy, Inc., corporate home of the Git project, in the United States and/or other countries.
 
 For questions or reports: lucamurani@gmail.com
