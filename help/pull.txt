@@ -1,0 +1,44 @@
+GIT-SHARED-PULL(1)
+
+NAME
+    git shared pull - get the versions of the creator and apply them
+
+SYNOPSIS
+    git shared pull [-f] [--all] [-c | -m <message>] [<path>]
+
+DESCRIPTION
+    Like 'git pull' = fetch + merge: for each file shared through a
+    remote (prototype), fetches the version chain of its creator, one
+    fetch for each creator, then runs 'git shared update' with the same
+    options. Only the version chain is fetched, not the project.
+
+    The latest version of the creator stays in this repository: after a
+    pull, or a 'git shared status --remote', update and status work
+    without the network.
+
+    If the creator cannot be reached, or no longer has the file, that
+    file is not updated and pull fails; the other files go on. Files
+    without a creator are only updated, as with update.
+
+    To finish or give up a merge (--ours, --theirs, --abort) no network
+    is needed: use update.
+
+OPTIONS
+    -f, --force
+        Overwrite local changes of the file.
+
+    --all
+        Also fetch from every local peer, as 'update --all'.
+
+    -c, --commit
+        Commit the applied files right away.
+
+    -m <message>
+        Commit right away with <message>.
+
+EXAMPLES
+    git shared pull -c
+
+SEE ALSO
+    git shared push --help, git shared update --help,
+    git shared status --help

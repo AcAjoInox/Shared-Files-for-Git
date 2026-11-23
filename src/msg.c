@@ -17,6 +17,8 @@ static const char *const msg_en[] = {
         "    status    show the shared files of this repository\n"
         "    publish   send new versions to the peers\n"
         "    update    get the new versions and apply them\n"
+        "    push      send the published versions to the creator (remote)\n"
+        "    pull      get the versions of the creator and apply them\n"
         "    prune     forget the peers that no longer exist\n"
         "    branch    choose the branches where a file is shared\n"
         "    relocate  tell the peers that this repository was moved\n"
@@ -116,11 +118,10 @@ static const char *const msg_en[] = {
         "Show or choose the language of the manual, for all your\n"
         "repositories. Messages stay in English for now.\n",
     [MSG_USAGE_PUBLISH] =
-        "usage: git shared publish [--remote <remote>] [<path>]\n"
+        "usage: git shared publish [<path>]\n"
         "\n"
-        "    --remote <remote>  push the versions to this remote; the first\n"
-        "                       time, it becomes the creator of the file\n"
-        "                       (default for the copy: origin)\n",
+        "Create the new version and announce it to the local peers. For a\n"
+        "file shared through a remote, then run 'git shared push'.\n",
     [MSG_USAGE_UPDATE] =
         "usage: git shared update [-f] [--all] [-c | -m <message>] [<path>]\n"
         "   or: git shared update (--ours | --theirs) [-c | -m <message>] [<path>]\n"
@@ -140,11 +141,28 @@ static const char *const msg_en[] = {
         "    --theirs          finish the merge taking the other version\n"
         "    --abort           give up the merge in progress\n",
     [MSG_USAGE_STATUS] =
-        "usage: git shared status [--peers]\n"
+        "usage: git shared status [--peers] [--remote]\n"
         "\n"
         "Show the state of each shared file.\n"
         "\n"
-        "    --peers    also show whether each peer has the same version\n",
+        "    --peers    also show whether each peer has the same version\n"
+        "    --remote   first get the latest versions from the creators\n",
+    [MSG_USAGE_PUSH] =
+        "usage: git shared push [<remote>] [--] [<path>]\n"
+        "\n"
+        "Send the published versions to the creator of each file, and a\n"
+        "copy to <remote> (default: origin). The first time, with <remote>\n"
+        "and <path>: <remote> becomes the creator of the file.\n",
+    [MSG_USAGE_PULL] =
+        "usage: git shared pull [-f] [--all] [-c | -m <message>] [<path>]\n"
+        "\n"
+        "Get the latest versions from the creators, then run\n"
+        "'git shared update'.\n"
+        "\n"
+        "    -f, --force       overwrite local changes\n"
+        "    --all             fetch from every local peer too\n"
+        "    -c, --commit      commit the applied files right away\n"
+        "    -m <message>      commit right away with <message>\n",
     [MSG_USAGE_HOOK] =
         "usage: git shared hook install\n"
         "   or: git shared hook <event> [<args>]\n"
@@ -299,10 +317,22 @@ static const char *const msg_en[] = {
     [MSG_ERR_CREATOR_PUSH] =
         "%s: cannot push to %s: this repository did not become the creator",
     [MSG_ERR_CREATOR_NEWER] =
-        "%s: the creator %s has a newer version: run 'git shared update'",
+        "%s: the creator %s has a newer version: run 'git shared pull'",
     [MSG_ERR_CREATOR_REFUSED] =
         "%s: not accepted by the creator %s (no write access, or not "
         "reachable): the version stays here as a proposal",
+    [MSG_ERR_CREATOR_MISSING] =
+        "%s: the creator %s does not have this file: not updated",
+    [MSG_ERR_CREATOR_UNREACHABLE] =
+        "%s: creator %s not reachable: not updated",
+    [MSG_ERR_PUSH_NO_CREATOR] =
+        "%s: no creator yet: run 'git shared push <remote> %s' to choose it",
+    [MSG_ERR_PUSH_NOTHING] =
+        "no file is shared through a remote: run "
+        "'git shared push <remote> <path>' to choose the creator of a file",
+    [MSG_ERR_PULL_NO_CREATOR] =
+        "%s: no creator, the file is shared only locally: run "
+        "'git shared update %s'",
 
     [MSG_WARN_BAD_ENTRY] = "ignoring invalid entry '%s' in .gitshared",
     [MSG_WARN_NOT_IN_HEAD] =
@@ -339,8 +369,6 @@ static const char *const msg_en[] = {
         "%s: none of its active branches exists (%s): "
         "run 'git shared branch %s -a <branch>'",
     [MSG_WARN_RELOCATE_NOT_MEMBER] = "%s: %s does not share this file: skipped",
-    [MSG_WARN_CREATOR_UNREACHABLE] =
-        "%s: creator %s not reachable: using the versions in this repository",
     [MSG_WARN_COPY_FAILED] = "%s: cannot copy the versions to %s",
     [MSG_HOOK_NOT_ALIGNED] = "%s: %s (run 'git shared %s')",
     [MSG_HOOK_ANNOUNCED] =
@@ -415,11 +443,13 @@ static const char *const msg_en[] = {
     [MSG_PUB_TO_MERGE] =
         "%s: a version from a peer does not follow this one: run "
         "'git shared update' to merge it first",
-    [MSG_PUB_CREATOR_NEW] =
-        "%s: published to %s, which is now the creator of the file",
+    [MSG_PUB_NOT_ON_CREATOR] =
+        "%s: not on the creator yet: run 'git shared push'",
     [MSG_PUB_COPIED] = "%s: versions copied to %s",
-    [MSG_PUB_TO_CREATOR] = "%s: published to the creator %s",
-    [MSG_PUB_CREATOR_HAS] = "%s: the creator %s already has this version",
+    [MSG_PUSH_CREATOR_NEW] =
+        "%s: pushed to %s, which is now the creator of the file",
+    [MSG_PUSH_TO_CREATOR] = "%s: pushed to the creator %s",
+    [MSG_PUSH_ON_CREATOR] = "%s: already on the creator %s",
     [MSG_SKIP_STATE] = "%s: %s, nothing to do",
     [MSG_UPD_RECEIVED] = "%s: new version received",
     [MSG_UPD_ABORTED] =
@@ -467,7 +497,14 @@ static const char *const msg_en[] = {
     [MSG_STATUS_TO_MERGE] =
         "the version of %s must be merged: run 'git shared update'",
     [MSG_STATUS_CREATOR_UNREACHABLE] =
-        "creator %s not reachable: state from the versions in this repository",
+        "creator %s not reachable: state from the last version seen",
+    [MSG_CREATOR_SAME] = "same version",
+    [MSG_CREATOR_AHEAD] = "ahead: run 'git shared push'",
+    [MSG_CREATOR_BEHIND] = "newer version on the creator: run 'git shared update'",
+    [MSG_CREATOR_DIVERGED] =
+        "diverged: run 'git shared update', then 'git shared push'",
+    [MSG_CREATOR_UNSEEN] = "not checked yet: run 'git shared status --remote'",
+    [MSG_CREATOR_MISSING] = "the file is no longer there",
     [MSG_STATUS_RENAMED] =
         "renamed from '%s': commit it with .gitshared to confirm",
     [MSG_STATUS_BRANCHES_GONE] =

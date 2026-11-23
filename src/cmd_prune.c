@@ -14,7 +14,8 @@
  * (REQ-F-023).
  *
  * Senza <path> toglie anche le ref di lavoro rimaste senza sezione locale
- * (refs/shared/<id>, refs/shared-incoming/<id>/<k>, refs/shared-merge/<id>):
+ * (refs/shared/<id>, refs/shared-incoming/<id>/<k>, refs/shared-merge/<id>,
+ * refs/shared-creator/<id>):
  * reportIdea B-27, C-22. E gli avvisi rimasti senza sezione (D-099).
  */
 #include <stdio.h>
@@ -110,11 +111,13 @@ static unsigned prune_entry(const Repo_t *r, const SharedEntry_t *e, int dry,
 }
 
 /* ID di una ref di lavoro: refs/shared/<id>, refs/shared-merge/<id>,
- * refs/shared-incoming/<id>/<k>. 0 se il nome non ha questa forma. */
+ * refs/shared-incoming/<id>/<k>, refs/shared-creator/<id>. 0 se il nome
+ * non ha questa forma. */
 static int ref_id(const char *ref, char id[GS_ID_HEX_LEN + 1U])
 {
     static const char *const prefix[] = { "refs/shared/", "refs/shared-merge/",
-                                          "refs/shared-incoming/" };
+                                          "refs/shared-incoming/",
+                                          "refs/shared-creator/" };
     const char *rest = NULL;
     size_t i;
     size_t len;
@@ -139,7 +142,8 @@ static unsigned prune_refs(Repo_t *r, int dry, int *rc)
 {
     static const char *const args[] = { "for-each-ref", "--format=%(refname)",
                                         "refs/shared", "refs/shared-merge",
-                                        "refs/shared-incoming", NULL };
+                                        "refs/shared-incoming",
+                                        "refs/shared-creator", NULL };
     const SharedEntry_t *e;
     Str_t lines = STR_INIT;
     Str_t orphans = STR_INIT;

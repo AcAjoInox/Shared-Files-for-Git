@@ -34,6 +34,8 @@ COMANDI
     status     mostra lo stato di ogni file shared e dei suoi peer
     publish    invia la versione nuova ai peer
     update     riceve le versioni nuove e le applica, unendo se serve
+    push       invia al creatore le versioni pubblicate (remoto)
+    pull       riceve le versioni del creatore e le applica (remoto)
     branch     sceglie i branch su cui un file e' shared
     prune      dimentica i peer che non esistono piu'
     relocate   avvisa i peer che questo repository e' stato spostato o copiato

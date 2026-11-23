@@ -8,6 +8,7 @@
 #include <string.h>
 
 #include "chain.h"
+#include "remote.h"
 #include "hooks.h"
 #include "mem.h"
 #include "path.h"
@@ -28,7 +29,6 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
     int rc = -1;
 
     o->message = NULL;
-    o->remote = NULL;
     o->commit = 0U;
     o->force = 0U;
     o->dry_run = 0U;
@@ -38,10 +38,12 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
     o->adopt = 0U;
     o->ours = 0U;
     o->theirs = 0U;
+    o->dashdash = 0U;
     while ((i < argc) && (end_opts == 0) && (argv[i][0] == '-') &&
            (argv[i][1] != '\0')) {
         if (strcmp(argv[i], "--") == 0) {
             end_opts = 1;
+            o->dashdash = 1U;
         } else if (((allowed & CMD_OPT_COMMIT) != 0U) &&
                    ((strcmp(argv[i], "-c") == 0) ||
                     (strcmp(argv[i], "--commit") == 0))) {
@@ -81,18 +83,6 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
         } else if (((allowed & CMD_OPT_CHOOSE) != 0U) &&
                    (strcmp(argv[i], "--theirs") == 0)) {
             o->theirs = 1U;
-        } else if (((allowed & CMD_OPT_REMOTE) != 0U) &&
-                   (strncmp(argv[i], "--remote=", 9U) == 0) &&
-                   (argv[i][9] != '\0')) {
-            o->remote = argv[i] + 9;
-        } else if (((allowed & CMD_OPT_REMOTE) != 0U) &&
-                   (strcmp(argv[i], "--remote") == 0)) {
-            if ((i + 1) >= argc) {
-                msg_error(MSG_ERR_OPT_VALUE, argv[i]);
-                goto exit;
-            }
-            i++;
-            o->remote = argv[i];
         } else {
             msg_error(MSG_ERR_UNKNOWN_OPT, argv[i]);
             goto exit;
@@ -683,4 +673,55 @@ int cmd_select(Repo_t *r, const char *user_path, unsigned char *sel)
     }
     str_free(&full);
     return ok;
+}
+
+void cmd_fetch_creators(const Repo_t *r, GitBatch_t *b, const unsigned char *sel,
+                        unsigned char *res, Str_t *urls)
+{
+    size_t n = r->n;
+    uint8_t *got = xmalloc((n > 0U) ? n : 1U);
+    size_t *idx = xmalloc(((n > 0U) ? n : 1U) * sizeof *idx);
+    Str_t ref = STR_INIT;
+    Str_t ids = STR_INIT;
+    Oid_t t;
+    size_t i;
+    size_t j;
+    size_t k;
+    size_t m;
+
+    for (i = 0U; i < n; i++) {
+        res[i] = CMD_NO_CREATOR;
+        str_reset(&urls[i]);
+        if (sel[i] == 0U) {
+            continue;
+        }
+        chain_ref(&ref, r->v[i].id);
+        if ((git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) ||
+            (remote_creator_url(b, &t, &urls[i]) != GS_OK)) {
+            str_reset(&urls[i]);
+        }
+    }
+    /* Un fetch per creatore: le voci con lo stesso URL vanno insieme. */
+    for (i = 0U; i < n; i++) {
+        if ((sel[i] == 0U) || (urls[i].len == 0U) || (res[i] != CMD_NO_CREATOR)) {
+            continue;
+        }
+        str_reset(&ids);
+        m = 0U;
+        for (j = i; j < n; j++) {
+            if ((sel[j] != 0U) && (res[j] == CMD_NO_CREATOR) &&
+                str_eq(&urls[j], str_cstr(&urls[i]))) {
+                str_addz(&ids, r->v[j].id);
+                idx[m++] = j;
+            }
+        }
+        remote_fetch_seen(str_cstr(&urls[i]), &ids, got);
+        for (k = 0U; k < m; k++) {
+            res[idx[k]] = got[k];
+        }
+    }
+    str_free(&ids);
+    str_free(&ref);
+    free(idx);
+    free(got);
 }

@@ -4,7 +4,7 @@ NOME
     git shared publish - invia la versione nuova ai peer
 
 SINTASSI
-    git shared publish [--remote <remote>] [<path>]
+    git shared publish [<path>]
 
 DESCRIZIONE
     Per ogni file shared modificato e committato sopra l'ultima versione,
@@ -27,31 +27,14 @@ DESCRIZIONE
     Senza <path>, tutti i file shared; con <path>, solo quello.
 
 REMOTO (PROTOTIPO)
-    La prima volta, 'publish --remote <remote>' rende quel repository
-    remoto il creatore del file: una versione nuova ne registra l'URL e
-    viene inviata li'. Si invia solo la catena delle versioni, mai il
-    progetto. I peer locali ricevono la versione come ogni altra.
-
-    Da quel momento, per quel file publish invia la catena anche al
-    remote di questo repository (--remote, oppure origin), come copia per
-    chi lo clona, e al creatore, dove stanno le versioni ufficiali. Il
-    creatore accetta solo una versione che segue la sua, e solo da chi
-    puo' scrivere li'. Se rifiuta perche' ha una versione piu' nuova,
-    lancia 'git shared update', committa e pubblica di nuovo. Se non puoi
-    scrivere li', la versione resta qui (e nel tuo remote) come proposta.
-
-    Senza --remote, un file che non ha un creatore resta locale.
-
-OPZIONI
-    --remote <remote>
-        Il remote che riceve la copia (default: origin). Per un file senza
-        creatore, diventa il creatore.
+    publish e' sempre locale. Per un file condiviso attraverso un remoto
+    la versione nuova arriva al creatore con 'git shared push': publish
+    lo ricorda quando il creatore non ha ancora la versione.
 
 ESEMPI
     git commit -am "Corretto il timeout in common.h"
     git shared publish
 
-    git shared publish --remote origin    # primo publish in remoto
-
 VEDI ANCHE
-    git shared update --help, git shared status --help
+    git shared update --help, git shared status --help,
+    git shared push --help

@@ -8,8 +8,10 @@
  *
  * Prima di ricavare lo stato si riceve (receive.h, D-099): senza avvisi
  * nessun processo; con avvisi un fetch per repo annunciante, una volta.
- * Per un file con creatore (remoto, D-105) anche ls-remote sul creatore
- * e, se serve, il fetch: la riga "creator" dice da dove arrivano.
+ * Per un file con creatore (remoto) conta anche l'ultima versione vista
+ * del creatore, senza rete; la riga "creator" dice da dove arrivano le
+ * versioni e com'e' T rispetto al creatore (D-110). Con --remote, prima
+ * un fetch per creatore: l'unico caso in cui status va in rete.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -26,6 +28,7 @@
 #include "inbox.h"
 #include "peers.h"
 #include "receive.h"
+#include "remote.h"
 #include "shared.h"
 #include "state.h"
 
@@ -73,6 +76,47 @@ static void print_entry(const Repo_t *r, const SharedEntry_t *e, eState_t st,
         fputs(state_name(st), stdout);
     }
     putchar('\n');
+}
+
+/*
+ * Riga "creator <url> (<rispetto al creatore>)" (D-110): T confrontata con
+ * l'ultima versione vista. Un processo solo se le due sono diverse.
+ * fetched: esito di status --remote per il file (CMD_NO_CREATOR = non
+ * chiesto).
+ */
+static void print_creator(const SharedEntry_t *e, GitBatch_t *b,
+                          const Received_t *rv, unsigned char fetched)
+{
+    const Oid_t *seen = &rv->creator_tip;
+    Str_t ref = STR_INIT;
+    eMsgId_t rel;
+    Oid_t t;
+
+    chain_ref(&ref, e->id);
+    if (git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) {
+        t.len = 0U;
+    }
+    if (fetched == (unsigned char)REMOTE_MISSING) {
+        rel = MSG_CREATOR_MISSING;
+    } else if (seen->len == 0U) {
+        rel = MSG_CREATOR_UNSEEN;
+    } else if (oid_eq(seen, &t)) {
+        rel = MSG_CREATOR_SAME;
+    } else if ((t.len > 0U) && merge_is_ancestor(seen, &t)) {
+        rel = MSG_CREATOR_AHEAD;
+    } else if ((t.len > 0U) && merge_is_ancestor(&t, seen)) {
+        rel = MSG_CREATOR_BEHIND;
+    } else {
+        rel = MSG_CREATOR_DIVERGED;
+    }
+    printf("    %-6s %s (%s)\n", msg(MSG_STATUS_FIELD_CREATOR),
+           str_cstr(&rv->creator), msg(rel));
+    if (fetched == (unsigned char)REMOTE_UNREACHABLE) {
+        printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+        printf(msg(MSG_STATUS_CREATOR_UNREACHABLE), str_cstr(&rv->creator));
+        putchar('\n');
+    }
+    str_free(&ref);
 }
 
 /*
@@ -153,6 +197,9 @@ int cmd_status(int argc, char **argv)
     Str_t list = STR_INIT;
     Str_t elsewhere = STR_INIT; /* branch che dichiara il file (B-16) */
     Str_t alt_path = STR_INIT;
+    Str_t *urls = NULL;          /* --remote: creatori */
+    unsigned char *sel = NULL;   /* --remote: file da chiedere */
+    unsigned char *fetched = NULL; /* --remote: esito per file */
     const SharedEntry_t *e;
     eState_t st;
     size_t i;
@@ -161,6 +208,7 @@ int cmd_status(int argc, char **argv)
     int found;
     int suspended;
     int with_peers = 0;
+    int with_remote = 0;
     int received;
     Received_t rv = RECEIVED_INIT;
     int rc = GS_EXIT_FATAL;
@@ -169,6 +217,8 @@ int cmd_status(int argc, char **argv)
     for (i = 1U; i < (size_t)argc; i++) {
         if (strcmp(argv[i], "--peers") == 0) {
             with_peers = 1;
+        } else if (strcmp(argv[i], "--remote") == 0) {
+            with_remote = 1;
         } else {
             if (argv[i][0] == '-') {
                 msg_error(MSG_ERR_UNKNOWN_OPT, argv[i]);
@@ -200,6 +250,32 @@ int cmd_status(int argc, char **argv)
     }
     repo_check_self(&repo);
 
+    /* --remote (D-110): un fetch per creatore, poi un cat-file che veda le
+     * ref e gli oggetti nuovi. Un creatore che non risponde e' una nota. */
+    sel = xmalloc((repo.n > 0U) ? repo.n : 1U);
+    fetched = xmalloc((repo.n > 0U) ? repo.n : 1U);
+    urls = xmalloc(((repo.n > 0U) ? repo.n : 1U) * sizeof *urls);
+    for (i = 0U; i < repo.n; i++) {
+        e = &repo.v[i];
+        str_init(&urls[i]);
+        fetched[i] = CMD_NO_CREATOR;
+        sel[i] = (with_remote && e->in_config && e->valid &&
+                  (e->pending == SHARED_PENDING_NONE) && (e->id[0] != '\0'))
+                     ? 1U
+                     : 0U;
+    }
+    if (with_remote) {
+        cmd_fetch_creators(&repo, &batch, sel, fetched, urls);
+        git_batch_close(&batch);
+        batch_open = 0;
+        if (git_batch_open(&batch) != GS_OK) {
+            msg_fatal(MSG_ERR_PROC, "git cat-file");
+            rc = GS_EXIT_FATAL;
+            goto exit;
+        }
+        batch_open = 1;
+    }
+
     for (i = 0U; i < repo.n; i++) {
         e = &repo.v[i];
         if (e->in_gitshared && !e->valid) {
@@ -230,16 +306,10 @@ int cmd_status(int argc, char **argv)
             }
             print_entry(&repo, e, st, suspended,
                         (found != 0) ? str_cstr(&alt_path) : NULL);
-            /* In remoto: da dove arrivano le versioni (D-105). */
+            /* In remoto: da dove arrivano le versioni e com'e' T
+             * rispetto al creatore (D-110). */
             if (received && (rv.creator.len > 0U)) {
-                printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_CREATOR),
-                       str_cstr(&rv.creator));
-                if (rv.creator_unreachable != 0) {
-                    printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
-                    printf(msg(MSG_STATUS_CREATOR_UNREACHABLE),
-                           str_cstr(&rv.creator));
-                    putchar('\n');
-                }
+                print_creator(e, &batch, &rv, fetched[i]);
             }
             /* Non dichiarato qui: dove lo e' (B-16, D-095). */
             if (found != 0) {
@@ -288,6 +358,14 @@ exit:
     if (batch_open != 0) {
         git_batch_close(&batch);
     }
+    if (urls != NULL) {
+        for (i = 0U; i < repo.n; i++) {
+            str_free(&urls[i]);
+        }
+    }
+    free(urls);
+    free(fetched);
+    free(sel);
     repo_close(&repo);
     branchnames_free(&names);
     received_free(&rv);

@@ -29,6 +29,8 @@ static const CmdDef_t commands[] = {
     { "mv", cmd_mv, MSG_USAGE_MV },
     { "prune", cmd_prune, MSG_USAGE_PRUNE },
     { "publish", cmd_publish, MSG_USAGE_PUBLISH },
+    { "pull", cmd_pull, MSG_USAGE_PULL },
+    { "push", cmd_push, MSG_USAGE_PUSH },
     { "relocate", cmd_relocate, MSG_USAGE_RELOCATE },
     { "set", cmd_set, MSG_USAGE_SET },
     { "status", cmd_status, MSG_USAGE_STATUS },

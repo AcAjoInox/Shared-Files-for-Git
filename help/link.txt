@@ -44,16 +44,16 @@ DESCRIPTION
     file is not touched, and the link works at once, without a commit.
 
 REMOTE (PROTOTYPE)
-    With <url> <id> you link a file published to a remote (see
-    'git shared publish --help'): <url> is its creator, or a repository
+    With <url> <id> you link a file shared through a remote (see
+    'git shared push --help'): <url> is its creator, or a repository
     that has a copy; <id> is the ID of the file, which 'git shared status'
     shows in every repository that uses it. Only the version chain is
     fetched, not the project. The default destination is the name of
     the file.
 
     This repository becomes nobody's peer and the creator records
-    nothing: new versions come from the creator, which 'git shared
-    status', 'publish' and 'update' ask every time.
+    nothing: new versions come from the creator with 'git shared pull',
+    and yours go there with 'git shared push'.
 
     After cloning a repository that uses a remote file, link it again
     from the URL of the clone: the chain there tells who the creator is.

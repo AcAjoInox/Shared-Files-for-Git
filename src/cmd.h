@@ -16,6 +16,8 @@ int cmd_link(int argc, char **argv);
 int cmd_mv(int argc, char **argv);
 int cmd_prune(int argc, char **argv);
 int cmd_publish(int argc, char **argv);
+int cmd_pull(int argc, char **argv);
+int cmd_push(int argc, char **argv);
 int cmd_relocate(int argc, char **argv);
 int cmd_set(int argc, char **argv);
 int cmd_status(int argc, char **argv);

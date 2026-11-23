@@ -20,12 +20,10 @@
 #define CMD_OPT_ALL    0x10U /* --all (update, D-099) */
 #define CMD_OPT_MERGE  0x20U /* --merge (link, D-029, D-102) */
 #define CMD_OPT_ADOPT  0x40U /* --adopt (link, D-064) */
-#define CMD_OPT_REMOTE 0x80U /* --remote <remote> (publish, D-104) */
 #define CMD_OPT_CHOOSE 0x100U /* --ours, --theirs (update, D-108) */
 
 typedef struct {
     const char *message; /* -m; NULL = messaggio standard */
-    const char *remote;  /* --remote; NULL = non data */
     unsigned commit : 1U;
     unsigned force : 1U;
     unsigned dry_run : 1U;
@@ -35,6 +33,7 @@ typedef struct {
     unsigned adopt : 1U;
     unsigned ours : 1U;
     unsigned theirs : 1U;
+    unsigned dashdash : 1U; /* le opzioni sono finite con "--" */
 } CmdOpts_t;
 
 /*
@@ -153,6 +152,27 @@ int cmd_repo_path(const Repo_t *r, const char *user_path, Str_t *out);
  * (errore stampato). sel[i] = 1 per le voci scelte.
  */
 int cmd_select(Repo_t *r, const char *user_path, unsigned char *sel);
+
+/*
+ * Ultima versione vista del creatore per le voci scelte (D-110): un fetch
+ * per creatore, con tutte le sue catene (remote_fetch_seen). res[i] =
+ * CMD_NO_CREATOR se T non ha un creatore, altrimenti un eRemoteFetch_t;
+ * urls[i] = URL del creatore ("" = nessuno), r->n elementi inizializzati
+ * dal chiamante. Dopo, il cat-file va riaperto: deve vedere le ref nuove.
+ */
+#define CMD_NO_CREATOR 0xFFU
+void cmd_fetch_creators(const Repo_t *r, GitBatch_t *b, const unsigned char *sel,
+                        unsigned char *res, Str_t *urls);
+
+/*
+ * Il cuore di update (REQ-F-009) per le voci scelte, dopo le opzioni e
+ * --abort / --ours / --theirs: ricezione, unioni, applicazioni, commit con
+ * -c / -m e messaggi finali. Lo usa anche pull (REQ-F-028). rc: il codice
+ * di uscita fin qui; ritorna quello nuovo. *batch_ok = 0 se il cat-file e'
+ * stato chiuso.
+ */
+int cmd_update_run(Repo_t *r, GitBatch_t *b, const unsigned char *sel,
+                   CmdOpts_t *o, int rc, int *batch_ok);
 
 /* Avviso per publish/update lanciati a mano su un branch sospeso (atto
  * esplicito: si fa); se nessun branch attivo esiste, anche il rimedio. */

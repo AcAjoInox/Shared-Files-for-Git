@@ -72,9 +72,11 @@ git commit -m "update common.h"
 | `git shared link <file-in-other-repo> [<dest>]` | Links a file shared by another repository; a copy that already exists is kept and `update` aligns it |
 | `git shared unlink <file>` | Stops sharing the file, which stays as a regular file |
 | `git shared mv <file> <dest>` | Renames a shared file, only in this repository |
-| `git shared status [--peers]` | State of each shared file; with `--peers`, also that of the peers |
+| `git shared status [--peers] [--remote]` | State of each shared file; with `--peers`, also that of the peers; with `--remote`, first asks the creators |
 | `git shared publish [<file>]` | Creates a new version and notifies the peers |
 | `git shared update [--all] [<file>]` | Receives and applies the latest version; `--ours` / `--theirs` keeps one version, `--abort` gives up a merge |
+| `git shared push [<remote>] [<file>]` | Remote (alpha): sends the published versions to the creator; the first time, `<remote>` becomes the creator |
+| `git shared pull [<file>]` | Remote (alpha): receives the versions of the creator, then `update` |
 | `git shared branch <file> [-a\|-rm <branch>]` | Chooses the branches where the file is shared; on the others it is a regular file |
 | `git shared prune [-n]` | Removes peers that were deleted or no longer share the file |
 | `git shared relocate [--copy]` | Tells the peers that the repository was moved or copied |
@@ -99,22 +101,27 @@ Each command has its own page: `git shared <command> --help`. The same pages are
 
 ## Remote repositories (alpha)
 
-A first prototype: expect changes. On GitHub, publishing to the creator and updating from it work; permissions, credentials and the less common cases are not tested yet, and GitLab not at all. It is in the Windows executable of `dist/windows/` (v0.6.1-alpha) and in the sources.
+A first prototype: expect changes. On GitHub, sending versions to the creator and receiving them from it work; permissions, credentials and the less common cases are not tested yet, and GitLab not at all. It is in the Windows executable of `dist/windows/` (v0.6.1-alpha) and in the sources.
 
-Each file gets a **creator**: the remote repository of its first remote publish. Its URL is stored in the version history of the file, so whoever has the file knows where new versions come from. Only that history is pushed and fetched, never the project.
+Each file gets a **creator**: the remote repository of its first `git shared push`. Its URL is stored in the version history of the file, so whoever has the file knows where new versions come from. Only that history is pushed and fetched, never the project.
+
+As in git, the network is used only when you ask: `publish`, `update` and `status` stay local; `push` sends to the creator, `pull` receives from it and applies, `status --remote` checks for something new.
 
 ```bash
 # Repository A: its remote becomes the creator of common.h
-git shared publish --remote origin
+git shared push origin common.h
 
 # Any other repository: link the file from the creator, by ID
 # (the ID is shown by 'git shared status')
 git shared link -c https://github.com/you/A 0f8c3e5a9b2d4c71a6e0d9b8c7f61234 inc/common.h
 
-# From then on: status asks the creator for new versions,
-# publish pushes to the creator (if you can write there) and to your own remote
-git shared status
+# From then on: publish locally, then push to the creator
+# (if you can write there) and a copy to your own remote
 git shared publish
+git shared push
+
+# Receive and apply the versions of the creator
+git shared pull -c
 ```
 
 Who cannot write to the creator keeps their version as a proposal. Not there yet: linking by name, receiving a proposal with a command, signatures.

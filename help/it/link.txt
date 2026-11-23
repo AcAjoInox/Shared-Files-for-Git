@@ -45,16 +45,16 @@ DESCRIZIONE
     file non viene toccato e il collegamento vale subito, senza commit.
 
 REMOTO (PROTOTIPO)
-    Con <url> <id> si collega un file pubblicato in remoto (vedi
-    'git shared publish --help'): <url> e' il suo creatore, o un
+    Con <url> <id> si collega un file condiviso attraverso un remoto
+    (vedi 'git shared push --help'): <url> e' il suo creatore, o un
     repository che ne ha una copia; <id> e' l'ID del file, che
     'git shared status' mostra in ogni repository che lo usa. Si scarica
     solo la catena delle versioni, non il progetto. La destinazione di
     default e' il nome del file.
 
     Il repository non diventa peer di nessuno e il creatore non registra
-    nulla: le versioni nuove arrivano dal creatore, che 'git shared
-    status', 'publish' e 'update' interrogano ogni volta.
+    nulla: le versioni nuove arrivano dal creatore con 'git shared pull',
+    e le tue ci vanno con 'git shared push'.
 
     Dopo un clone di un repository che usa un file remoto, ricollegalo
     dall'URL del clone: la catena che c'e' dice qual e' il creatore.

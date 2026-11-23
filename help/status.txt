@@ -4,7 +4,7 @@ NAME
     git shared status - show the state of each shared file
 
 SYNOPSIS
-    git shared status [--peers]
+    git shared status [--peers] [--remote]
 
 DESCRIPTION
     Shows each shared file with its path, ID and state, and what to do.
@@ -15,11 +15,12 @@ DESCRIPTION
     received, or when the version of a peer must be merged: in both
     cases, update.
 
-    For a file published to a remote (prototype) a "creator" line shows
-    the repository the versions come from: status asks it whether there
-    is a new version, and fetches only the version chain. If it cannot
-    be reached a note says so, and the state uses the versions already
-    here.
+    For a file shared through a remote (prototype) a "creator" line
+    shows the repository the versions come from and, in brackets, how
+    the latest version here compares with the last one seen there: same
+    version; ahead (push); newer version on the creator (update);
+    diverged (update, then push); not checked yet (status --remote).
+    Without --remote, status never uses the network.
 
     aligned               you have the latest version: nothing to do
     new version to apply  a peer published a newer one: update
@@ -55,6 +56,13 @@ OPTIONS
         yet (publish); no longer shares the file, or not found (prune);
         cannot be read now. Nothing is fetched from the peers or changed
         in them.
+
+    --remote
+        First fetches the version chain from the creator of each file
+        shared through a remote, one fetch for each creator, as pull
+        does, but without applying anything. If a creator cannot be
+        reached a note says so, and the state uses the last version
+        seen.
 
 SEE ALSO
     git shared update --help, git shared publish --help

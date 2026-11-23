@@ -72,9 +72,11 @@ git commit -m "aggiorno common.h"
 | `git shared link <file-in-altra-repo> [<dest>]` | Collega un file shared di un'altra repo; una copia che esiste già resta com'è e `update` la allinea |
 | `git shared unlink <file>` | Smette di condividere il file, che resta come file normale |
 | `git shared mv <file> <dest>` | Rinomina un file shared, solo in questa repo |
-| `git shared status [--peers]` | Stato di ogni file shared; con `--peers`, anche quello dei peer |
+| `git shared status [--peers] [--remote]` | Stato di ogni file shared; con `--peers`, anche quello dei peer; con `--remote`, prima chiede ai creatori |
 | `git shared publish [<file>]` | Crea una versione nuova e avvisa i peer |
 | `git shared update [--all] [<file>]` | Riceve e applica l'ultima versione; `--ours` / `--theirs` tiene una versione, `--abort` rinuncia a un'unione |
+| `git shared push [<remote>] [<file>]` | Remoto (alpha): invia al creatore le versioni pubblicate; la prima volta `<remote>` diventa il creatore |
+| `git shared pull [<file>]` | Remoto (alpha): riceve le versioni del creatore, poi `update` |
 | `git shared branch <file> [-a\|-rm <branch>]` | Sceglie i branch su cui il file è shared; sugli altri è un file normale |
 | `git shared prune [-n]` | Toglie i peer cancellati o che non condividono più il file |
 | `git shared relocate [--copy]` | Avvisa i peer che la repo è stata spostata o copiata |
@@ -99,22 +101,27 @@ Ogni comando ha la sua pagina: `git shared <comando> --help`. Le stesse pagine s
 
 ## Repository remote (alpha)
 
-Un primo prototipo: può cambiare. Su GitHub pubblicare verso il creatore e aggiornarsi da lui funziona; permessi, credenziali e i casi meno comuni non sono ancora provati, GitLab per niente. C'è nell'eseguibile Windows di `dist/windows/` (v0.6.1-alpha) e nei sorgenti.
+Un primo prototipo: può cambiare. Su GitHub inviare le versioni al creatore e riceverle da lui funziona; permessi, credenziali e i casi meno comuni non sono ancora provati, GitLab per niente. C'è nell'eseguibile Windows di `dist/windows/` (v0.6.1-alpha) e nei sorgenti.
 
-Ogni file ha un **creatore**: la repository remota del suo primo publish in remoto. Il suo URL sta nella storia delle versioni del file, quindi chi ha il file sa da dove arrivano le versioni nuove. Si inviano e si scaricano solo quella storia, mai il progetto.
+Ogni file ha un **creatore**: la repository remota del suo primo `git shared push`. Il suo URL sta nella storia delle versioni del file, quindi chi ha il file sa da dove arrivano le versioni nuove. Si inviano e si scaricano solo quella storia, mai il progetto.
+
+Come in git, la rete si usa solo quando la chiedi: `publish`, `update` e `status` restano locali; `push` invia al creatore, `pull` riceve da lui e applica, `status --remote` controlla se c'è qualcosa di nuovo.
 
 ```bash
 # Repository A: il suo remote diventa il creatore di common.h
-git shared publish --remote origin
+git shared push origin common.h
 
 # Qualsiasi altra repository: collega il file dal creatore, per ID
 # (l'ID lo mostra 'git shared status')
 git shared link -c https://github.com/tu/A 0f8c3e5a9b2d4c71a6e0d9b8c7f61234 inc/common.h
 
-# Da qui in poi: status chiede al creatore se ci sono versioni nuove,
-# publish invia al creatore (se puoi scriverci) e al tuo remote
-git shared status
+# Da qui in poi: publish in locale, poi push al creatore
+# (se puoi scriverci) e una copia al tuo remote
 git shared publish
+git shared push
+
+# Ricevi e applica le versioni del creatore
+git shared pull -c
 ```
 
 Chi non può scrivere sul creatore tiene la sua versione come proposta. Non c'è ancora: collegare per nome, ricevere una proposta con un comando, le firme.

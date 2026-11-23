@@ -24,6 +24,8 @@ typedef enum {
     MSG_USAGE_PUBLISH,
     MSG_USAGE_UPDATE,
     MSG_USAGE_STATUS,
+    MSG_USAGE_PUSH,
+    MSG_USAGE_PULL,
     MSG_USAGE_HOOK,
 
     MSG_ERR_UNKNOWN_CMD,     /* sottocomando */
@@ -114,6 +116,11 @@ typedef enum {
     MSG_ERR_CREATOR_PUSH,    /* file, url */
     MSG_ERR_CREATOR_NEWER,   /* file, url */
     MSG_ERR_CREATOR_REFUSED, /* file, url */
+    MSG_ERR_CREATOR_MISSING, /* file, url */
+    MSG_ERR_CREATOR_UNREACHABLE, /* file, url */
+    MSG_ERR_PUSH_NO_CREATOR, /* file, path */
+    MSG_ERR_PUSH_NOTHING,
+    MSG_ERR_PULL_NO_CREATOR, /* file, path */
 
     MSG_WARN_BAD_ENTRY,      /* nome della sezione */
     MSG_WARN_NOT_IN_HEAD,    /* path */
@@ -132,7 +139,6 @@ typedef enum {
     MSG_WARN_MOVED,          /* path ricordato */
     MSG_WARN_BRANCHES_GONE,  /* file, branch attivi, path */
     MSG_WARN_RELOCATE_NOT_MEMBER, /* file, path */
-    MSG_WARN_CREATOR_UNREACHABLE, /* file, url */
     MSG_WARN_COPY_FAILED,    /* file, url */
     MSG_HOOK_NOT_ALIGNED,    /* file, stato, comando */
     MSG_HOOK_ANNOUNCED,      /* file */
@@ -189,10 +195,11 @@ typedef enum {
     MSG_PUB_DIVERGED,        /* file */
     MSG_PUB_MERGING,         /* file */
     MSG_PUB_TO_MERGE,        /* file */
-    MSG_PUB_CREATOR_NEW,     /* file, url */
+    MSG_PUB_NOT_ON_CREATOR,  /* file */
     MSG_PUB_COPIED,          /* file, url */
-    MSG_PUB_TO_CREATOR,      /* file, url */
-    MSG_PUB_CREATOR_HAS,     /* file, url */
+    MSG_PUSH_CREATOR_NEW,    /* file, url */
+    MSG_PUSH_TO_CREATOR,     /* file, url */
+    MSG_PUSH_ON_CREATOR,     /* file, url */
     MSG_SKIP_STATE,          /* file, stato */
     MSG_UPD_RECEIVED,        /* file */
     MSG_UPD_APPLIED,         /* file */
@@ -230,6 +237,12 @@ typedef enum {
     MSG_STATUS_TO_MERGE,     /* repo che ha annunciato */
     MSG_STATUS_RENAMED,      /* path di prima */
     MSG_STATUS_CREATOR_UNREACHABLE, /* url */
+    MSG_CREATOR_SAME,
+    MSG_CREATOR_AHEAD,
+    MSG_CREATOR_BEHIND,
+    MSG_CREATOR_DIVERGED,
+    MSG_CREATOR_UNSEEN,
+    MSG_CREATOR_MISSING,
 
     MSG_STATE_ALIGNED,
     MSG_STATE_TO_APPLY,

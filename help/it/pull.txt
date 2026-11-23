@@ -1,0 +1,45 @@
+GIT-SHARED-PULL(1)
+
+NOME
+    git shared pull - riceve le versioni del creatore e le applica
+
+SINTASSI
+    git shared pull [-f] [--all] [-c | -m <messaggio>] [<path>]
+
+DESCRIZIONE
+    Come 'git pull' = fetch + merge: per ogni file condiviso attraverso
+    un remoto (prototipo), scarica la catena delle versioni del suo
+    creatore, un fetch per creatore, poi lancia 'git shared update' con
+    le stesse opzioni. Si scarica solo la catena delle versioni, non il
+    progetto.
+
+    L'ultima versione del creatore resta in questo repository: dopo un
+    pull, o un 'git shared status --remote', update e status lavorano
+    senza rete.
+
+    Se il creatore non risponde, o non ha piu' il file, quel file non si
+    aggiorna e pull fallisce; gli altri file proseguono. I file senza
+    creatore vengono solo aggiornati, come con update.
+
+    Per concludere un'unione o rinunciarvi (--ours, --theirs, --abort)
+    non serve la rete: si usa update.
+
+OPZIONI
+    -f, --force
+        Sovrascrive le modifiche locali del file.
+
+    --all
+        Scarica anche da tutti i peer locali, come 'update --all'.
+
+    -c, --commit
+        Committa subito i file applicati.
+
+    -m <messaggio>
+        Committa subito con <messaggio>.
+
+ESEMPI
+    git shared pull -c
+
+VEDI ANCHE
+    git shared push --help, git shared update --help,
+    git shared status --help

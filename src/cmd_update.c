@@ -4,7 +4,8 @@
  *
  * Per ogni file shared (o quello indicato):
  *   1. ricezione (receive.h): fetch solo dalle repo che hanno annunciato
- *      una versione che qui manca, da tutti i peer con --all; se una
+ *      una versione che qui manca, da tutti i peer con --all; in remoto
+ *      l'ultima versione vista del creatore, senza rete (D-110); se una
  *      versione ricevuta discende da T, T avanza in fast-forward; le
  *      versioni che non discendono da T restano da unire;
  *   2. un'unione in corso con la risoluzione in staging viene conclusa;
@@ -344,9 +345,6 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         *rc = GS_EXIT_ERROR;
         goto exit;
     }
-    if (rv.creator_unreachable != 0) {
-        msg_warning(MSG_WARN_CREATOR_UNREACHABLE, label, str_cstr(&rv.creator));
-    }
     if (rv.advanced != 0) {
         printf(msg(MSG_UPD_RECEIVED), label);
         putchar('\n');
@@ -585,19 +583,65 @@ exit:
     str_free(&name);
 }
 
-int cmd_update(int argc, char **argv)
+int cmd_update_run(Repo_t *r, GitBatch_t *b, const unsigned char *sel,
+                   CmdOpts_t *o, int rc, int *batch_ok)
 {
-    CmdOpts_t o;
-    Repo_t repo = REPO_INIT;
-    GitBatch_t batch;
     Touched_t touched = { STR_INIT, STR_INIT };
     BranchNames_t names = BRANCHNAMES_INIT;
-    unsigned char *sel = NULL;
     Str_t text = STR_INIT;
     const char *p;
     eMsgId_t id;
     size_t i;
     int committed = 0;
+
+    for (i = 0U; i < r->n; i++) {
+        if ((sel[i] != 0U) &&
+            !update_entry(r, &r->v[i], b, o, &touched, &rc, batch_ok, &names)) {
+            goto exit;
+        }
+    }
+
+    /* Commit dedicato dei soli file applicati o uniti (D-007). */
+    if ((o->commit != 0U) && (touched.applied.len > 0U)) {
+        if (o->message == NULL) {
+            str_addf(&text, msg(MSG_UPD_COMMIT_MSG),
+                     (str_zcount(&touched.applied) == 1U) ? touched.applied.buf
+                                                         : "shared files");
+            o->message = str_cstr(&text);
+        }
+        if (cmd_commit(r, o->message, &touched.applied) == GS_OK) {
+            committed = 1;
+        } else {
+            msg_error(MSG_ERR_COMMIT);
+            rc = GS_EXIT_ERROR;
+        }
+    }
+    for (p = str_znext(&touched.applied, NULL); p != NULL;
+         p = str_znext(&touched.applied, p)) {
+        if (str_zhas(&touched.merged, p)) {
+            id = (committed != 0) ? MSG_UPD_MERGED_COMMITTED : MSG_UPD_MERGED;
+        } else {
+            id = (committed != 0) ? MSG_UPD_COMMITTED : MSG_UPD_APPLIED;
+        }
+        printf(msg(id), p);
+        putchar('\n');
+    }
+
+exit:
+    str_free(&text);
+    str_free(&touched.merged);
+    str_free(&touched.applied);
+    branchnames_free(&names);
+    return rc;
+}
+
+int cmd_update(int argc, char **argv)
+{
+    CmdOpts_t o;
+    Repo_t repo = REPO_INIT;
+    GitBatch_t batch;
+    unsigned char *sel = NULL;
+    size_t i;
     int aborted = 0;
     int chosen = 0;
     int first;
@@ -675,39 +719,7 @@ int cmd_update(int argc, char **argv)
         }
     }
 
-    for (i = 0U; i < repo.n; i++) {
-        if ((sel[i] != 0U) &&
-            !update_entry(&repo, &repo.v[i], &batch, &o, &touched, &rc,
-                          &batch_ok, &names)) {
-            goto exit;
-        }
-    }
-
-    /* Commit dedicato dei soli file applicati o uniti (D-007). */
-    if ((o.commit != 0U) && (touched.applied.len > 0U)) {
-        if (o.message == NULL) {
-            str_addf(&text, msg(MSG_UPD_COMMIT_MSG),
-                     (str_zcount(&touched.applied) == 1U) ? touched.applied.buf
-                                                         : "shared files");
-            o.message = str_cstr(&text);
-        }
-        if (cmd_commit(&repo, o.message, &touched.applied) == GS_OK) {
-            committed = 1;
-        } else {
-            msg_error(MSG_ERR_COMMIT);
-            rc = GS_EXIT_ERROR;
-        }
-    }
-    for (p = str_znext(&touched.applied, NULL); p != NULL;
-         p = str_znext(&touched.applied, p)) {
-        if (str_zhas(&touched.merged, p)) {
-            id = (committed != 0) ? MSG_UPD_MERGED_COMMITTED : MSG_UPD_MERGED;
-        } else {
-            id = (committed != 0) ? MSG_UPD_COMMITTED : MSG_UPD_APPLIED;
-        }
-        printf(msg(id), p);
-        putchar('\n');
-    }
+    rc = cmd_update_run(&repo, &batch, sel, &o, rc, &batch_ok);
 
 exit:
     free(sel);
@@ -717,9 +729,5 @@ exit:
         }
         repo_close(&repo);
     }
-    str_free(&text);
-    str_free(&touched.merged);
-    str_free(&touched.applied);
-    branchnames_free(&names);
     return rc;
 }

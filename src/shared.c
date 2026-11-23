@@ -12,6 +12,7 @@
 #include "msg.h"
 #include "inbox.h"
 #include "peers.h"
+#include "remote.h"
 #include "sys.h"
 
 /* Processi avviati da repo_open e non ancora chiusi. */
@@ -733,8 +734,15 @@ static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
 
     /* Link remoto (D-106): chi riceve dal creatore non e' un peer di
      * nessuno e il creatore non registra nulla. Le versioni arrivano dal
-     * creatore, al primo comando che ricava lo stato. */
+     * creatore, con pull (D-110). Se la catena viene dal creatore, la sua
+     * punta e' anche l'ultima versione vista; da una copia no. */
     if (e->pending_remote != 0U) {
+        if ((remote_creator_url(b, &t, &found) == GS_OK) &&
+            str_eq(&found, str_cstr(&e->pending_src))) {
+            remote_seen_ref(&ref, e->id);
+            (void)git_set_ref(str_cstr(&ref), &t, "git shared: link");
+        }
+        str_reset(&found);
         err = end_pending(e);
         goto exit;
     }
@@ -975,6 +983,10 @@ eGsErr_t repo_forget(const Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
         if (git_batch_query(b, str_cstr(&name), &oid) == GIT_OBJ_COMMIT) {
             str_addz(&refs, str_cstr(&name));
         }
+    }
+    remote_seen_ref(&name, e->id); /* D-110 */
+    if (git_batch_query(b, str_cstr(&name), &oid) == GIT_OBJ_COMMIT) {
+        str_addz(&refs, str_cstr(&name));
     }
     err = git_delete_refs(&refs);
     inbox_remove(str_cstr(&r->top), e->id); /* avvisi: suggerimenti */

@@ -14,11 +14,10 @@
  *     versione non e' arrivata o non discende da T (da unire).
  * Senza avvisi nessun processo. update --all fa il fetch da tutti i peer.
  *
- * In remoto (D-105): se T ha un creatore, ls-remote della sola ref sul
- * creatore e, se la sua punta manca qui, fetch della catena. La punta del
- * creatore entra tra le versioni ricevute come quella di un peer. Un
- * creatore irraggiungibile e' solo una nota: lo stato si ricava dalle
- * versioni che ci sono.
+ * In remoto (D-110): se T ha un creatore, l'ultima versione vista del
+ * creatore (refs/shared-creator/<id>) entra tra le versioni ricevute come
+ * quella di un peer. Nessuna rete: la ref la aggiornano push, pull e
+ * status --remote (remote.h).
  */
 #ifndef GS_RECEIVE_H
 #define GS_RECEIVE_H
@@ -35,21 +34,20 @@ typedef struct {
                       * (elenco compatto, senza doppioni) */
     Str_t to_merge;  /* repo che hanno annunciato una versione da unire */
     Str_t creator;   /* URL del creatore di T ("" = solo locale, D-103) */
-    Oid_t creator_tip; /* punta di refs/shared/<id> sul creatore; len = 0
-                        * se non c'e' o non si e' letta */
-    int creator_unreachable; /* 1 se il creatore non ha risposto */
+    Oid_t creator_tip; /* ultima versione vista del creatore; len = 0 se
+                        * non c'e' (D-110) */
     int advanced;    /* 1 se T e' avanzata */
 } Received_t;
 
 #define RECEIVED_INIT { OIDLIST_INIT, STR_INIT, STR_INIT, STR_INIT, \
-                        { 0U, { 0U } }, 0, 0 }
+                        { 0U, { 0U } }, 0 }
 
 void received_free(Received_t *rv);
 
 /*
  * Riceve per una voce collegata. all = 1: fetch anche da tutti i peer
  * (update --all). GS_ERR_GIT se la catena non c'e' o git fallisce; un peer
- * o il creatore irraggiungibili sono solo un avviso.
+ * irraggiungibile e' solo un avviso.
  */
 eGsErr_t receive_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
                        int all, Received_t *rv);

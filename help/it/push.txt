@@ -1,0 +1,42 @@
+GIT-SHARED-PUSH(1)
+
+NOME
+    git shared push - invia al creatore le versioni pubblicate
+
+SINTASSI
+    git shared push [<remote>] [--] [<path>]
+
+DESCRIZIONE
+    Per un file condiviso attraverso un remoto (prototipo), invia al suo
+    creatore, il repository remoto dove stanno le versioni ufficiali, le
+    versioni gia' pubblicate qui. Si invia solo la catena delle versioni,
+    mai il progetto. Come 'git push' dopo 'git commit': publish crea la
+    versione, push la invia. publish, update e status non usano mai la
+    rete; push, pull e 'status --remote' si'.
+
+    La prima volta, 'git shared push <remote> <path>' rende <remote> il
+    creatore del file: una versione nuova, con lo stesso contenuto
+    dell'ultima, ne registra l'URL e viene inviata li'. I peer locali la
+    ricevono come ogni altra versione.
+
+    Da quel momento push invia l'ultima versione al creatore, e una copia
+    a <remote> (default: origin), per chi clona questo repository. Il
+    creatore accetta solo una versione che segue la sua, e solo da chi
+    puo' scrivere li'. Se ha una versione piu' nuova, lancia
+    'git shared pull', committa e lancia di nuovo push. Se non puoi
+    scrivere li', la versione resta qui (e nel tuo remote) come proposta.
+
+    Senza <path>, tutti i file che hanno un creatore, con un push per
+    creatore; i file senza creatore si saltano. Il primo argomento e' un
+    <remote> se questo repository ha un remote con quel nome; dopo '--'
+    e' sempre un path.
+
+ESEMPI
+    git shared push origin common.h   # origin diventa il creatore
+    git commit -am "Corretto il timeout in common.h"
+    git shared publish
+    git shared push
+
+VEDI ANCHE
+    git shared pull --help, git shared publish --help,
+    git shared status --help
