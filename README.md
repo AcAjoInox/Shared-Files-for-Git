@@ -126,6 +126,36 @@ Who cannot write to the creator keeps their version as a proposal. Not there yet
 - At most 32 peers per file.
 - The extension must be installed on every machine that publishes or applies versions. Anyone without it uses the repository as usual.
 
+## FAQ and alternatives
+
+### How do I share a single file between multiple Git repositories?
+
+Make it shared in one repository with `git shared set <file>`, link it from the others with `git shared link`, and from then on use `git shared publish` and `git shared update` to move new versions around. See the [two-minute tour](#two-minute-tour). The path can be different in each repository.
+
+### Why not a git submodule?
+
+A submodule brings in a whole repository, not a single file, and it lives in its own folder at a fixed path. For one header you would need a repository just for that file, and every clone needs `git submodule update`. Changes are made and committed inside the submodule, then recorded again in the parent project. Here the file is a regular file of each project, at the path each project prefers.
+
+### Why not git subtree?
+
+A subtree copies a whole folder into the project and mixes its history with the project's. Sending a change back to the other projects takes `git subtree split` or `git subtree push` by hand, and the other projects must remember to pull it. Here each shared file has its own small history, and the peers are told that a new version exists.
+
+### Why not a symlink?
+
+A symlink points to a path on one machine, so it breaks in a clone or on another computer, and the file it points to is outside the repository. On Windows, Git checks symlinks out as plain text files unless `core.symlinks` is enabled, and creating them needs Developer Mode or administrator rights.
+
+### Why not copy the file by hand, or with a script?
+
+That is exactly how copies drift apart: nobody knows which one is the newest, and a change made in one project is lost when another copy is pasted over it. Here every version is recorded in the file's history, and two independent changes are merged like `git merge`, never overwritten.
+
+### Do the other developers need the extension?
+
+Only those who publish or apply new versions. For everyone else the shared file is a regular file: they clone, build and commit as always.
+
+### Does it work with GitHub or GitLab?
+
+The first release works between repositories on the same machine. Support for remote repositories is in alpha: see [Remote repositories](#remote-repositories-alpha).
+
 ## How it was made
 
 The code was written entirely by an AI model, under human supervision. Ideas, requirements, testing and debugging are driven by a person.

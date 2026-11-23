@@ -126,6 +126,36 @@ Chi non può scrivere sul creatore tiene la sua versione come proposta. Non c'è
 - Al massimo 32 peer per file.
 - L'estensione va installata su ogni macchina che pubblica o applica versioni. Chi non ce l'ha usa la repo normalmente.
 
+## Domande frequenti e alternative
+
+### Come condivido un singolo file tra più repository Git?
+
+Lo dichiari shared in una repository con `git shared set <file>`, lo colleghi dalle altre con `git shared link`, e da lì in poi `git shared publish` e `git shared update` fanno girare le versioni nuove. Vedi [In due minuti](#in-due-minuti). Il path può essere diverso in ogni repository.
+
+### Perché non un git submodule?
+
+Un submodule porta dentro un'intera repository, non un singolo file, e sta in una sua cartella a un path fisso. Per un header servirebbe una repository solo per quel file, e ogni clone deve fare `git submodule update`. Le modifiche si fanno e si committano dentro il submodule, poi si registrano di nuovo nel progetto che lo contiene. Qui il file è un file normale di ogni progetto, al path che ogni progetto preferisce.
+
+### Perché non git subtree?
+
+Un subtree copia un'intera cartella nel progetto e ne mescola la storia con quella del progetto. Per mandare una modifica agli altri progetti servono `git subtree split` o `git subtree push` a mano, e gli altri progetti devono ricordarsi di prenderla. Qui ogni file shared ha una sua piccola storia, e i peer vengono avvisati che c'è una versione nuova.
+
+### Perché non un link simbolico?
+
+Un link simbolico punta a un path di una macchina, quindi si rompe in un clone o su un altro computer, e il file a cui punta sta fuori dalla repository. Su Windows, Git estrae i link simbolici come semplici file di testo se `core.symlinks` non è attivo, e per crearli servono la Modalità sviluppatore o i diritti di amministratore.
+
+### Perché non copiare il file a mano, o con uno script?
+
+È proprio così che le copie si separano: nessuno sa quale sia la più recente, e una modifica fatta in un progetto si perde quando ci si incolla sopra un'altra copia. Qui ogni versione è registrata nella storia del file, e due modifiche indipendenti vengono unite come fa `git merge`, mai sovrascritte.
+
+### Gli altri sviluppatori devono installare l'estensione?
+
+Solo chi pubblica o applica versioni nuove. Per tutti gli altri il file shared è un file normale: clonano, compilano e committano come sempre.
+
+### Funziona con GitHub o GitLab?
+
+La prima versione funziona tra repository sulla stessa macchina. L'uso tra repository remote è in alpha: vedi [Repository remote](#repository-remote-alpha).
+
 ## Come è stato fatto
 
 Il codice è stato scritto interamente da un modello di AI, sotto supervisione umana. Idee, requisiti, test e debug sono guidati da una persona.
