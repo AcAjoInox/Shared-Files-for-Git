@@ -49,25 +49,53 @@ eGsErr_t remote_url(const char *name, Str_t *url)
     return err;
 }
 
+/*
+ * URL dei blob "creator" gia' letti. Un blob non cambia mai (l'oid e' il
+ * suo contenuto), quindi la copia vale per tutto il processo: piu' file con
+ * lo stesso creatore costano un solo cat-file blob. Memoria statica e
+ * limitata (D-066): oltre REMOTE_URL_CACHE creatori diversi si rilegge.
+ * Solo URL validi (url_ok: al piu' GS_PATH_MAX caratteri).
+ */
+#define REMOTE_URL_CACHE 4U
+static Oid_t url_cache_blob[REMOTE_URL_CACHE];
+static char url_cache_text[REMOTE_URL_CACHE][GS_PATH_MAX + 1U];
+static size_t url_cache_n = 0U;
+
 eGsErr_t remote_creator_url(GitBatch_t *b, const Oid_t *version, Str_t *url)
 {
     const char *args[] = { "cat-file", "blob", NULL, NULL };
     char hex[OID_HEX_SIZE];
     Oid_t blob;
+    size_t k;
     eGsErr_t err = GS_OK;
 
     str_reset(url);
     chain_creator(b, version, NULL, &blob);
-    if (blob.len > 0U) {
-        oid_to_hex(&blob, hex);
-        args[2] = hex;
-        err = git_run(args, 0U, url); /* senza il fine riga finale */
-        if ((err == GS_OK) && !url_ok(str_cstr(url))) {
-            err = GS_ERR_FORMAT;
+    if (blob.len == 0U) {
+        return GS_OK; /* nessun creatore */
+    }
+    for (k = 0U; k < url_cache_n; k++) {
+        if (oid_eq(&url_cache_blob[k], &blob)) {
+            str_add(url, url_cache_text[k]);
+            return GS_OK;
         }
-        if (err != GS_OK) {
-            str_reset(url);
-        }
+    }
+    oid_to_hex(&blob, hex);
+    args[2] = hex;
+    err = git_run(args, 0U, url); /* senza il fine riga finale */
+    /* Un byte nullo dentro il blob accorcerebbe l'URL: non valido. */
+    if ((err == GS_OK) &&
+        ((strlen(str_cstr(url)) != url->len) || !url_ok(str_cstr(url)))) {
+        err = GS_ERR_FORMAT;
+    }
+    if (err != GS_OK) {
+        str_reset(url);
+    } else if (url_cache_n < REMOTE_URL_CACHE) {
+        url_cache_blob[url_cache_n] = blob;
+        memcpy(url_cache_text[url_cache_n], str_cstr(url), url->len + 1U);
+        url_cache_n++;
+    } else {
+        /* cache piena: la prossima volta si rilegge */
     }
     return err;
 }
