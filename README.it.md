@@ -61,7 +61,7 @@ git commit -m "aggiorno common.h"
 1. **Conta solo ciò che è committato.** Una modifica non committata non si pubblica mai. `set`, `link`, `unlink` e `mv` diventano effettivi al commit: prima puoi annullarli con `git restore`.
 2. **Decidi tu quando.** Si pubblica solo con `git shared publish`, e i comandi non fanno commit da soli. Con `-c` o `-m "messaggio"` committano subito, ma solo il file shared e `.gitshared`: il resto dello staging non entra nel commit.
 3. **Il tuo lavoro non si perde.** `update` non sovrascrive modifiche non committate, nemmeno quelle in staging. Per forzare serve `-f`.
-4. **Nessuna modifica viene scartata.** Se due repo modificano il file ognuna per conto suo, `update` unisce le versioni come `git merge`. In caso di conflitto risolvi i marker, fai `git add` e rilanci `git shared update`. Per rinunciare c'è `git shared update --abort`.
+4. **Nessuna modifica viene scartata.** Se due repo modificano il file ognuna per conto suo, `update` unisce le versioni come `git merge`. In caso di conflitto risolvi i marker, fai `git add` e rilanci `git shared update`, oppure tieni una delle due versioni, intera, con `git shared update --ours` o `--theirs`. Un file binario non si unisce mai: il file resta la tua versione e scegli con `--ours` o `--theirs`. Per rinunciare c'è `git shared update --abort`.
 5. **Nessun blocco.** Puoi modificare il file anche se la tua copia è indietro: il file risulta *divergente* e `update` unisce.
 
 ## I comandi
@@ -74,7 +74,7 @@ git commit -m "aggiorno common.h"
 | `git shared mv <file> <dest>` | Rinomina un file shared, solo in questa repo |
 | `git shared status [--peers]` | Stato di ogni file shared; con `--peers`, anche quello dei peer |
 | `git shared publish [<file>]` | Crea una versione nuova e avvisa i peer |
-| `git shared update [--all] [<file>]` | Riceve e applica l'ultima versione; `--abort` rinuncia a un'unione |
+| `git shared update [--all] [<file>]` | Riceve e applica l'ultima versione; `--ours` / `--theirs` tiene una versione, `--abort` rinuncia a un'unione |
 | `git shared branch <file> [-a\|-rm <branch>]` | Sceglie i branch su cui il file è shared; sugli altri è un file normale |
 | `git shared prune [-n]` | Toglie i peer cancellati o che non condividono più il file |
 | `git shared relocate [--copy]` | Avvisa i peer che la repo è stata spostata o copiata |
@@ -91,7 +91,7 @@ Ogni comando ha la sua pagina: `git shared <comando> --help`. Le stesse pagine s
 | da committare | Hai applicato con `update`, manca il commit | `git commit` |
 | da pubblicare | Hai una modifica che i peer non hanno | `git shared publish` |
 | divergente | Tu e un peer avete modificato il file separatamente | `git shared update` |
-| unione in corso | `update` ha trovato un conflitto | Correggi, `git add`, `git shared update` |
+| unione in corso | `update` ha trovato un conflitto | Correggi, `git add`, `git shared update`; oppure `git shared update --ours` / `--theirs` |
 | in attesa di commit | `set`, `link`, `unlink` o `mv` non ancora committato | `git commit` o `git restore` |
 | sospeso | Su questo branch il file non è shared | Niente, o `git shared branch` |
 | scollegato | La repo dichiara il file ma non conosce i peer (es. un clone) | `git shared link` |

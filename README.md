@@ -61,7 +61,7 @@ git commit -m "update common.h"
 1. **Only committed work counts.** An uncommitted change is never published. `set`, `link`, `unlink` and `mv` take effect at the commit: until then you can cancel them with `git restore`.
 2. **You decide when.** Nothing is published except by `git shared publish`, and the commands never commit by themselves. With `-c` or `-m "message"` they commit right away, but only the shared file and `.gitshared`: the rest of the staging area stays out of the commit.
 3. **Your work is never lost.** `update` does not overwrite uncommitted changes, staged ones included. Forcing it takes `-f`.
-4. **No change is thrown away.** If two repositories change the file independently, `update` merges the versions like `git merge`. On a conflict, resolve the markers, `git add` and run `git shared update` again. To give up, use `git shared update --abort`.
+4. **No change is thrown away.** If two repositories change the file independently, `update` merges the versions like `git merge`. On a conflict, resolve the markers, `git add` and run `git shared update` again, or keep one of the two versions, whole, with `git shared update --ours` or `--theirs`. A binary file is never merged: the file keeps your version and you choose with `--ours` or `--theirs`. To give up, use `git shared update --abort`.
 5. **Nothing is locked.** You can change the file even if your copy is behind: the file is *diverged* and `update` merges.
 
 ## Commands
@@ -74,7 +74,7 @@ git commit -m "update common.h"
 | `git shared mv <file> <dest>` | Renames a shared file, only in this repository |
 | `git shared status [--peers]` | State of each shared file; with `--peers`, also that of the peers |
 | `git shared publish [<file>]` | Creates a new version and notifies the peers |
-| `git shared update [--all] [<file>]` | Receives and applies the latest version; `--abort` gives up a merge |
+| `git shared update [--all] [<file>]` | Receives and applies the latest version; `--ours` / `--theirs` keeps one version, `--abort` gives up a merge |
 | `git shared branch <file> [-a\|-rm <branch>]` | Chooses the branches where the file is shared; on the others it is a regular file |
 | `git shared prune [-n]` | Removes peers that were deleted or no longer share the file |
 | `git shared relocate [--copy]` | Tells the peers that the repository was moved or copied |
@@ -91,7 +91,7 @@ Each command has its own page: `git shared <command> --help`. The same pages are
 | applied, to commit | You applied it with `update`, the commit is missing | `git commit` |
 | to publish | You have a change the peers don't have | `git shared publish` |
 | diverged | You and a peer changed the file separately | `git shared update` |
-| merge in progress | `update` found a conflict | Fix it, `git add`, `git shared update` |
+| merge in progress | `update` found a conflict | Fix it, `git add`, `git shared update`; or `git shared update --ours` / `--theirs` |
 | pending commit | `set`, `link`, `unlink` or `mv` not committed yet | `git commit` or `git restore` |
 | suspended on this branch | On this branch the file is not shared | Nothing, or `git shared branch` |
 | unlinked | The repository declares the file but doesn't know the peers (e.g. a clone) | `git shared link` |
