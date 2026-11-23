@@ -13,7 +13,7 @@ Il file resta un file normale: chi usa la repo senza l'estensione lo vede, lo co
 
 ## Installazione
 
-**Windows, senza compilare.** Scarica [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (compilato dall'ultimo tag, v0.6.0-alpha) e mettilo in una cartella del `PATH`, per esempio `%USERPROFILE%\bin`. Serve solo git 2.34 o più recente. Verifica con `git shared -h`; il manuale è in `git shared help`. Il file non è firmato: la prima volta Windows potrebbe chiedere conferma.
+**Windows, senza compilare.** Scarica [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (compilato dall'ultimo tag, v0.6.1-alpha) e mettilo in una cartella del `PATH`, per esempio `%USERPROFILE%\bin`. Serve solo git 2.34 o più recente. Verifica con `git shared -h`; il manuale è in `git shared help`. Il file non è firmato: la prima volta Windows potrebbe chiedere conferma.
 
 **Dai sorgenti.** Servono git 2.34 o più recente, `make` e `gcc` (su Windows MinGW-w64).
 
@@ -99,7 +99,7 @@ Ogni comando ha la sua pagina: `git shared <comando> --help`. Le stesse pagine s
 
 ## Repository remote (alpha)
 
-Un primo prototipo, non ancora provato su un hosting vero: può cambiare. C'è nell'eseguibile Windows di `dist/windows/` (v0.6.0-alpha) e nei sorgenti.
+Un primo prototipo: può cambiare. Su GitHub pubblicare verso il creatore e aggiornarsi da lui funziona; permessi, credenziali e i casi meno comuni non sono ancora provati, GitLab per niente. C'è nell'eseguibile Windows di `dist/windows/` (v0.6.1-alpha) e nei sorgenti.
 
 Ogni file ha un **creatore**: la repository remota del suo primo publish in remoto. Il suo URL sta nella storia delle versioni del file, quindi chi ha il file sa da dove arrivano le versioni nuove. Si inviano e si scaricano solo quella storia, mai il progetto.
 
