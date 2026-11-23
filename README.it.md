@@ -101,7 +101,7 @@ Ogni comando ha la sua pagina: `git shared <comando> --help`. Le stesse pagine s
 
 ## Repository remote (alpha)
 
-Un primo prototipo: può cambiare. Su GitHub inviare le versioni al creatore e riceverle da lui funziona; permessi, credenziali e i casi meno comuni non sono ancora provati, GitLab per niente. C'è nell'eseguibile Windows di `dist/windows/` (v0.6.1-alpha) e nei sorgenti.
+Un primo prototipo: può cambiare. Su GitHub inviare le versioni al creatore e riceverle da lui funziona; permessi, credenziali e i casi meno comuni non sono ancora provati, GitLab per niente. C'è nell'eseguibile Windows di `dist/windows/` (v0.7.0-alpha) e nei sorgenti.
 
 Ogni file ha un **creatore**: la repository remota del suo primo `git shared push`. Il suo URL sta nella storia delle versioni del file, quindi chi ha il file sa da dove arrivano le versioni nuove. Si inviano e si scaricano solo quella storia, mai il progetto.
 
