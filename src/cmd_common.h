@@ -134,7 +134,9 @@ int cmd_reopen(Repo_t *r, GitBatch_t *b);
  * "da pubblicare", la base e' T: D-065) dal blob di HEAD e dalla T che lo
  * stato ha usato (reportIdea B-31), con il creatore di T (D-103), poi
  * scrive l'avviso di T in tutti i peer (D-099); un peer con .git file
- * riceve con il push. tip = T come l'ha letta lo stato; all'uscita, la T
+ * riceve con il push. Senza create (file allineato) si avvisano solo i peer
+ * che non hanno T ne' il suo avviso: se ce l'hanno tutti, "gia' pubblicata"
+ * e nient'altro. tip = T come l'ha letta lo stato; all'uscita, la T
  * pubblicata. GS_EXIT_OK, oppure GS_EXIT_ERROR se la versione non si crea
  * o il push di ripiego e' rifiutato (messaggi stampati).
  */

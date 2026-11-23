@@ -11,7 +11,9 @@ DESCRIPTION
     version, creates a new version and tells every peer about it: a
     small notice goes into the peer's .git folder, and the peer fetches
     the version by itself at its next git shared command. For a file
-    already aligned, the notice is written again where it is missing.
+    already aligned, the notice goes only to the peers that have neither
+    the version nor its notice (e.g. peers that could not be reached);
+    if every peer has it, publish says so and does nothing.
 
     Committing never publishes: this is the only way.
 

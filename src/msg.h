@@ -182,6 +182,8 @@ typedef enum {
     MSG_LANG_SET,            /* lingua */
     MSG_PUB_CREATED,         /* file */
     MSG_PUB_NOTIFIED,        /* file, peer raggiunti (unsigned), peer (unsigned) */
+    MSG_PUB_NOTIFIED_SOME,   /* file, raggiunti, da avvisare, gia' aggiornati (unsigned) */
+    MSG_PUB_UP_TO_DATE,      /* file */
     MSG_PUB_NO_PEERS,        /* file */
     MSG_PUB_TO_APPLY,        /* file */
     MSG_PUB_DIVERGED,        /* file */

@@ -5,8 +5,9 @@
  * Per ogni file shared (o quello indicato), prima si riceve (D-099), poi:
  *   da pubblicare -> nuova versione con genitore T (la base e' T, D-065),
  *                    poi avviso ai peer;
- *   allineato     -> avviso di T ai peer (es. peer prima irraggiungibili:
- *                    un avviso che c'e' gia' non si riscrive);
+ *   allineato     -> avviso di T ai soli peer che non hanno T ne' il suo
+ *                    avviso (es. peer prima irraggiungibili); se ce l'hanno
+ *                    tutti, "gia' pubblicata" e niente altro;
  *   altri stati   -> niente: si dice cosa fare.
  * Una versione ricevuta che non discende da T va prima unita (update).
  * Ai peer con .git file si fa il push, che non forza mai (D-040).

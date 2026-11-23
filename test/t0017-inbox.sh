@@ -62,7 +62,9 @@ expect_eq "publish: l'avviso dice chi pubblica" "$(cat "$(inbox B)/$T1")" "$TOP_
 expect_eq "publish: la ref di B non cambia" "$(tip B)" "$OLD"
 expect_eq "publish: nessun file temporaneo" "$(ls "$(inbox B)" | tr '\n' ' ')" "$T1 "
 run git shared publish
-expect_out "publish ripetuto: avviso gia' scritto" "p.h: 2 of 2 peers notified"
+expect_rc "publish ripetuto: codice 0" 0
+expect_out "publish ripetuto: tutti hanno l'avviso" "p.h: already published, every peer has this version"
+expect_no_out "publish ripetuto: nessun peer avvisato" "peers notified"
 expect_eq "publish ripetuto: un solo avviso" "$(notices B)" 1
 run git shared status --peers
 expect_out "status --peers: annunciata, non ricevuta" "$TOP_B: announced, not received yet: nothing to do"
@@ -131,11 +133,16 @@ run git shared status
 expect_out "avviso perso: B si crede allineata" "aligned"
 cd "$TRASH/A" || exit 1
 run git shared publish
-expect_out "publish da allineato: riscrive l'avviso" "p.h: 2 of 2 peers notified"
+expect_out "publish da allineato: avvisa solo B" "p.h: 1 of 1 peers notified, 1 already had this version"
 cd "$TRASH/B" || exit 1
 run git shared status
 expect_out "avviso riscritto: da applicare" "new version to apply"
 git shared update -c >/dev/null
+# B ha la versione, C il suo avviso: non c'e' niente da pubblicare
+cd "$TRASH/A" || exit 1
+run git shared publish
+expect_rc "tutti allineati: codice 0" 0
+expect_out "tutti allineati: gia' pubblicata" "p.h: already published, every peer has this version"
 
 cd "$TRASH/A" || exit 1
 mv "$TRASH/B" "$TRASH/B.off"

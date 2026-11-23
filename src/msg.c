@@ -402,6 +402,9 @@ static const char *const msg_en[] = {
     [MSG_LANG_SET] = "Manual language: %s.",
     [MSG_PUB_CREATED] = "%s: new version created",
     [MSG_PUB_NOTIFIED] = "%s: %u of %u peers notified",
+    [MSG_PUB_NOTIFIED_SOME] =
+        "%s: %u of %u peers notified, %u already had this version",
+    [MSG_PUB_UP_TO_DATE] = "%s: already published, every peer has this version",
     [MSG_PUB_NO_PEERS] = "%s: no peers to send it to",
     [MSG_PUB_TO_APPLY] =
         "%s: a newer version exists: run 'git shared update' first",

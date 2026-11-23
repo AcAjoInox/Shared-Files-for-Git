@@ -11,7 +11,9 @@ DESCRIZIONE
     crea una versione nuova e la annuncia a tutti i peer: un piccolo
     avviso va nella cartella .git del peer, che scarica la versione da
     se' al suo comando git shared successivo. Per un file gia' allineato
-    l'avviso si riscrive dove manca.
+    l'avviso va solo ai peer che non hanno ne' la versione ne' il suo
+    avviso (es. peer prima irraggiungibili); se ce l'hanno tutti, publish
+    lo dice e non fa nulla.
 
     Il commit non pubblica mai: questo e' l'unico modo.
 

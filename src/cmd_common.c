@@ -520,13 +520,45 @@ static eGsErr_t new_version(const SharedEntry_t *e, GitBatch_t *b,
     return err;
 }
 
+/*
+ * Peer a cui manca la versione t (file allineato): chi ha gia' t come
+ * ultima versione, o l'avviso di t (ricevera' da solo, D-099), non va
+ * avvisato di nuovo. In todo gli altri, compresi quelli irraggiungibili
+ * (l'avviso lo dice). Ritorna quanti hanno gia' t.
+ */
+static unsigned peers_missing(const SharedEntry_t *e, const Oid_t *t,
+                              Str_t *todo)
+{
+    size_t n = str_zcount(&e->peers);
+    Oid_t *tips = xmalloc(((n > 0U) ? n : 1U) * sizeof *tips);
+    const char *p;
+    size_t k;
+    unsigned have = 0U;
+
+    peers_tips(e->id, &e->peers, tips);
+    for (k = 0U, p = str_znext(&e->peers, NULL); p != NULL;
+         k++, p = str_znext(&e->peers, p)) {
+        if (((tips[k].len > 0U) && oid_eq(&tips[k], t)) ||
+            inbox_has(p, e->id, t)) {
+            have++;
+        } else {
+            str_addz(todo, p);
+        }
+    }
+    free(tips);
+    return have;
+}
+
 int cmd_publish_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
                       const StateInfo_t *create, Oid_t *tip)
 {
     PeerTally_t tally = { 0U, 0U, 0U };
     Str_t push = STR_INIT; /* peer con .git file: ripiego sul push */
+    Str_t todo = STR_INIT; /* peer da avvisare */
     const char *label = str_cstr(&e->path);
+    const char *p;
     unsigned npeers = (unsigned)str_zcount(&e->peers);
+    unsigned have = 0U; /* peer che hanno gia' T */
     Oid_t t = *tip;
     Oid_t creator;
     int rc = GS_EXIT_OK;
@@ -551,18 +583,38 @@ int cmd_publish_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         }
         goto exit;
     }
+    if (create == NULL) {
+        /* Allineato: si avvisa solo chi non ha ancora T. Se ce l'hanno
+         * tutti non c'e' niente da fare. */
+        have = peers_missing(e, &t, &todo);
+        if (have == npeers) {
+            printf(msg(MSG_PUB_UP_TO_DATE), label);
+            putchar('\n');
+            goto exit;
+        }
+    } else {
+        for (p = str_znext(&e->peers, NULL); p != NULL;
+             p = str_znext(&e->peers, p)) {
+            str_addz(&todo, p);
+        }
+    }
     /* In locale una notifica, non la catena (D-099): nessun processo. */
-    inbox_notify(label, e->id, &e->peers, str_cstr(&r->top), &t, &tally, &push);
+    inbox_notify(label, e->id, &todo, str_cstr(&r->top), &t, &tally, &push);
     if (push.len > 0U) {
         peers_push(label, e->id, &push, &tally);
     }
-    printf(msg(MSG_PUB_NOTIFIED), label, tally.ok, npeers);
+    if (have == 0U) {
+        printf(msg(MSG_PUB_NOTIFIED), label, tally.ok, npeers);
+    } else {
+        printf(msg(MSG_PUB_NOTIFIED_SOME), label, tally.ok, npeers - have, have);
+    }
     putchar('\n');
     if (tally.rejected > 0U) {
         rc = GS_EXIT_ERROR;
     }
 
 exit:
+    str_free(&todo);
     str_free(&push);
     return rc;
 }
