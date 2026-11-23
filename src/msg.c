@@ -123,17 +123,21 @@ static const char *const msg_en[] = {
         "                       (default for the copy: origin)\n",
     [MSG_USAGE_UPDATE] =
         "usage: git shared update [-f] [--all] [-c | -m <message>] [<path>]\n"
+        "   or: git shared update (--ours | --theirs) [-c | -m <message>] [<path>]\n"
         "   or: git shared update --abort [<path>]\n"
         "\n"
         "Diverged versions are merged. After a conflict: fix the file,\n"
-        "'git add' it and run 'git shared update' again. To give up:\n"
-        "'git shared update --abort'.\n"
+        "'git add' it and run 'git shared update' again, or keep one\n"
+        "version with --ours or --theirs (the only way for a binary\n"
+        "file). To give up: 'git shared update --abort'.\n"
         "\n"
         "    -f, --force       overwrite local changes\n"
         "    --all             fetch from every peer, not only from the\n"
         "                      ones that announced a new version\n"
         "    -c, --commit      commit the applied files right away\n"
         "    -m <message>      commit right away with <message>\n"
+        "    --ours            finish the merge keeping your version\n"
+        "    --theirs          finish the merge taking the other version\n"
         "    --abort           give up the merge in progress\n",
     [MSG_USAGE_STATUS] =
         "usage: git shared status [--peers]\n"
@@ -267,10 +271,23 @@ static const char *const msg_en[] = {
     [MSG_ERR_MERGE] = "%s: cannot merge",
     [MSG_ERR_CONFLICT_OPEN] =
         "%s: merge conflict: fix it, 'git add' it, then run "
-        "'git shared update' (to give up: git shared update --abort '%s')",
+        "'git shared update', or keep one version with "
+        "'git shared update --ours' or '--theirs' "
+        "(to give up: git shared update --abort '%s')",
+    [MSG_ERR_CONFLICT_BINARY] =
+        "%s: binary file changed on both sides: the file keeps your "
+        "version, see the other one with \"git show ':3:%s'\"; keep one "
+        "with 'git shared update --ours' or '--theirs' "
+        "(to give up: git shared update --abort '%s')",
+    [MSG_ERR_CHOOSE_STAGED] =
+        "%s: the conflict is already resolved in the index: run "
+        "'git shared update' to finish, or give it up with "
+        "'git shared update --abort %s'",
     [MSG_ERR_NO_MERGE] = "%s: no merge in progress",
     [MSG_ERR_NO_MERGE_ANY] = "no merge in progress",
     [MSG_ERR_ABORT_OPTS] = "--abort cannot be used with -c, -m, -f or --all",
+    [MSG_ERR_CHOOSE_OPTS] =
+        "use only one of --ours and --theirs, without --abort, -f or --all",
     [MSG_ERR_NO_REMOTE] = "no remote named '%s' in this repository",
     [MSG_ERR_REMOTE_FETCH] =
         "cannot get '%s' from %s: is the file shared there, and can the "

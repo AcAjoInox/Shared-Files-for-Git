@@ -121,6 +121,34 @@ exit:
     return err;
 }
 
+/*
+ * 1 se a o b e' binario per git: "git diff --numstat" tra due blob scrive
+ * "-<TAB>-" al posto dei conteggi delle righe. Senza path non valgono gli
+ * attributi; diff.external e textconv sono esclusi. Due blob uguali non
+ * danno righe: il chiamante sceglie coppie diverse.
+ */
+static int pair_is_binary(const char *top, const Oid_t *a, const Oid_t *b)
+{
+    const char *args[] = { "-C", top, "diff", "--no-ext-diff", "--no-textconv",
+                           "--no-color", "--numstat", NULL, NULL, NULL };
+    char hex_a[OID_HEX_SIZE];
+    char hex_b[OID_HEX_SIZE];
+    Str_t out = STR_INIT;
+    int code = 0;
+    int binary = 0;
+
+    oid_to_hex(a, hex_a);
+    oid_to_hex(b, hex_b);
+    args[7] = hex_a;
+    args[8] = hex_b;
+    if ((git_capture(args, PROC_STDERR_NULL, &out, &code) == GS_OK) &&
+        (code == 0) && (out.len >= 3U)) {
+        binary = (strncmp(out.buf, "-\t-", 3U) == 0);
+    }
+    str_free(&out);
+    return binary;
+}
+
 eGsErr_t merge_three(const char *top, const char *path, const Oid_t *base,
                      const Oid_t *ours, const Oid_t *theirs, int *conflict)
 {
@@ -128,22 +156,36 @@ eGsErr_t merge_three(const char *top, const char *path, const Oid_t *base,
                               "--", path, NULL };
     const char *a_marks[] = { "-C", top, "--literal-pathspecs", "checkout",
                               "-m", "--", path, NULL };
+    /* checkout-index prende i path alla lettera, senza pathspec */
+    const char *a_ours[] = { "-C", top, "checkout-index", "-f", "--stage=2",
+                             "--", path, NULL };
     Str_t out = STR_INIT;
     int code = 0;
     eGsErr_t err = set_stages(top, path, base, ours, theirs);
 
-    *conflict = 0;
+    *conflict = MERGE_CLEAN;
     if (err == GS_OK) {
         /* 0 = unione pulita: stage 0 e file scritti. Altro: gli stage
          * restano (conflitto, file binario, programma assente). */
         err = git_capture(a_merge, PROC_STDERR_NULL, &out, &code);
     }
     if ((err == GS_OK) && (code != 0)) {
-        *conflict = 1;
-        /* Riscrive il file dagli stage, con le etichette "ours" e
-         * "theirs" e lo stile di merge.conflictStyle. Se non riesce
-         * restano i marker di merge-one-file: il conflitto c'e' comunque. */
-        (void)git_capture(a_marks, PROC_STDERR_NULL, &out, &code);
+        /* Binario solo qui: un'unione pulita non e' mai di un binario.
+         * Le due coppie coprono le tre versioni anche se due coincidono. */
+        if (pair_is_binary(top, base, ours) || pair_is_binary(top, ours, theirs)) {
+            /* Nessun marker (D-108): nel file la versione nostra, intatta.
+             * merge-one-file l'ha gia' lasciata; si riscrive per non
+             * dipendere da come lo fa. */
+            *conflict = MERGE_BINARY;
+            (void)git_capture(a_ours, PROC_STDERR_NULL, &out, &code);
+        } else {
+            *conflict = MERGE_CONFLICT;
+            /* Riscrive il file dagli stage, con le etichette "ours" e
+             * "theirs" e lo stile di merge.conflictStyle. Se non riesce
+             * restano i marker di merge-one-file: il conflitto c'e'
+             * comunque. */
+            (void)git_capture(a_marks, PROC_STDERR_NULL, &out, &code);
+        }
     }
     str_free(&out);
     return err;

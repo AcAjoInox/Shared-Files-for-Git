@@ -1,6 +1,6 @@
 /*
  * cmd_update.c - "git shared update [-f] [--all] [-c | -m <msg>] [<path>]"
- * (REQ-F-009, REQ-F-010, REQ-F-011, D-040, D-078, D-099).
+ * (REQ-F-009, REQ-F-010, REQ-F-011, D-040, D-078, D-099, D-108).
  *
  * Per ogni file shared (o quello indicato):
  *   1. ricezione (receive.h): fetch solo dalle repo che hanno annunciato
@@ -13,12 +13,17 @@
  *   4. le versioni dei peer rimaste si uniscono una alla volta.
  * Ogni unione pulita crea la versione nella catena prima del commit:
  * dopo, il file e' "da committare" (D-076). Al primo conflitto ci si
- * ferma: stage nell'index, marker nel file, refs/shared-merge/<id>.
+ * ferma: stage nell'index, marker nel file (per un binario la versione
+ * nostra, senza marker: D-108), refs/shared-merge/<id>.
  * Non committa, salvo -c/-m (D-007, D-075). Modifiche locali: rifiuta,
  * salvo -f; una versione applicata e non committata non lo e' (D-076).
  *
  * "git shared update --abort [<path>]" (D-093): rinuncia all'unione in
  * corso, senza fetch; il file torna quello di HEAD.
+ *
+ * "git shared update --ours | --theirs [<path>]" (D-108): conclude l'unione
+ * in corso con la versione nostra (stage 2) o con quella ricevuta (stage
+ * 3), intera, per binari e testo; poi prosegue come update.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -149,14 +154,18 @@ static eStep_t merge_step(const Repo_t *r, const SharedEntry_t *e,
 
     /* 2. Conflitto: l'unione resta registrata. Il commit provvisorio ha
      * per genitori le versioni che si stanno unendo. */
-    if (conflict != 0) {
+    if (conflict != MERGE_CLEAN) {
         merge_ref(&ref, e->id);
         if ((chain_commit(theirs, tip, p2, NULL, str_cstr(&e->name), &v) != GS_OK) ||
             (git_set_ref(str_cstr(&ref), &v, "git shared: merge") != GS_OK)) {
             msg_error(MSG_ERR_MERGE, path);
             goto exit;
         }
-        msg_error(MSG_ERR_CONFLICT_OPEN, path, path);
+        if (conflict == MERGE_BINARY) {
+            msg_error(MSG_ERR_CONFLICT_BINARY, path, path, path);
+        } else {
+            msg_error(MSG_ERR_CONFLICT_OPEN, path, path);
+        }
         step = STEP_CONFLICT;
         goto exit;
     }
@@ -188,12 +197,15 @@ exit:
 /*
  * Unione registrata in refs/shared-merge/<id>. Ritorna 1 se si puo'
  * proseguire con lo stato (nessuna unione, o conclusa), 0 se il file e'
- * da saltare (*rc aggiornato).
+ * da saltare (*rc aggiornato). Con --ours / --theirs (choose_entry) la
+ * versione scelta e' gia' nell'index: e' una risoluzione anche se uguale
+ * a HEAD, quindi non si guarda se l'unione e' scaduta (D-108).
  */
 static int settle_merge(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
                         const CmdOpts_t *o, Touched_t *touched, int *rc,
                         int *batch_ok)
 {
+    const int chosen = (o->ours != 0U) || (o->theirs != 0U);
     const char *label = str_cstr(&e->path);
     char hex[OID_HEX_SIZE];
     Str_t name = STR_INIT;
@@ -206,6 +218,7 @@ static int settle_merge(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     Oid_t tip;
     Oid_t t;
     Oid_t result;
+    Oid_t before; /* T prima della conclusione */
     int unmerged = 0;
     int has_p2;
     int go_on = 0;
@@ -218,8 +231,9 @@ static int settle_merge(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     }
     str_reset(&name);
     str_addf(&name, "HEAD:%s", label);
-    if ((git_batch_blob(b, str_cstr(&name), &h) == 0) ||
-        !merge_is_live(b, label, &h, &unmerged)) {
+    if ((chosen == 0) &&
+        ((git_batch_blob(b, str_cstr(&name), &h) == 0) ||
+         !merge_is_live(b, label, &h, &unmerged))) {
         /* Abbandonata (git restore): l'index e' tornato a HEAD. */
         drop_marker(e, b);
         msg_warning(MSG_WARN_MERGE_DROPPED, label);
@@ -259,6 +273,7 @@ static int settle_merge(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     /* La risoluzione incorpora `old` (e p2). Se T e' ancora `old` diventa
      * la nuova versione cosi' com'e'; se nel frattempo e' avanzata
      * (reportIdea B-17) e' un'altra unione, con base `old`. */
+    before = tip;
     step = merge_step(r, e, b, &base, &i, &t, &t, has_p2 ? &p2 : NULL, &tip,
                       &result);
     if (refresh(b, batch_ok) != GS_OK) {
@@ -269,7 +284,11 @@ static int settle_merge(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         *rc = GS_EXIT_ERROR;
         goto exit;
     }
-    add_once(&touched->merged, label);
+    /* Nessuna versione nuova: la risoluzione e' T (es. --theirs su una
+     * divergenza del branch). E' un'applicazione, non un'unione. */
+    if (!oid_eq(&tip, &before)) {
+        add_once(&touched->merged, label);
+    }
     go_on = 1;
 
 exit:
@@ -313,6 +332,10 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     size_t k;
     int was_merged;
     int go_on = 1;
+    int merged_peer = 0; /* il ciclo sotto ha unito una versione */
+    /* Messaggio rimandato: se restano versioni dei peer, lo stato lo dice
+     * l'unione; se sono tutte gia' contenute in T, si stampa questo. */
+    eMsgId_t later = MSG_COUNT;
     eStep_t step;
 
     cur.len = 0U;
@@ -350,11 +373,9 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         if (was_merged) {
             printf(msg(MSG_UPD_MERGED_PUBLISH), label);
             putchar('\n');
-        } else if (rv.heads.n == 0U) {
-            printf(msg(MSG_UPD_UP_TO_DATE), label);
-            putchar('\n');
         } else {
-            /* allineato a T, ma i peer hanno altro: si unisce sotto */
+            /* con versioni dei peer: si unisce sotto */
+            later = MSG_UPD_UP_TO_DATE;
         }
     } else if (st == STATE_TO_APPLY) {
         if (apply(r, e, b, &si, (int)o->force)) {
@@ -368,11 +389,7 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
          * working tree e' ancora quello (--only committa il WT). */
         cur = si.t;
         if (o->commit == 0U) {
-            if (rv.heads.n == 0U) {
-                printf(msg(was_merged ? MSG_UPD_MERGED : MSG_UPD_TO_COMMIT),
-                       label);
-                putchar('\n');
-            }
+            later = was_merged ? MSG_UPD_MERGED : MSG_UPD_TO_COMMIT;
         } else if (cmd_worktree_differs(r, label)) {
             msg_error(MSG_ERR_LOCAL_CHANGES, label);
             *rc = GS_EXIT_ERROR;
@@ -382,10 +399,7 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         }
     } else if (st == STATE_TO_PUBLISH) {
         cur = si.h;
-        if (rv.heads.n == 0U) {
-            printf(msg(MSG_UPD_TO_PUBLISH), label);
-            putchar('\n');
-        }
+        later = MSG_UPD_TO_PUBLISH;
     } else if (st == STATE_DIVERGED) {
         /* Modifica committata da una base vecchia: base, H, T. */
         if ((o->force == 0U) && cmd_has_local_changes(r, e, b)) {
@@ -434,6 +448,7 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         if ((mb.len > 0U) && oid_eq(&mb, &rv.heads.v[k])) {
             continue;
         }
+        merged_peer = 1;
         if ((o->force == 0U) && cmd_has_local_changes(r, e, b)) {
             msg_error(MSG_ERR_LOCAL_CHANGES, label);
             *rc = GS_EXIT_ERROR;
@@ -465,10 +480,60 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
             add_once(&touched->applied, label);
         }
     }
+    if ((later != MSG_COUNT) && (merged_peer == 0) && (cur.len > 0U)) {
+        printf(msg(later), label);
+        putchar('\n');
+    }
 
 exit:
     received_free(&rv);
     return go_on;
+}
+
+/*
+ * --ours / --theirs (D-108): la versione scelta, presa dallo stage 2
+ * (nostra) o 3 (loro), va nell'index al posto degli stage e nel working
+ * tree; la conclusione la fa poi update_entry. Ritorna 1 se il file e'
+ * pronto. named = file indicato dall'utente: senza unione e' un errore;
+ * altrimenti si salta. Se gli stage non ci sono piu' la risoluzione e'
+ * gia' in staging: la si conclude con update, o si rinuncia.
+ */
+static int choose_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
+                        const CmdOpts_t *o, int named, int *rc, int *found)
+{
+    const char *label = str_cstr(&e->path);
+    Str_t name = STR_INIT;
+    Oid_t k;
+    Oid_t v;
+    int ok = 0;
+
+    merge_ref(&name, e->id);
+    if (git_batch_query(b, str_cstr(&name), &k) != GIT_OBJ_COMMIT) {
+        if (named != 0) {
+            msg_error(MSG_ERR_NO_MERGE, label);
+            *rc = GS_EXIT_ERROR;
+        }
+        goto exit;
+    }
+    *found = 1;
+    str_reset(&name);
+    str_addf(&name, ":%c:%s", (o->ours != 0U) ? '2' : '3', label);
+    if (git_batch_blob(b, str_cstr(&name), &v) == 0) {
+        msg_error(MSG_ERR_CHOOSE_STAGED, label, label);
+        *rc = GS_EXIT_ERROR;
+        goto exit;
+    }
+    /* update-index --cacheinfo allo stage 0 toglie gli stage 1/2/3 */
+    if (cmd_write_file(r, label, &v) != GS_OK) {
+        msg_error(MSG_ERR_WRITE_FILE, label);
+        *rc = GS_EXIT_ERROR;
+        goto exit;
+    }
+    ok = 1;
+
+exit:
+    str_free(&name);
+    return ok;
 }
 
 /*
@@ -534,19 +599,28 @@ int cmd_update(int argc, char **argv)
     size_t i;
     int committed = 0;
     int aborted = 0;
+    int chosen = 0;
     int first;
     int opened = 0;
     int batch_ok = 0;
     int rc = GS_EXIT_USAGE;
 
     first = cmd_parse(argc, argv,
-                      CMD_OPT_COMMIT | CMD_OPT_FORCE | CMD_OPT_ABORT | CMD_OPT_ALL,
+                      CMD_OPT_COMMIT | CMD_OPT_FORCE | CMD_OPT_ABORT | CMD_OPT_ALL |
+                          CMD_OPT_CHOOSE,
                       MSG_USAGE_UPDATE, &o);
     if (first < 0) {
         goto exit;
     }
     if ((argc - first) > 1) {
         msg_error(MSG_ERR_TOO_MANY_ARGS);
+        fputs(msg(MSG_USAGE_UPDATE), stderr);
+        goto exit;
+    }
+    if (((o.ours != 0U) || (o.theirs != 0U)) &&
+        (((o.ours != 0U) && (o.theirs != 0U)) || (o.abort != 0U) ||
+         (o.force != 0U) || (o.all != 0U))) {
+        msg_error(MSG_ERR_CHOOSE_OPTS);
         fputs(msg(MSG_USAGE_UPDATE), stderr);
         goto exit;
     }
@@ -579,6 +653,26 @@ int cmd_update(int argc, char **argv)
             rc = GS_EXIT_ERROR;
         }
         goto exit;
+    }
+
+    /* --ours / --theirs: prima la scelta nell'index, poi la conclusione
+     * come in ogni update, solo per i file con un'unione in corso. */
+    if ((o.ours != 0U) || (o.theirs != 0U)) {
+        for (i = 0U; i < repo.n; i++) {
+            if ((sel[i] != 0U) &&
+                !choose_entry(&repo, &repo.v[i], &batch, &o, (first < argc),
+                              &rc, &chosen)) {
+                sel[i] = 0U;
+            }
+        }
+        if ((chosen == 0) && (first >= argc)) {
+            msg_error(MSG_ERR_NO_MERGE_ANY);
+            rc = GS_EXIT_ERROR;
+        }
+        if (refresh(&batch, &batch_ok) != GS_OK) {
+            rc = GS_EXIT_FATAL;
+            goto exit;
+        }
     }
 
     for (i = 0U; i < repo.n; i++) {

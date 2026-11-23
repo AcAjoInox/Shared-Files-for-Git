@@ -21,6 +21,7 @@
 #define CMD_OPT_MERGE  0x20U /* --merge (link, D-029, D-102) */
 #define CMD_OPT_ADOPT  0x40U /* --adopt (link, D-064) */
 #define CMD_OPT_REMOTE 0x80U /* --remote <remote> (publish, D-104) */
+#define CMD_OPT_CHOOSE 0x100U /* --ours, --theirs (update, D-108) */
 
 typedef struct {
     const char *message; /* -m; NULL = messaggio standard */
@@ -32,6 +33,8 @@ typedef struct {
     unsigned all : 1U;
     unsigned merge : 1U;
     unsigned adopt : 1U;
+    unsigned ours : 1U;
+    unsigned theirs : 1U;
 } CmdOpts_t;
 
 /*

@@ -5,6 +5,7 @@ NOME
 
 SINTASSI
     git shared update [-f] [--all] [-c | -m <messaggio>] [<path>]
+    git shared update (--ours | --theirs) [-c | -m <messaggio>] [<path>]
     git shared update --abort [<path>]
 
 DESCRIZIONE
@@ -26,6 +27,17 @@ DESCRIZIONE
         git add <file>
         git shared update -c
         git shared publish
+    Oppure tieni una delle due versioni, intera, invece di correggere il
+    file:
+        git shared update --ours -c      (la tua)
+        git shared update --theirs -c    (l'altra)
+
+    I file binari non si uniscono mai, anche quando le modifiche non
+    toccano gli stessi byte: e' sempre un conflitto. Il file resta la tua
+    versione, senza marker, e l'altra e' nell'index:
+        git show ':3:<file>' > altra-versione
+    Poi scegli con --ours o --theirs.
+
     Per rinunciare all'unione:
         git shared update --abort
     Il file torna quello dell'ultimo commit e l'unione sparisce, in un
@@ -51,6 +63,16 @@ OPZIONI
 
     -m <messaggio>
         Come -c, con <messaggio>.
+
+    --ours, --theirs
+        Conclude l'unione in corso tenendo la tua versione (--ours) o
+        prendendo l'altra (--theirs), intera: per un file binario, o per
+        un file di testo invece di correggere i marker. La versione
+        scelta va nel file e nell'index, poi update prosegue come
+        sempre; tenere la tua e' una scelta, non una rinuncia. Senza
+        <path>, tutti i file shared con un'unione in corso. Se la
+        risoluzione e' gia' in staging (git add), concludila con
+        'git shared update' o rinuncia con --abort.
 
     --abort
         Rinuncia all'unione in corso: il file torna quello dell'ultimo

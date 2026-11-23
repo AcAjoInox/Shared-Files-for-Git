@@ -5,6 +5,7 @@ NAME
 
 SYNOPSIS
     git shared update [-f] [--all] [-c | -m <message>] [<path>]
+    git shared update (--ours | --theirs) [-c | -m <message>] [<path>]
     git shared update --abort [<path>]
 
 DESCRIPTION
@@ -26,6 +27,16 @@ DESCRIPTION
         git add <file>
         git shared update -c
         git shared publish
+    Or keep one of the two versions, whole, instead of fixing the file:
+        git shared update --ours -c      (yours)
+        git shared update --theirs -c    (the other one)
+
+    Binary files are never merged, even when the changes do not touch
+    the same bytes: it is always a conflict. The file keeps your version,
+    with no markers, and the other one is in the index:
+        git show ':3:<file>' > other-version
+    Then choose with --ours or --theirs.
+
     To give up the merge:
         git shared update --abort
     The file goes back to the last commit and the merge is dropped, in
@@ -50,6 +61,16 @@ OPTIONS
 
     -m <message>
         Like -c, with <message>.
+
+    --ours, --theirs
+        Finish the merge in progress keeping your version (--ours) or
+        taking the other one (--theirs), whole: for a binary file, or
+        for a text file instead of fixing the markers. The chosen
+        version goes into the file and the index, then update goes on
+        as usual; keeping yours is a choice, not a way to give up.
+        Without <path>, every shared file with a merge in progress. If
+        the resolution is already staged (git add), finish it with
+        'git shared update' or give up with --abort.
 
     --abort
         Give up the merge in progress: the file goes back to the last

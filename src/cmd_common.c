@@ -36,6 +36,8 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
     o->all = 0U;
     o->merge = 0U;
     o->adopt = 0U;
+    o->ours = 0U;
+    o->theirs = 0U;
     while ((i < argc) && (end_opts == 0) && (argv[i][0] == '-') &&
            (argv[i][1] != '\0')) {
         if (strcmp(argv[i], "--") == 0) {
@@ -73,6 +75,12 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
         } else if (((allowed & CMD_OPT_ADOPT) != 0U) &&
                    (strcmp(argv[i], "--adopt") == 0)) {
             o->adopt = 1U;
+        } else if (((allowed & CMD_OPT_CHOOSE) != 0U) &&
+                   (strcmp(argv[i], "--ours") == 0)) {
+            o->ours = 1U;
+        } else if (((allowed & CMD_OPT_CHOOSE) != 0U) &&
+                   (strcmp(argv[i], "--theirs") == 0)) {
+            o->theirs = 1U;
         } else if (((allowed & CMD_OPT_REMOTE) != 0U) &&
                    (strncmp(argv[i], "--remote=", 9U) == 0) &&
                    (argv[i][9] != '\0')) {

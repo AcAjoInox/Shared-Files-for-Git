@@ -122,7 +122,7 @@ Who cannot write to the creator keeps their version as a proposal. Not there yet
 ## Limits of the first release
 
 - Repositories on the same machine (Linux and Windows); remote repositories only in alpha.
-- Only single text files: no folders, no binaries.
+- Only single files, text or binary: no folders. A binary file is never merged: on a conflict you keep one of the two versions (`git shared update --ours` or `--theirs`).
 - At most 32 peers per file.
 - The extension must be installed on every machine that publishes or applies versions. Anyone without it uses the repository as usual.
 

@@ -122,7 +122,7 @@ Chi non può scrivere sul creatore tiene la sua versione come proposta. Non c'è
 ## Limiti della prima versione
 
 - Repository sulla stessa macchina (Linux e Windows); repository remote solo in alpha.
-- Solo singoli file di testo: niente cartelle, niente binari.
+- Solo singoli file, di testo o binari: niente cartelle. Un file binario non si unisce mai: in caso di conflitto si tiene una delle due versioni (`git shared update --ours` o `--theirs`).
 - Al massimo 32 peer per file.
 - L'estensione va installata su ogni macchina che pubblica o applica versioni. Chi non ce l'ha usa la repo normalmente.
 

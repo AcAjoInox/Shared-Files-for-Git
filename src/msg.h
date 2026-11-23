@@ -101,9 +101,12 @@ typedef enum {
     MSG_ERR_PUBLISH,         /* file */
     MSG_ERR_MERGE,           /* file */
     MSG_ERR_CONFLICT_OPEN,   /* file, path */
+    MSG_ERR_CONFLICT_BINARY, /* file, path, path */
+    MSG_ERR_CHOOSE_STAGED,   /* file, path */
     MSG_ERR_NO_MERGE,        /* file */
     MSG_ERR_NO_MERGE_ANY,
     MSG_ERR_ABORT_OPTS,
+    MSG_ERR_CHOOSE_OPTS,
     MSG_ERR_NO_REMOTE,       /* remote */
     MSG_ERR_REMOTE_FETCH,    /* id, url */
     MSG_ERR_NO_CREATOR,      /* id, url */

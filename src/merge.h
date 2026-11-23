@@ -3,8 +3,10 @@
  *
  * L'unione si fa nell'index di git, con il solo plumbing: stage 1/2/3 del
  * path (base, nostra, loro) e "git merge-index git-merge-one-file". Il
- * conflitto e' quello di git: stage nell'index, marker nel file. Il
- * contenuto non passa mai dai buffer dell'estensione (D-042).
+ * conflitto e' quello di git: stage nell'index, marker nel file. Un file
+ * binario (D-108) non si unisce mai: conflitto senza marker, con la
+ * versione nostra nel file. Il contenuto non passa mai dai buffer
+ * dell'estensione (D-042).
  *
  * Unico dato salvato: refs/shared-merge/<id>, l'equivalente di MERGE_HEAD.
  * Punta a un commit provvisorio i cui genitori sono le versioni che il
@@ -38,11 +40,17 @@ eGsErr_t merge_empty_blob(Oid_t *out);
 /* Blob del path nell'index (stage 0), letto con un processo nuovo. */
 eGsErr_t merge_index_blob(const char *top, const char *path, Oid_t *out);
 
+/* Esito di merge_three. */
+#define MERGE_CLEAN    0 /* risultato nell'index (stage 0) e nel file */
+#define MERGE_CONFLICT 1 /* testo: stage 1/2/3, marker nel file */
+#define MERGE_BINARY   2 /* binario: stage 1/2/3, versione nostra nel file */
+
 /*
- * Unisce ours e theirs con base base sul path dato (relativo a top).
- * Unione pulita: risultato nell'index (stage 0) e nel working tree,
- * *conflict = 0. Conflitto: stage 1/2/3 nell'index, marker "ours" /
- * "theirs" nel file, *conflict = 1. Il working tree viene sovrascritto.
+ * Unisce ours e theirs con base base sul path dato (relativo a top);
+ * *conflict = MERGE_CLEAN, MERGE_CONFLICT o MERGE_BINARY. Binario (D-108):
+ * una delle tre versioni ha un byte nullo nei primi 8000 byte, la regola
+ * di git; git-merge-one-file non lo unisce mai, e il file resta la
+ * versione nostra, senza marker. Il working tree viene sovrascritto.
  */
 eGsErr_t merge_three(const char *top, const char *path, const Oid_t *base,
                      const Oid_t *ours, const Oid_t *theirs, int *conflict);
