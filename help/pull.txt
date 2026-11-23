@@ -8,7 +8,7 @@ SYNOPSIS
 
 DESCRIPTION
     Like 'git pull' = fetch + merge: for each file shared through a
-    remote (prototype), fetches the version chain of its creator, one
+    remote (beta), fetches the version chain of its creator, one
     fetch for each creator, then runs 'git shared update' with the same
     options. Only the version chain is fetched, not the project.
 

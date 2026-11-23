@@ -26,7 +26,7 @@ DESCRIPTION
 
     Without <path>, all the shared files; with it, only that one.
 
-REMOTE (PROTOTYPE)
+REMOTE (BETA)
     publish is always local. For a file shared through a remote, the
     new version reaches the creator with 'git shared push': publish
     reminds it when the creator does not have the version yet.

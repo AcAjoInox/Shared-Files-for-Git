@@ -44,7 +44,7 @@ DESCRIZIONE
     (status dice "unlinked"): collegalo di nuovo da uno dei suoi peer. Il
     file non viene toccato e il collegamento vale subito, senza commit.
 
-REMOTO (PROTOTIPO)
+REMOTO (BETA)
     Con <url> <id> si collega un file condiviso attraverso un remoto
     (vedi 'git shared push --help'): <url> e' il suo creatore, o un
     repository che ne ha una copia; <id> e' l'ID del file, che

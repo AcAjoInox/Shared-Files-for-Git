@@ -15,7 +15,7 @@ DESCRIPTION
     received, or when the version of a peer must be merged: in both
     cases, update.
 
-    For a file shared through a remote (prototype) a "creator" line
+    For a file shared through a remote (beta) a "creator" line
     shows the repository the versions come from and, in brackets, how
     the latest version here compares with the last one seen there: same
     version; ahead (push); newer version on the creator (update);

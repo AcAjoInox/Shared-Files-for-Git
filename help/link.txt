@@ -43,7 +43,7 @@ DESCRIPTION
     (status says "unlinked"): link it again from one of its peers. The
     file is not touched, and the link works at once, without a commit.
 
-REMOTE (PROTOTYPE)
+REMOTE (BETA)
     With <url> <id> you link a file shared through a remote (see
     'git shared push --help'): <url> is its creator, or a repository
     that has a copy; <id> is the ID of the file, which 'git shared status'

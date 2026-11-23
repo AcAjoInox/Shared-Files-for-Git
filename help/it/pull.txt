@@ -8,7 +8,7 @@ SINTASSI
 
 DESCRIZIONE
     Come 'git pull' = fetch + merge: per ogni file condiviso attraverso
-    un remoto (prototipo), scarica la catena delle versioni del suo
+    un remoto (beta), scarica la catena delle versioni del suo
     creatore, un fetch per creatore, poi lancia 'git shared update' con
     le stesse opzioni. Si scarica solo la catena delle versioni, non il
     progetto.

@@ -9,11 +9,11 @@ A common header, a configuration file, a script: they are often needed by more t
 
 The file stays a regular file: anyone using the repository without the extension sees it, builds it and uses it as always.
 
-> **Status:** first release, for repositories on the **same machine**. Support for remote repositories (GitHub, GitLab) is in **alpha**: see [Remote repositories](#remote-repositories-alpha).
+> **Status:** first release, for repositories on the **same machine**. Support for remote repositories (GitHub, GitLab) is in **beta**: see [Remote repositories](#remote-repositories-beta).
 
 ## Installation
 
-**Windows, without compiling.** Download [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (built from the latest tag, v0.7.0-alpha) and put it in a folder of your `PATH`, for example `%USERPROFILE%\bin`. It needs only git 2.34 or later. Check with `git shared -h`; the manual is in `git shared help`. The file is not signed, so Windows may warn you the first time you run it.
+**Windows, without compiling.** Download [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (built from the latest tag, v0.8.0) and put it in a folder of your `PATH`, for example `%USERPROFILE%\bin`. It needs only git 2.34 or later. Check with `git shared -h`; the manual is in `git shared help`. The file is not signed, so Windows may warn you the first time you run it.
 
 **From the sources.** You need git 2.34 or later, `make` and `gcc` (MinGW-w64 on Windows).
 
@@ -75,8 +75,8 @@ git commit -m "update common.h"
 | `git shared status [--peers] [--remote]` | State of each shared file; with `--peers`, also that of the peers; with `--remote`, first asks the creators |
 | `git shared publish [<file>]` | Creates a new version and notifies the peers |
 | `git shared update [--all] [<file>]` | Receives and applies the latest version; `--ours` / `--theirs` keeps one version, `--abort` gives up a merge |
-| `git shared push [<remote>] [<file>]` | Remote (alpha): sends the published versions to the creator; the first time, `<remote>` becomes the creator |
-| `git shared pull [<file>]` | Remote (alpha): receives the versions of the creator, then `update` |
+| `git shared push [<remote>] [<file>]` | Remote (beta): sends the published versions to the creator; the first time, `<remote>` becomes the creator |
+| `git shared pull [<file>]` | Remote (beta): receives the versions of the creator, then `update` |
 | `git shared branch <file> [-a\|-rm <branch>]` | Chooses the branches where the file is shared; on the others it is a regular file |
 | `git shared prune [-n]` | Removes peers that were deleted or no longer share the file |
 | `git shared relocate [--copy]` | Tells the peers that the repository was moved or copied |
@@ -99,9 +99,9 @@ Each command has its own page: `git shared <command> --help`. The same pages are
 | unlinked | The repository declares the file but doesn't know the peers (e.g. a clone) | `git shared link` |
 | inconsistent | File renamed without `git shared mv` or deleted, or `.gitshared` edited by hand | `git shared mv`, `git shared unlink` or `git restore .gitshared` |
 
-## Remote repositories (alpha)
+## Remote repositories (beta)
 
-A first prototype: expect changes. On GitHub, sending versions to the creator and receiving them from it work; permissions, credentials and the less common cases are not tested yet, and GitLab not at all. It is in the Windows executable of `dist/windows/` (v0.7.0-alpha) and in the sources.
+The main flow works: on GitHub `push`, `pull` and `status --remote` work and are tested; permissions, credentials and the less common cases are not tested yet, and GitLab not at all. It is in the Windows executable of `dist/windows/` (v0.8.0) and in the sources.
 
 Each file gets a **creator**: the remote repository of its first `git shared push`. Its URL is stored in the version history of the file, so whoever has the file knows where new versions come from. Only that history is pushed and fetched, never the project.
 
@@ -128,7 +128,7 @@ Who cannot write to the creator keeps their version as a proposal. Not there yet
 
 ## Limits of the first release
 
-- Repositories on the same machine (Linux and Windows); remote repositories only in alpha.
+- Repositories on the same machine (Linux and Windows); remote repositories in beta.
 - Only single files, text or binary: no folders. A binary file is never merged: on a conflict you keep one of the two versions (`git shared update --ours` or `--theirs`).
 - At most 32 peers per file.
 - The extension must be installed on every machine that publishes or applies versions. Anyone without it uses the repository as usual.
@@ -161,7 +161,7 @@ Only those who publish or apply new versions. For everyone else the shared file 
 
 ### Does it work with GitHub or GitLab?
 
-The first release works between repositories on the same machine. Support for remote repositories is in alpha: see [Remote repositories](#remote-repositories-alpha).
+The first release works between repositories on the same machine. Support for remote repositories is in beta: see [Remote repositories](#remote-repositories-beta).
 
 ## How it was made
 

@@ -7,7 +7,7 @@ SYNOPSIS
     git shared push [<remote>] [--] [<path>]
 
 DESCRIPTION
-    For a file shared through a remote (prototype), sends the versions
+    For a file shared through a remote (beta), sends the versions
     already published here to its creator, the remote repository where
     the official versions are. Only the version chain is pushed, never
     the project. Like 'git push' after 'git commit': publish creates the

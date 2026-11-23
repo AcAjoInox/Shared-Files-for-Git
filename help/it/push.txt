@@ -7,7 +7,7 @@ SINTASSI
     git shared push [<remote>] [--] [<path>]
 
 DESCRIZIONE
-    Per un file condiviso attraverso un remoto (prototipo), invia al suo
+    Per un file condiviso attraverso un remoto (beta), invia al suo
     creatore, il repository remoto dove stanno le versioni ufficiali, le
     versioni gia' pubblicate qui. Si invia solo la catena delle versioni,
     mai il progetto. Come 'git push' dopo 'git commit': publish crea la

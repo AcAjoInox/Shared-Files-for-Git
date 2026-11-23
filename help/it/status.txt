@@ -44,7 +44,7 @@ DESCRIZIONE
     o quando la versione di un peer va unita: in entrambi i casi,
     update.
 
-    Per un file condiviso attraverso un remoto (prototipo) una riga
+    Per un file condiviso attraverso un remoto (beta) una riga
     "creator" mostra il repository da cui arrivano le versioni e, tra
     parentesi, com'e' l'ultima versione di qui rispetto all'ultima vista
     li': same version (uguale); ahead (avanti: push); newer version on
