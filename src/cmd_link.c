@@ -582,12 +582,18 @@ int cmd_link(int argc, char **argv)
     } else {
         e = repo_find_id(&repo, str_cstr(&id));
     }
+    /* Come la chiave appena scritta (D-113): un ri-aggancio puo' avere
+     * campi letti da chiavi vecchie rimaste. */
+    str_reset(&e->pending_src);
+    str_reset(&e->pending_path);
+    str_reset(&e->pending_branch);
+    str_reset(&e->pending_commit);
     str_add(&e->pending_src, str_cstr(&src.top));
     str_add(&e->pending_path, str_cstr(&dest));
     str_add(&e->pending_branch, str_cstr(&repo.branch));
     e->in_config = 1U;
     e->pending = SHARED_PENDING_LINK;
-    e->pending_remote_key = 1U;
+    e->pending_packed = 1U;
     e->pending_remote = (remote != 0) ? 1U : 0U;
 
     /* Ri-aggancio con la sezione gia' committata (es. un clone): niente

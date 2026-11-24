@@ -63,7 +63,8 @@ int cmd_open(Repo_t *r, GitBatch_t *b);
  * della sorgente per link, NULL altrimenti; remote = 1 se src e' l'URL di
  * una repo remota (link remoto, D-106: nessuna membership); commit = HEAD
  * al comando per unlink (D-081), NULL altrimenti. Registra anche il branch
- * corrente, su cui si cerchera' il commit di conferma. */
+ * corrente, su cui si cerchera' il commit di conferma. Tutto nella sola
+ * chiave shared.<id>.pending, con una scrittura (D-113). */
 eGsErr_t cmd_set_pending(const Repo_t *r, const char *id, const char *op,
                          const char *path, const char *src, int remote,
                          const char *commit);

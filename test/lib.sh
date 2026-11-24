@@ -156,6 +156,25 @@ shared_id() {
 	git config -f .gitshared "shared.$1.id"
 }
 
+# pending_op <id> [<repo>]: operazione in attesa, la prima riga della
+# chiave shared.<id>.pending ("" se nessuna, D-113)
+pending_op() {
+	git -C "${2:-.}" config "shared.$1.pending" 2>/dev/null | sed -n 1p
+}
+
+# pending_field <id> <campo>: campo dell'attesa (path, branch, remote,
+# commit, source), una riga della chiave; la sorgente e' il resto (D-113)
+pending_field() {
+	case "$2" in
+	path) _pf=2p ;;
+	branch) _pf=3p ;;
+	remote) _pf=4p ;;
+	commit) _pf=5p ;;
+	*) _pf='6,$p' ;;
+	esac
+	git config "shared.$1.pending" 2>/dev/null | sed -n "$_pf"
+}
+
 # done_testing: piano TAP; codice di uscita 1 se un test e' fallito
 done_testing() {
 	echo "1..$n_test"

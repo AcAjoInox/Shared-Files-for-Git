@@ -58,7 +58,7 @@ expect_eq "set: branch di default in .gitshared" \
 	"$(git config -f .gitshared shared.common.h.branch)" main
 expect_ok "set: intestazione in .gitshared" grep -q "Managed by 'git shared'" .gitshared
 expect_eq "set: .gitshared in staging" "$(git diff --cached --name-only)" .gitshared
-expect_eq "set: attesa in .git/config" "$(git config "shared.$ID.pending")" set
+expect_eq "set: attesa in .git/config" "$(pending_op "$ID")" set
 expect_fail "set: nessuna catena prima del commit" git rev-parse -q --verify "refs/shared/$ID"
 
 run git shared status

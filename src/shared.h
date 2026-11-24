@@ -45,7 +45,9 @@ typedef struct {
     unsigned in_config : 1U;    /* sezione [shared "<id>"] in .git/config */
     unsigned valid : 1U;        /* id e path ben formati */
     unsigned pending : 2U;      /* ePending_t */
-    unsigned pending_remote_key : 1U; /* chiave pendingRemote presente */
+    unsigned pending_packed : 1U; /* attesa nel formato in una chiave (D-113) */
+    unsigned pending_legacy : 5U; /* chiavi pendingXxx presenti, formato fino
+                                   * alla v0.9.0: PENDING_OLD_* (D-113) */
     unsigned pending_remote : 1U; /* link remoto in attesa: pending_src e'
                                    * un URL, nessuna membership (D-106) */
 } SharedEntry_t;
@@ -56,12 +58,15 @@ typedef struct {
     Str_t branch; /* branch corrente senza "refs/heads/"; "" se HEAD staccata */
     Str_t objfmt; /* algoritmo degli oid: "sha1" o "sha256" (D-033) */
     Str_t self_path; /* shared.selfPath: dove la repo ricorda di essere */
+    Str_t hooks;  /* cartella degli hook, assoluta (rev-parse --git-path
+                   * hooks: rispetta core.hooksPath); solo da repo_open */
     SharedEntry_t *v;
     size_t n;
     size_t cap;
 } Repo_t;
 
-#define REPO_INIT { STR_INIT, STR_INIT, STR_INIT, STR_INIT, STR_INIT, NULL, 0U, 0U }
+#define REPO_INIT { STR_INIT, STR_INIT, STR_INIT, STR_INIT, STR_INIT, STR_INIT, \
+                    NULL, 0U, 0U }
 
 /*
  * Apre la repo della cartella corrente e carica i file shared.
@@ -91,6 +96,16 @@ SharedEntry_t *repo_add(Repo_t *r);
 SharedEntry_t *repo_find_path(Repo_t *r, const char *path);
 SharedEntry_t *repo_find_name(Repo_t *r, const char *name);
 SharedEntry_t *repo_find_id(Repo_t *r, const char *id);
+
+/*
+ * Valore di shared.<id>.pending per un'attesa (D-113): tutti i campi in
+ * una chiave, separati da '\n'. branch "" = HEAD staccata; src NULL tranne
+ * per link (allora remote vale); commit NULL tranne per unlink. 0 se path
+ * o branch contengono '\n' (non succede: i comandi li rifiutano prima).
+ */
+int shared_pending_value(Str_t *v, const char *op, const char *path,
+                         const char *branch, const char *src, int remote,
+                         const char *commit);
 
 /* 1 se branch e' tra i branch attivi della voce (nomi esatti nella v0). */
 int shared_is_active(const SharedEntry_t *e, const char *branch);

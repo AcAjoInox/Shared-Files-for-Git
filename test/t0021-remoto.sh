@@ -165,7 +165,6 @@ expect_eq "link remoto: sezione in .gitshared" \
 	"$(git config -f .gitshared shared.p.h.path)" "inc/p.h"
 expect_fail "link remoto: nessun peer" git config --get-all "shared.$ID.peer"
 expect_fail "link remoto: attesa chiusa" git config "shared.$ID.pending"
-expect_fail "link remoto: nessuna chiave pendingRemote" git config "shared.$ID.pendingremote"
 expect_eq "link remoto: il creatore non registra nulla" \
 	"$(git -C "$TRASH/A" config --get-all "shared.$ID.peer" | wc -l | tr -d ' ')" "1"
 run git shared status
@@ -179,7 +178,7 @@ put c.txt c
 run git shared link "$SRV_A" "$ID"
 expect_rc "link remoto senza destinazione: codice 0" 0
 expect_ok "link remoto senza destinazione: path = nome" test -f p.h
-expect_eq "link remoto in attesa: pendingRemote" "$(git config "shared.$ID.pendingremote")" "true"
+expect_eq "link remoto in attesa: remoto" "$(pending_field "$ID" remote)" "true"
 expect_eq "link remoto in attesa: stato" "$(state_of)" "pending commit"
 git commit -q -m link 2>/dev/null
 expect_fail "link remoto al commit: attesa chiusa" git config "shared.$ID.pending"

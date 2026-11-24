@@ -53,8 +53,8 @@ expect_ok "link: contenuto uguale alla sorgente" cmp -s "$TEST_FILE" "../A/$TEST
 expect_eq "link: .gitshared e file in staging" \
 	"$(git diff --cached --name-only | tr '\n' ' ')" ".gitshared $TEST_FILE "
 expect_eq "link: stesso ID della sorgente" "$(shared_id "$TEST_FILE")" "$ID"
-expect_eq "link: attesa" "$(git config "shared.$ID.pending")" link
-expect_eq "link: sorgente registrata" "$(git config "shared.$ID.pendingSource")" "$TOP_A"
+expect_eq "link: attesa" "$(pending_op "$ID")" link
+expect_eq "link: sorgente registrata" "$(pending_field "$ID" source)" "$TOP_A"
 expect_ok "link: catena ricevuta in una ref temporanea" \
 	git rev-parse -q --verify "refs/shared-incoming/$ID/0"
 expect_fail "link: refs/shared non ancora creata" git rev-parse -q --verify "refs/shared/$ID"
@@ -74,7 +74,6 @@ expect_fail "ref temporanea cancellata" git rev-parse -q --verify "refs/shared-i
 expect_eq "B conosce A" "$(git config --get-all "shared.$ID.peer")" "$TOP_A"
 expect_eq "A conosce B" "$(git -C ../A config --get-all "shared.$ID.peer")" "$TOP_B"
 expect_fail "attesa rimossa" git config "shared.$ID.pending"
-expect_fail "sorgente dell'attesa rimossa" git config "shared.$ID.pendingSource"
 
 # --- link con destinazione diversa e -c: C conosce A e B -----------------------
 make_repo C

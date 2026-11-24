@@ -153,27 +153,16 @@ eGsErr_t cmd_set_pending(const Repo_t *r, const char *id, const char *op,
                          const char *path, const char *src, int remote,
                          const char *commit)
 {
-    /* "pending" per ultima: senza di lei le altre chiavi sono ignorate,
-     * quindi un'interruzione non lascia un'attesa senza branch (D-077). */
-    eGsErr_t err = set_key(id, "pendingPath", path);
+    /* Una chiave sola, scritta in una volta (D-113): niente attese a
+     * meta' (D-077) ne' campi rimasti da un'attesa interrotta (D-106). */
+    Str_t value = STR_INIT;
+    eGsErr_t err = GS_ERR_USAGE;
 
-    if ((err == GS_OK) && (r->branch.len > 0U)) {
-        err = set_key(id, "pendingBranch", str_cstr(&r->branch));
+    if (shared_pending_value(&value, op, path, str_cstr(&r->branch), src,
+                             remote, commit)) {
+        err = set_key(id, "pending", str_cstr(&value));
     }
-    if ((err == GS_OK) && (src != NULL)) {
-        err = set_key(id, "pendingSource", src);
-    }
-    /* Sempre scritta per un link: un valore rimasto da un'attesa
-     * interrotta non deve valere per quella nuova (D-106). */
-    if ((err == GS_OK) && (src != NULL)) {
-        err = set_key(id, "pendingRemote", (remote != 0) ? "true" : "false");
-    }
-    if ((err == GS_OK) && (commit != NULL)) {
-        err = set_key(id, "pendingCommit", commit);
-    }
-    if (err == GS_OK) {
-        err = set_key(id, "pending", op);
-    }
+    str_free(&value);
     return err;
 }
 

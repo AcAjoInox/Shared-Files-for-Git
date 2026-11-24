@@ -4,11 +4,6 @@
 
 . "$(dirname "$0")/lib.sh"
 
-# pending_key <id> <campo>: valore della chiave dell'attesa ("" se assente)
-pending_key() {
-	git config "shared.$1.$2" 2>/dev/null
-}
-
 # has_chain <id>: la catena esiste
 has_chain() {
 	git rev-parse -q --verify "refs/shared/$1" >/dev/null
@@ -22,8 +17,8 @@ git branch old
 put c.h v1
 git shared set c.h >/dev/null
 ID=$(shared_id c.h)
-expect_eq "attesa: branch registrato" "$(pending_key "$ID" pendingBranch)" "main"
-expect_eq "attesa: path registrato" "$(pending_key "$ID" pendingPath)" "c.h"
+expect_eq "attesa: branch registrato" "$(pending_field "$ID" branch)" "main"
+expect_eq "attesa: path registrato" "$(pending_field "$ID" path)" "c.h"
 
 # --- B-29: set committato, primo comando da un altro branch -------------------
 git commit -q -m "share c.h"
@@ -35,9 +30,9 @@ case "$ERR" in
 *) ok "B-29: nessun avviso di scarto" ;;
 esac
 expect_ok "B-29: completato da old (catena creata)" has_chain "$ID"
-expect_eq "B-29: attesa tolta" "$(pending_key "$ID" pending)" ""
-expect_eq "B-29: chiavi accessorie tolte" \
-	"$(pending_key "$ID" pendingBranch)$(pending_key "$ID" pendingPath)" ""
+expect_eq "B-29: attesa tolta" "$(pending_op "$ID")" ""
+expect_eq "B-29: nessuna chiave dell'attesa" \
+	"$(git config --name-only --get-regexp "^shared[.]$ID[.]pending" | wc -l | tr -d ' ')" "0"
 expect_eq "B-29: branch attivi dal default (main)" \
 	"$(git config --get-all "shared.$ID.branch")" "main"
 git checkout -q main
@@ -86,7 +81,7 @@ git restore --staged --worktree .gitshared
 run git shared status
 expect_err "restore: attesa scartata, con il path" \
 	"discarded pending operation on 'c.h'"
-expect_eq "restore: sezione locale tolta" "$(pending_key "$ID" pending)" ""
+expect_eq "restore: sezione locale tolta" "$(pending_op "$ID")" ""
 
 # --- restore, poi comando da un altro branch: si decide solo sul branch -------
 make_repo e
@@ -124,7 +119,7 @@ git branch -q -D tmp
 run git shared status
 expect_err "branch cancellato: avviso" "on branch 'tmp', which no longer exists"
 expect_err "branch cancellato: come toglierla" "git config --remove-section shared.$ID"
-expect_eq "branch cancellato: l'attesa resta" "$(pending_key "$ID" pending)" "set"
+expect_eq "branch cancellato: l'attesa resta" "$(pending_op "$ID")" "set"
 
 # --- B-29 per link -------------------------------------------------------------
 make_repo A
@@ -171,7 +166,7 @@ case "$ERR" in
 *) ok "B-39: nessuno scarto" ;;
 esac
 expect_ok "B-39: completato dal branch che lo dichiara" has_chain "$ID"
-expect_eq "B-39: attesa tolta" "$(pending_key "$ID" pending)" ""
+expect_eq "B-39: attesa tolta" "$(pending_op "$ID")" ""
 expect_out "B-39: su main la sezione non c'e' (B-16)" "suspended on this branch (not declared here)"
 git switch -q feat
 run git shared status
@@ -211,7 +206,7 @@ expect_out "B-40: set riprende: da committare" "'c.h' is now shared as 'c.h'. Co
 expect_eq "B-40: stesso ID" "$(shared_id c.h)" "$ID"
 expect_eq "B-40: una sola sezione" \
 	"$(git config -f .gitshared --get-regexp '[.]id$' | wc -l | tr -d ' ')" "1"
-expect_eq "B-40: di nuovo in attesa" "$(pending_key "$ID" pending)" "set"
+expect_eq "B-40: di nuovo in attesa" "$(pending_op "$ID")" "set"
 git commit -q -m "share c.h"
 run git shared status
 expect_out "B-40: allineato dopo il commit" "aligned"
@@ -310,5 +305,79 @@ expect_out "clone: publish arriva a LB e al clone" "2 of 2 peers notified"
 cd "$TRASH/LC" || exit 1
 run git shared update -c
 expect_out "clone: update dal peer" "new version applied and committed"
+
+# --- D-113: attesa in una chiave; il formato fino alla v0.9.0 si legge ancora ---
+# pending_count <id>: chiavi dell'attesa (pending, pendingXxx) nella sezione
+pending_count() {
+	git config --name-only --get-regexp "^shared[.]$1[.]pending" | wc -l | tr -d ' '
+}
+
+make_repo v
+cd "$TRASH/v" || exit 1
+put o.txt o
+git branch old
+put c.h v1
+git shared set c.h >/dev/null
+ID=$(shared_id c.h)
+expect_eq "D-113: una chiave sola" "$(pending_count "$ID")" "1"
+expect_eq "D-113: campi vuoti per set" \
+	"$(pending_field "$ID" remote)$(pending_field "$ID" commit)$(pending_field "$ID" source)" ""
+
+# set della v0.9.0: branch e path letti dalle chiavi vecchie
+git config "shared.$ID.pending" set
+git config "shared.$ID.pendingPath" c.h
+git config "shared.$ID.pendingBranch" main
+git restore --staged .gitshared
+mv .gitshared ../v.gitshared
+git checkout -q old
+run git shared status
+case "$ERR" in
+*discarded*) not_ok "v0.9.0: da old non si scarta" "$ERR" ;;
+*) ok "v0.9.0: da old non si scarta" ;;
+esac
+expect_out "v0.9.0: branch dalla chiave vecchia" "pending commit (on branch main)"
+expect_out "v0.9.0: path dalla chiave vecchia" "c.h"
+git checkout -q main
+mv ../v.gitshared .gitshared
+git add .gitshared
+git commit -q -m "share c.h" 2>/dev/null
+expect_ok "v0.9.0: completato al commit" has_chain "$ID"
+expect_eq "v0.9.0: tutte le chiavi tolte" "$(pending_count "$ID")" "0"
+
+# chiavi vecchie rimaste da un'attesa interrotta: la chiave nuova vale
+put d.h v1
+git shared set d.h >/dev/null
+DID=$(shared_id d.h)
+git config "shared.$DID.pendingBranch" ghost
+git config "shared.$DID.pendingPath" ghost.h
+run git shared status
+expect_no_out "chiavi rimaste: ignorate" "ghost"
+git commit -q -m "share d.h" 2>/dev/null
+expect_ok "chiavi rimaste: completato" has_chain "$DID"
+expect_eq "chiavi rimaste: tolte anche loro" "$(pending_count "$DID")" "0"
+
+# link della v0.9.0: la sorgente dalla chiave vecchia, per la membership
+make_repo vs
+cd "$TRASH/vs" || exit 1
+put w.h v1
+git shared set -c w.h >/dev/null
+WID=$(shared_id w.h)
+make_repo vd
+cd "$TRASH/vd" || exit 1
+put o.txt o
+git shared link ../vs/w.h >/dev/null
+SRC=$(pending_field "$WID" source)
+expect_eq "D-113: sorgente nella chiave" "$SRC" "$(git -C ../vs rev-parse --show-toplevel)"
+expect_eq "D-113: link locale" "$(pending_field "$WID" remote)" "false"
+git config "shared.$WID.pending" link
+git config "shared.$WID.pendingSource" "$SRC"
+git config "shared.$WID.pendingPath" w.h
+git config "shared.$WID.pendingBranch" main
+git config "shared.$WID.pendingRemote" false
+git commit -q -m "link w.h" 2>/dev/null
+expect_ok "v0.9.0 link: completato" has_chain "$WID"
+expect_eq "v0.9.0 link: la sorgente conosce la destinazione" \
+	"$(git -C ../vs config --get-all "shared.$WID.peer")" "$(git rev-parse --show-toplevel)"
+expect_eq "v0.9.0 link: tutte le chiavi tolte" "$(pending_count "$WID")" "0"
 
 done_testing

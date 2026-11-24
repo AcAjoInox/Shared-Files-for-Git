@@ -263,4 +263,25 @@ run git shared set -c r.h
 expect_ok "riparato: blocco tolto dall'hook Python" cmp -s .git/hooks/post-merge "$TRASH/RP-orig"
 expect_err "riparato: avviso" "post-merge is not a shell script: removed the git shared block"
 
+# --- cartella degli hook letta all'apertura della repo -----------------------
+# Da una sottocartella: la cartella resta quella della repo.
+make_repo SD
+cd "$TRASH/SD" || exit 1
+mkdir -p sub/deep
+put sub/deep/s.h s
+(cd sub/deep && git shared set -c s.h >/dev/null 2>&1)
+expect_ok "sottocartella: blocco in .git/hooks" has_block post-merge
+expect_fail "sottocartella: niente hook nella sottocartella" test -e sub/deep/.git
+
+# core.hooksPath relativo: relativo alla radice, anche da una sottocartella.
+make_repo HP
+cd "$TRASH/HP" || exit 1
+git config core.hooksPath myhooks
+mkdir -p myhooks sub
+put sub/h.h h
+(cd sub && git shared set -c h.h >/dev/null 2>&1)
+expect_ok "core.hooksPath: blocco in myhooks" grep -q ">>> git shared >>>" myhooks/post-merge
+expect_fail "core.hooksPath: niente in .git/hooks" has_block post-merge
+expect_fail "core.hooksPath: niente in sub/myhooks" test -e sub/myhooks
+
 done_testing

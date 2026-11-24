@@ -34,8 +34,9 @@ static const struct {
 };
 
 /*
- * Cartella degli hook: `rev-parse --git-path hooks` dalla radice, che
- * rispetta core.hooksPath. Il risultato puo' essere relativo alla radice.
+ * Cartella degli hook: di solito gia' letta da repo_open, nella sua
+ * rev-parse. Altrimenti `rev-parse --git-path hooks` dalla radice, che
+ * rispetta core.hooksPath; il risultato puo' essere relativo alla radice.
  */
 static eGsErr_t hooks_dir(const Repo_t *r, Str_t *dir)
 {
@@ -43,6 +44,11 @@ static eGsErr_t hooks_dir(const Repo_t *r, Str_t *dir)
     Str_t out = STR_INIT;
     eGsErr_t err;
 
+    if (r->hooks.len > 0U) {
+        str_reset(dir);
+        str_add(dir, str_cstr(&r->hooks));
+        return GS_OK;
+    }
     args[1] = str_cstr(&r->top);
     err = git_run(args, 0U, &out);
     if (err == GS_OK) {

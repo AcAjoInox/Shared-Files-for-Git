@@ -30,7 +30,7 @@ printf 'x\n' >x.txt
 git add x.txt
 run git commit -q -m "solo x" -- x.txt
 expect_eq "commit senza .gitshared: nessun output" "$OUT$ERR" ""
-expect_eq "commit senza .gitshared: ancora in attesa" "$(git config "shared.$ID.pending")" "set"
+expect_eq "commit senza .gitshared: ancora in attesa" "$(pending_op "$ID")" "set"
 expect_ok "commit senza .gitshared: il blocco resta" has_block post-commit
 run git commit -q -m "share f.h"
 expect_eq "commit di conferma: nessun output" "$OUT$ERR" ""
@@ -132,7 +132,7 @@ put t.h t
 git shared set t.h >/dev/null
 ID_T=$(shared_id t.h)
 commit_no_hooks -q -m "share t.h"
-expect_eq "hook saltato: set ancora in attesa" "$(git config "shared.$ID_T.pending")" "set"
+expect_eq "hook saltato: set ancora in attesa" "$(pending_op "$ID_T")" "set"
 make_repo D2
 cd "$TRASH/D2" || exit 1
 put z.txt z
@@ -165,7 +165,7 @@ case "$ERR" in
 *) ok "set non committato: nessun falso irraggiungibile" ;;
 esac
 expect_eq "set non committato: attesa della sorgente intatta" \
-	"$(git -C ../S3 config "shared.$ID_Q.pending")" "set"
+	"$(pending_op "$ID_Q" ../S3)" "set"
 expect_fail "set non committato: niente nella destinazione" test -e .gitshared
 
 # --- hook saltato: link da una repo il cui link e' ancora in attesa -------------

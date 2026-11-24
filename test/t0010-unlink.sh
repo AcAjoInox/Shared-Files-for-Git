@@ -4,9 +4,6 @@
 
 . "$(dirname "$0")/lib.sh"
 
-pending_key() {
-	git config "shared.$1.$2" 2>/dev/null
-}
 
 has_chain() {
 	git rev-parse -q --verify "refs/shared/$1" >/dev/null
@@ -46,8 +43,8 @@ expect_out "unlink: messaggio" "'c.h' is no longer shared. Commit .gitshared to 
 expect_fail "unlink: .gitshared vuoto, tolto" test -f .gitshared
 expect_eq "unlink: cancellazione in staging" "$(git diff --cached --name-status)" "D	.gitshared"
 expect_ok "unlink: il file resta" test -f c.h
-expect_eq "unlink: attesa" "$(pending_key "$ID" pending)" "unlink"
-expect_eq "unlink: commit del comando" "$(pending_key "$ID" pendingCommit)" "$(git rev-parse HEAD)"
+expect_eq "unlink: attesa" "$(pending_op "$ID")" "unlink"
+expect_eq "unlink: commit del comando" "$(pending_field "$ID" commit)" "$(git rev-parse HEAD)"
 expect_ok "unlink: catena ancora presente" has_chain "$ID"
 run git shared status
 expect_out "unlink: in attesa di commit" "pending commit"
@@ -60,7 +57,7 @@ git restore --staged --worktree .gitshared
 run git shared status
 expect_err "restore: unlink annullato" "discarded pending operation on 'c.h'"
 expect_out "restore: di nuovo allineato" "aligned"
-expect_eq "restore: attesa tolta" "$(pending_key "$ID" pending)$(pending_key "$ID" pendingCommit)" ""
+expect_eq "restore: attesa tolta" "$(pending_op "$ID")" ""
 expect_ok "restore: catena intatta" has_chain "$ID"
 
 # --- commit: dati locali tolti ---------------------------------------------------

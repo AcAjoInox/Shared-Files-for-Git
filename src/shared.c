@@ -20,6 +20,25 @@
 #define RUN_HEAD 0x2U
 #define RUN_CFG  0x4U
 
+/* Chiavi dell'attesa nel formato fino alla v0.9.0 (D-113): si leggono
+ * ancora e si tolgono alla fine dell'attesa. */
+#define PENDING_OLD_SOURCE 0x01U
+#define PENDING_OLD_PATH   0x02U
+#define PENDING_OLD_BRANCH 0x04U
+#define PENDING_OLD_COMMIT 0x08U
+#define PENDING_OLD_REMOTE 0x10U
+
+static const struct {
+    const char *field; /* come arriva da git, in minuscolo */
+    unsigned bit;
+} pending_old[] = {
+    { "pendingsource", PENDING_OLD_SOURCE },
+    { "pendingpath", PENDING_OLD_PATH },
+    { "pendingbranch", PENDING_OLD_BRANCH },
+    { "pendingcommit", PENDING_OLD_COMMIT },
+    { "pendingremote", PENDING_OLD_REMOTE },
+};
+
 /* Chiave "shared.<sub>.<campo>\n<valore>" di `git config -z`. */
 typedef struct {
     const char *sub;
@@ -50,7 +69,8 @@ static void entry_init(SharedEntry_t *e)
     e->in_config = 0U;
     e->valid = 0U;
     e->pending = SHARED_PENDING_NONE;
-    e->pending_remote_key = 0U;
+    e->pending_packed = 0U;
+    e->pending_legacy = 0U;
     e->pending_remote = 0U;
 }
 
@@ -86,6 +106,7 @@ void repo_close(Repo_t *r)
     str_free(&r->branch);
     str_free(&r->objfmt);
     str_free(&r->self_path);
+    str_free(&r->hooks);
 }
 
 SharedEntry_t *repo_add(Repo_t *r)
@@ -319,14 +340,114 @@ static void parse_gitshared_rec(Repo_t *r, const char *rec, int with_branches)
     }
 }
 
+/* Copia in out la riga che inizia in p; ritorna l'inizio della successiva
+ * (o la fine della stringa). */
+static const char *pending_line(const char *p, Str_t *out)
+{
+    const char *nl = strchr(p, '\n');
+    size_t n = (nl != NULL) ? (size_t)(nl - p) : strlen(p);
+
+    str_reset(out);
+    str_addn(out, p, n);
+    return (nl != NULL) ? (nl + 1) : (p + n);
+}
+
+/*
+ * Valore di shared.<id>.pending (D-113): "<op>\n<path>\n<branch>\n
+ * <remote>\n<commit>\n<sorgente>", campi vuoti dove non servono; la
+ * sorgente, path o URL, per ultima: e' il resto del valore. Senza '\n' e'
+ * il formato fino alla v0.9.0, con solo l'operazione e i campi nelle
+ * chiavi pendingXxx.
+ */
+static void parse_pending(SharedEntry_t *e, const char *value)
+{
+    static const char *const ops[] = { "", "set", "link", "unlink" };
+    Str_t op = STR_INIT;
+    Str_t remote = STR_INIT;
+    const char *p = pending_line(value, &op);
+    unsigned i;
+
+    e->pending = SHARED_PENDING_NONE;
+    for (i = 1U; i < (sizeof ops / sizeof ops[0]); i++) {
+        if (str_eq(&op, ops[i])) {
+            e->pending = i & 0x3U; /* bitfield di 2 bit (C-17) */
+        }
+    }
+    if (strchr(value, '\n') != NULL) {
+        e->pending_packed = 1U;
+        p = pending_line(p, &e->pending_path);
+        p = pending_line(p, &e->pending_branch);
+        p = pending_line(p, &remote);
+        p = pending_line(p, &e->pending_commit);
+        str_reset(&e->pending_src);
+        str_add(&e->pending_src, p);
+        e->pending_remote = str_eq(&remote, "true") ? 1U : 0U;
+    }
+    str_free(&remote);
+    str_free(&op);
+}
+
+int shared_pending_value(Str_t *v, const char *op, const char *path,
+                         const char *branch, const char *src, int remote,
+                         const char *commit)
+{
+    int ok = (strchr(path, '\n') == NULL) && (strchr(branch, '\n') == NULL);
+
+    str_reset(v);
+    if (ok) {
+        str_addf(v, "%s\n%s\n%s\n%s\n%s\n%s", op, path, branch,
+                 (src == NULL) ? "" : ((remote != 0) ? "true" : "false"),
+                 (commit == NULL) ? "" : commit,
+                 (src == NULL) ? "" : src);
+    }
+    return ok;
+}
+
+/* Chiave pendingXxx del formato fino alla v0.9.0: si ricorda che c'e',
+ * per toglierla, ma il valore conta solo senza il formato nuovo, che
+ * puo' arrivare prima o dopo. 1 se il campo era una di quelle chiavi. */
+static int parse_pending_old(SharedEntry_t *e, const CfgKey_t *k)
+{
+    unsigned bit = 0U;
+    Str_t *dst = NULL;
+    size_t i;
+
+    for (i = 0U; (bit == 0U) && (i < (sizeof pending_old / sizeof pending_old[0])); i++) {
+        if (field_is(k, pending_old[i].field)) {
+            bit = pending_old[i].bit;
+        }
+    }
+    if (bit != 0U) {
+        e->pending_legacy = (e->pending_legacy | bit) & 0x1FU; /* 5 bit */
+        if (bit == PENDING_OLD_SOURCE) {
+            dst = &e->pending_src;
+        } else if (bit == PENDING_OLD_PATH) {
+            dst = &e->pending_path;
+        } else if (bit == PENDING_OLD_BRANCH) {
+            dst = &e->pending_branch;
+        } else if (bit == PENDING_OLD_COMMIT) {
+            dst = &e->pending_commit;
+        } else {
+            /* PENDING_OLD_REMOTE: un flag, non una stringa */
+        }
+        if (e->pending_packed == 0U) {
+            if (dst != NULL) {
+                str_reset(dst);
+                str_add(dst, k->value);
+            } else {
+                e->pending_remote = (strcmp(k->value, "true") == 0) ? 1U : 0U;
+            }
+        }
+    }
+    return bit != 0U;
+}
+
 /* Record di .git/config (scope locale): sezione per ID. I nomi delle
  * variabili arrivano in minuscolo da git ("pendingsource"). */
 static void parse_local_rec(Repo_t *r, const char *rec)
 {
-    static const char *const pending[] = { "", "set", "link", "unlink" };
     CfgKey_t k;
     SharedEntry_t *e;
-    unsigned i;
 
     if ((split_key(rec, &k) != 0) && id_is_valid(k.sub, k.sub_len)) {
         e = find_sub(r, k.sub, k.sub_len, 1);
@@ -337,26 +458,9 @@ static void parse_local_rec(Repo_t *r, const char *rec)
         }
         e->in_config = 1U;
         if (field_is(&k, "pending")) {
-            for (i = 1U; i < (sizeof pending / sizeof pending[0]); i++) {
-                if (strcmp(k.value, pending[i]) == 0) {
-                    e->pending = i & 0x3U; /* bitfield di 2 bit (C-17) */
-                }
-            }
-        } else if (field_is(&k, "pendingsource")) {
-            str_reset(&e->pending_src);
-            str_add(&e->pending_src, k.value);
-        } else if (field_is(&k, "pendingbranch")) {
-            str_reset(&e->pending_branch);
-            str_add(&e->pending_branch, k.value);
-        } else if (field_is(&k, "pendingpath")) {
-            str_reset(&e->pending_path);
-            str_add(&e->pending_path, k.value);
-        } else if (field_is(&k, "pendingcommit")) {
-            str_reset(&e->pending_commit);
-            str_add(&e->pending_commit, k.value);
-        } else if (field_is(&k, "pendingremote")) {
-            e->pending_remote_key = 1U;
-            e->pending_remote = (strcmp(k.value, "true") == 0) ? 1U : 0U;
+            parse_pending(e, k.value);
+        } else if (parse_pending_old(e, &k)) {
+            /* gia' letto */
         } else if (field_is(&k, "branch")) {
             str_addz(&e->branches, k.value);
         } else if (field_is(&k, "peer")) {
@@ -412,21 +516,33 @@ exit:
 }
 
 /* Divide l'output di rev-parse (una riga per valore; il prefisso puo'
- * essere una riga vuota). */
+ * essere una riga vuota). Con hooks != NULL c'e' una quarta riga, la
+ * cartella degli hook. */
 static eGsErr_t parse_locate(const Str_t *out, int code, Str_t *top,
-                             Str_t *prefix, Str_t *objfmt)
+                             Str_t *prefix, Str_t *objfmt, Str_t *hooks)
 {
     const char *l1 = str_cstr(out);
     const char *l2;
     const char *l3;
+    const char *l4 = NULL;
     eGsErr_t err = GS_ERR_NOT_REPO; /* anche dentro .git: nessun worktree */
 
     l2 = strchr(l1, '\n');
     l3 = (l2 != NULL) ? strchr(l2 + 1, '\n') : NULL;
-    if ((code == 0) && (l2 != NULL) && (l2 != l1) && (l3 != NULL)) {
+    if ((hooks != NULL) && (l3 != NULL)) {
+        l4 = strchr(l3 + 1, '\n');
+    }
+    if ((code == 0) && (l2 != NULL) && (l2 != l1) && (l3 != NULL) &&
+        ((hooks == NULL) || (l4 != NULL))) {
         str_addn(top, l1, (size_t)(l2 - l1));
         str_addn(prefix, l2 + 1, (size_t)(l3 - (l2 + 1)));
-        str_add(objfmt, l3 + 1);
+        if (hooks == NULL) {
+            str_add(objfmt, l3 + 1);
+        } else {
+            str_addn(objfmt, l3 + 1, (size_t)(l4 - (l3 + 1)));
+            str_add(hooks, l4 + 1);
+            str_trim_eol(hooks);
+        }
         str_trim_eol(objfmt);
         err = GS_OK;
     }
@@ -443,7 +559,7 @@ eGsErr_t repo_locate(const char *dir, Str_t *top, Str_t *prefix,
     eGsErr_t err = git_capture(args, PROC_STDERR_NULL, &out, &code);
 
     if (err == GS_OK) {
-        err = parse_locate(&out, code, top, prefix, objfmt);
+        err = parse_locate(&out, code, top, prefix, objfmt, NULL);
     }
     str_free(&out);
     return err;
@@ -451,9 +567,13 @@ eGsErr_t repo_locate(const char *dir, Str_t *top, Str_t *prefix,
 
 eGsErr_t repo_open(Repo_t *r)
 {
+    /* La cartella degli hook nello stesso processo: assoluta, perche'
+     * relativa sarebbe rispetto alla cartella corrente (git >= 2.31). */
     static const char *const a_top[] = { "rev-parse", "--show-toplevel",
                                          "--show-prefix",
-                                         "--show-object-format", NULL };
+                                         "--show-object-format",
+                                         "--path-format=absolute",
+                                         "--git-path", "hooks", NULL };
     static const char *const a_head[] = { "symbolic-ref", "-q", "HEAD", NULL };
     static const char *const a_cfg[] = { "config", "-z", "--show-scope",
                                          "--get-regexp", "^shared\\.", NULL };
@@ -491,7 +611,8 @@ eGsErr_t repo_open(Repo_t *r)
     run &= ~RUN_TOP;
     err = proc_collect(&p_top, &out, &code);
     if (err == GS_OK) {
-        err = parse_locate(&out, code, &r->top, &r->prefix, &r->objfmt);
+        err = parse_locate(&out, code, &r->top, &r->prefix, &r->objfmt,
+                           &r->hooks);
     }
     if (err != GS_OK) {
         goto exit;
@@ -679,28 +800,19 @@ eGsErr_t repo_auth_drop(const char *id, int accepted, const char *value)
 /* Fine dell'attesa: per ultima, cosi' un'interruzione si puo' ripetere. */
 static eGsErr_t end_pending(SharedEntry_t *e)
 {
-    /* "pending" per prima: se ci si ferma dopo, restano solo chiavi
-     * accessorie, ignorate senza "pending". Il contrario lascerebbe
-     * un'attesa senza il suo branch (D-077). */
+    /* Una chiave sola (D-113). Le chiavi del formato fino alla v0.9.0,
+     * se ci sono, dopo: senza "pending" sono ignorate (D-077). */
     eGsErr_t err = config_unset(e->id, "pending");
+    size_t i;
 
-    if ((err == GS_OK) && (e->pending_src.len > 0U)) {
-        err = config_unset(e->id, "pendingsource");
-    }
-    if ((err == GS_OK) && (e->pending_path.len > 0U)) {
-        err = config_unset(e->id, "pendingpath");
-    }
-    if ((err == GS_OK) && (e->pending_branch.len > 0U)) {
-        err = config_unset(e->id, "pendingbranch");
-    }
-    if ((err == GS_OK) && (e->pending_commit.len > 0U)) {
-        err = config_unset(e->id, "pendingcommit");
-    }
-    if ((err == GS_OK) && (e->pending_remote_key != 0U)) {
-        err = config_unset(e->id, "pendingremote");
+    for (i = 0U; (err == GS_OK) && (i < (sizeof pending_old / sizeof pending_old[0])); i++) {
+        if ((e->pending_legacy & pending_old[i].bit) != 0U) {
+            err = config_unset(e->id, pending_old[i].field);
+        }
     }
     if (err == GS_OK) {
-        e->pending_remote_key = 0U;
+        e->pending_packed = 0U;
+        e->pending_legacy = 0U;
         e->pending_remote = 0U;
         e->pending = SHARED_PENDING_NONE;
         e->in_config = 1U;
