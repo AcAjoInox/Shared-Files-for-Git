@@ -31,6 +31,13 @@ eGsErr_t sys_random(uint8_t *buf, size_t n);
  */
 char *sys_getenv(const char *name);
 
+/*
+ * Scrive una variabile d'ambiente del processo, che i figli ereditano.
+ * Windows: nell'ambiente del sistema operativo (SetEnvironmentVariableW),
+ * da cui CreateProcess copia quello dei figli. 0 = riuscito.
+ */
+int sys_setenv(const char *name, const char *value);
+
 FILE *sys_fopen(const char *path, const char *mode);
 int sys_remove(const char *path);
 

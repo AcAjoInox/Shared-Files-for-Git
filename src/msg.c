@@ -370,6 +370,8 @@ static const char *const msg_en[] = {
         "run 'git shared branch %s -a <branch>'",
     [MSG_WARN_RELOCATE_NOT_MEMBER] = "%s: %s does not share this file: skipped",
     [MSG_WARN_COPY_FAILED] = "%s: cannot copy the versions to %s",
+    [MSG_WARN_CHAIN_RESTORED] =
+        "%s: the version chain was missing: restored from %s",
     [MSG_HOOK_NOT_ALIGNED] = "%s: %s (run 'git shared %s')",
     [MSG_HOOK_ANNOUNCED] =
         "%s: new version announced by a peer (run 'git shared update')",
@@ -505,6 +507,10 @@ static const char *const msg_en[] = {
         "diverged: run 'git shared update', then 'git shared push'",
     [MSG_CREATOR_UNSEEN] = "not checked yet: run 'git shared status --remote'",
     [MSG_CREATOR_MISSING] = "the file is no longer there",
+    [MSG_STATUS_CHAIN_MISSING] =
+        "the version chain is missing and no copy was found: "
+        "run 'git shared unlink %s', then link the file again",
+    [MSG_CREATOR_SEEN] = "seen %s",
     [MSG_STATUS_RENAMED] =
         "renamed from '%s': commit it with .gitshared to confirm",
     [MSG_STATUS_BRANCHES_GONE] =

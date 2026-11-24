@@ -31,6 +31,13 @@ DESCRIPTION
     argument is a <remote> when this repository has a remote with that
     name; after '--' it is always a path.
 
+    push never asks for a password: it uses the credentials git already
+    has (credential helper, ssh keys). If they are missing, the version
+    is not accepted; a plain 'git fetch' or 'git push' to that remote
+    sets them up. A remote given as a relative path is recorded in the
+    chain as an absolute one. The same remote written in another form
+    (https:// or git@, with or without .git) counts as the same.
+
 EXAMPLES
     git shared push origin common.h   # origin becomes the creator
     git commit -am "Fix the timeout in common.h"

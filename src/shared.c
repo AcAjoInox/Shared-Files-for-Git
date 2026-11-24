@@ -41,6 +41,8 @@ static void entry_init(SharedEntry_t *e)
     str_init(&e->pending_branch);
     str_init(&e->pending_path);
     str_init(&e->pending_commit);
+    str_init(&e->seen_url);
+    e->seen_at = 0UL;
     e->id[0] = '\0';
     e->in_gitshared = 0U;
     e->in_config = 0U;
@@ -61,6 +63,7 @@ static void entry_free(SharedEntry_t *e)
     str_free(&e->pending_branch);
     str_free(&e->pending_path);
     str_free(&e->pending_commit);
+    str_free(&e->seen_url);
 }
 
 void repo_close(Repo_t *r)
@@ -354,6 +357,9 @@ static void parse_local_rec(Repo_t *r, const char *rec)
             str_addz(&e->branches, k.value);
         } else if (field_is(&k, "peer")) {
             str_addz(&e->peers, k.value);
+        } else if (field_is(&k, "authorityseen")) {
+            /* D-112: un valore malformato vale come mai visto */
+            (void)remote_seen_parse(k.value, &e->seen_url, &e->seen_at);
         } else {
             /* campi sconosciuti: ignorati */
         }
@@ -735,12 +741,15 @@ static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
     /* Link remoto (D-106): chi riceve dal creatore non e' un peer di
      * nessuno e il creatore non registra nulla. Le versioni arrivano dal
      * creatore, con pull (D-110). Se la catena viene dal creatore, la sua
-     * punta e' anche l'ultima versione vista; da una copia no. */
+     * punta e' anche l'ultima versione vista; da una copia no. Gli URL si
+     * confrontano in forma normale (D-112, P-04). */
     if (e->pending_remote != 0U) {
-        if ((remote_creator_url(b, &t, &found) == GS_OK) &&
-            str_eq(&found, str_cstr(&e->pending_src))) {
+        if ((remote_creator_url(b, &t, &found) == GS_OK) && (found.len > 0U) &&
+            remote_same(str_cstr(&found), str_cstr(&e->pending_src))) {
             remote_seen_ref(&ref, e->id);
-            (void)git_set_ref(str_cstr(&ref), &t, "git shared: link");
+            if (git_set_ref(str_cstr(&ref), &t, "git shared: link") == GS_OK) {
+                (void)remote_seen_write(e->id, str_cstr(&found), NULL, NULL);
+            }
         }
         str_reset(&found);
         err = end_pending(e);
@@ -984,7 +993,12 @@ eGsErr_t repo_forget(const Repo_t *r, SharedEntry_t *e, GitBatch_t *b)
             str_addz(&refs, str_cstr(&name));
         }
     }
-    remote_seen_ref(&name, e->id); /* D-110 */
+    remote_seen_ref(&name, e->id); /* D-110, D-112 */
+    if (git_batch_query(b, str_cstr(&name), &oid) == GIT_OBJ_COMMIT) {
+        str_addz(&refs, str_cstr(&name));
+    }
+    str_reset(&name);
+    str_addf(&name, "refs/shared-creator/%s", e->id); /* fino a v0.8.0 */
     if (git_batch_query(b, str_cstr(&name), &oid) == GIT_OBJ_COMMIT) {
         str_addz(&refs, str_cstr(&name));
     }

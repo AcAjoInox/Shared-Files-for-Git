@@ -16,9 +16,9 @@ tip() {
 	git -C "$TRASH/$1" rev-parse -q --verify "refs/shared/${2:-$ID}"
 }
 
-# seen <repo>: ultima versione vista del creatore
+# seen <repo>: ultima versione vista (refs/shared-authority, D-112)
 seen() {
-	git -C "$TRASH/$1" rev-parse -q --verify "refs/shared-creator/${2:-$ID}"
+	git -C "$TRASH/$1" rev-parse -q --verify "refs/shared-authority/${2:-$ID}"
 }
 
 # srv_tip <nome>: refs/shared/<id> della repo bare srv/<nome>.git
@@ -106,7 +106,7 @@ expect_eq "creatore: ultima versione vista" "$(seen A)" "$T1"
 expect_ok "creatore: avviso nel peer locale" test -f "$TRASH/B/.git/shared/inbox/$ID/$T1"
 
 run git shared status
-expect_out "status del creatore: riga creator" "    creator $SRV_A (same version)"
+expect_out "status del creatore: riga creator" "    creator $SRV_A (same version, seen "
 expect_out "status del creatore: allineato" "state  aligned"
 
 # B riceve con l'avviso, come ogni versione: da qui conosce il creatore, ma
@@ -170,7 +170,7 @@ expect_eq "link remoto: il creatore non registra nulla" \
 	"$(git -C "$TRASH/A" config --get-all "shared.$ID.peer" | wc -l | tr -d ' ')" "1"
 run git shared status
 expect_out "C: allineato" "state  aligned"
-expect_out "C: riga creator" "    creator $SRV_A (same version)"
+expect_out "C: riga creator" "    creator $SRV_A (same version, seen "
 
 # Senza destinazione e senza -c: il nome del file, poi il commit.
 make_repo C3
@@ -209,7 +209,7 @@ expect_out "ri-aggancio: il creatore resta srv/A.git, mai visto" \
 	"    creator $SRV_A (not checked yet"
 run git shared status --remote
 expect_rc "ri-aggancio: status --remote codice 0" 0
-expect_out "ri-aggancio: status --remote, stessa versione" "    creator $SRV_A (same version)"
+expect_out "ri-aggancio: status --remote, stessa versione" "    creator $SRV_A (same version, seen "
 expect_eq "ri-aggancio: status --remote, versione vista" "$(seen C2)" "$T1"
 
 # --- B pubblica in locale, poi push: copia su srv/B.git, ufficiale sul creatore ----
@@ -234,7 +234,7 @@ expect_eq "B push: srv/B.git ha la versione" "$(srv_tip B)" "$T2"
 expect_eq "B push: versione vista" "$(seen B)" "$T2"
 expect_eq "B push: la versione eredita il creatore" "$(creator_of B)" "$SRV_A"
 run git shared status
-expect_out "B: dopo il push, stessa versione" "    creator $SRV_A (same version)"
+expect_out "B: dopo il push, stessa versione" "    creator $SRV_A (same version, seen "
 
 # Mario: status senza rete non sa nulla; status --remote scarica la catena,
 # poi update lavora senza rete.
@@ -260,7 +260,7 @@ cd "$TRASH/A" || exit 1
 git shared update -c >/dev/null 2>&1
 expect_eq "A: allineato dopo update" "$(state_of)" "aligned"
 run git shared status
-expect_out "A: avanti rispetto all'ultima vista" "(ahead: run 'git shared push')"
+expect_out "A: avanti rispetto all'ultima vista" "(ahead: run 'git shared push', seen "
 run git shared push
 expect_rc "A push di una versione che il creatore ha: codice 0" 0
 expect_out "A push: accettato" "p.h: pushed to the creator $SRV_A"
@@ -345,7 +345,7 @@ git --git-dir="$TRASH/srv/A.git" update-ref -d "refs/shared/$ID"
 run git shared status --remote
 expect_rc "file sparito dal creatore: status codice 0" 0
 expect_out "file sparito dal creatore: riga creator" "    creator $SRV_A (the file is no longer there)"
-expect_out "l'altro file: stessa versione" "    creator $SRV_A (same version)"
+expect_out "l'altro file: stessa versione" "    creator $SRV_A (same version, seen "
 run git shared pull
 expect_rc "file sparito dal creatore: pull codice 1" 1
 expect_err "file sparito dal creatore: messaggio" \

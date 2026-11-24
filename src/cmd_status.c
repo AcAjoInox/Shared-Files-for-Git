@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "cmd.h"
 #include "cmd_common.h"
@@ -78,6 +79,18 @@ static void print_entry(const Repo_t *r, const SharedEntry_t *e, eState_t st,
     putchar('\n');
 }
 
+/* Data e ora locali "AAAA-MM-GG hh:mm" di un istante in secondi dal 1970. */
+static const char *seen_date(unsigned long at, char *buf, size_t size)
+{
+    time_t tt = (time_t)at;
+    const struct tm *tm = localtime(&tt);
+
+    if ((tm == NULL) || (strftime(buf, size, "%Y-%m-%d %H:%M", tm) == 0U)) {
+        (void)snprintf(buf, size, "%lu", at);
+    }
+    return buf;
+}
+
 /*
  * Riga "creator <url> (<rispetto al creatore>)" (D-110): T confrontata con
  * l'ultima versione vista. Un processo solo se le due sono diverse.
@@ -89,6 +102,7 @@ static void print_creator(const SharedEntry_t *e, GitBatch_t *b,
 {
     const Oid_t *seen = &rv->creator_tip;
     Str_t ref = STR_INIT;
+    char date[32];
     eMsgId_t rel;
     Oid_t t;
 
@@ -109,8 +123,15 @@ static void print_creator(const SharedEntry_t *e, GitBatch_t *b,
     } else {
         rel = MSG_CREATOR_DIVERGED;
     }
-    printf("    %-6s %s (%s)\n", msg(MSG_STATUS_FIELD_CREATOR),
+    printf("    %-6s %s (%s", msg(MSG_STATUS_FIELD_CREATOR),
            str_cstr(&rv->creator), msg(rel));
+    /* Quando e' stata vista (D-112, B-53): senza, "same version" dopo
+     * giorni senza rete sembrerebbe un controllo appena fatto. */
+    if ((seen->len > 0U) && (rel != MSG_CREATOR_MISSING) && (e->seen_at > 0UL)) {
+        fputs(", ", stdout);
+        printf(msg(MSG_CREATOR_SEEN), seen_date(e->seen_at, date, sizeof date));
+    }
+    fputs(")\n", stdout);
     if (fetched == (unsigned char)REMOTE_UNREACHABLE) {
         printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
         printf(msg(MSG_STATUS_CREATOR_UNREACHABLE), str_cstr(&rv->creator));
@@ -197,6 +218,8 @@ int cmd_status(int argc, char **argv)
     Str_t list = STR_INIT;
     Str_t elsewhere = STR_INIT; /* branch che dichiara il file (B-16) */
     Str_t alt_path = STR_INIT;
+    Str_t chain = STR_INIT;      /* refs/shared/<id> (B-51) */
+    Oid_t tip;
     Str_t *urls = NULL;          /* --remote: creatori */
     unsigned char *sel = NULL;   /* --remote: file da chiedere */
     unsigned char *fetched = NULL; /* --remote: esito per file */
@@ -311,6 +334,17 @@ int cmd_status(int argc, char **argv)
             if (received && (rv.creator.len > 0U)) {
                 print_creator(e, &batch, &rv, fetched[i]);
             }
+            /* Catena assente e non ricostruita (D-112, B-51): l'unica
+             * uscita e' unlink, poi di nuovo link. */
+            if (!received && e->in_config && e->in_gitshared &&
+                (e->pending == SHARED_PENDING_NONE) && (st == STATE_INCONSISTENT)) {
+                chain_ref(&chain, e->id);
+                if (git_batch_query(&batch, str_cstr(&chain), &tip) != GIT_OBJ_COMMIT) {
+                    printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+                    printf(msg(MSG_STATUS_CHAIN_MISSING), str_cstr(&e->path));
+                    putchar('\n');
+                }
+            }
             /* Non dichiarato qui: dove lo e' (B-16, D-095). */
             if (found != 0) {
                 printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
@@ -370,6 +404,7 @@ exit:
     branchnames_free(&names);
     received_free(&rv);
     str_free(&alt_path);
+    str_free(&chain);
     str_free(&elsewhere);
     str_free(&list);
     return rc;

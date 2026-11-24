@@ -11,6 +11,7 @@
 #include "inbox.h"
 #include "mem.h"
 #include "merge.h"
+#include "msg.h"
 #include "peers.h"
 #include "remote.h"
 
@@ -82,10 +83,12 @@ static void fetch_from(const SharedEntry_t *e, GitBatch_t *b, const Str_t *from,
 }
 
 /*
- * In remoto (D-110): l'ultima versione vista del creatore,
- * refs/shared-creator/<id>, va tra le candidate come la versione di un
- * peer, con l'URL come provenienza: se e' da unire, remember ne fa un
- * avviso. Nessuna rete: la ref la aggiornano push, pull e status --remote.
+ * In remoto (D-110): l'ultima versione vista, refs/shared-authority/<id>,
+ * va tra le candidate come la versione di un peer, con l'URL come
+ * provenienza: se e' da unire, remember ne fa un avviso. Nessuna rete: la
+ * ref la aggiornano push, pull e status --remote. E' una versione del
+ * file, quindi e' candidata comunque; come confronto con il creatore
+ * (creator_tip) vale solo se e' stata vista su di lui (D-112).
  */
 static void from_creator(const SharedEntry_t *e, GitBatch_t *b, const Oid_t *t,
                          OidList_t *cand, Tips_t *tips, Received_t *rv)
@@ -95,7 +98,10 @@ static void from_creator(const SharedEntry_t *e, GitBatch_t *b, const Oid_t *t,
 
     remote_seen_ref(&ref, e->id);
     if (git_batch_query(b, str_cstr(&ref), &seen) == GIT_OBJ_COMMIT) {
-        rv->creator_tip = seen;
+        if ((e->seen_url.len > 0U) &&
+            remote_same(str_cstr(&e->seen_url), str_cstr(&rv->creator))) {
+            rv->creator_tip = seen;
+        }
         if (!oid_eq(&seen, t)) {
             if (!oidlist_has(cand, &seen)) {
                 oidlist_add(cand, &seen);
@@ -214,6 +220,78 @@ exit:
     return err;
 }
 
+eGsErr_t receive_restore_chain(const SharedEntry_t *e, GitBatch_t *b, Oid_t *t)
+{
+    PeerTally_t tally = { 0U, 0U, 0U };
+    size_t n = str_zcount(&e->peers);
+    uint8_t *ok = xmalloc((n > 0U) ? n : 1U);
+    const char *rp[] = { "rev-parse", "--verify", "-q", NULL, NULL };
+    const char *p;
+    Str_t ref = STR_INIT;
+    Str_t src = STR_INIT;
+    Str_t del = STR_INIT;
+    Str_t out = STR_INIT;
+    Oid_t tip;
+    size_t k;
+    int found = 0;
+    eGsErr_t err = GS_ERR_GIT;
+
+    /* 1. L'ultima versione vista in remoto: nessuna rete. Il suo tree dice
+     * anche il creatore, quindi il prossimo pull sa dove andare. */
+    remote_seen_ref(&ref, e->id);
+    if (git_batch_query(b, str_cstr(&ref), &tip) == GIT_OBJ_COMMIT) {
+        found = 1;
+        if (e->seen_url.len > 0U) {
+            str_add(&src, str_cstr(&e->seen_url));
+        } else if ((remote_creator_url(b, &tip, &src) != GS_OK) ||
+                   (src.len == 0U)) {
+            str_reset(&src);
+            str_add(&src, str_cstr(&ref));
+        } else {
+            /* URL del creatore */
+        }
+    }
+    /* 2. I peer locali: il primo che ha la catena. */
+    if ((found == 0) && (n > 0U)) {
+        peers_fetch(str_cstr(&e->path), e->id, &e->peers, ok, &tally);
+        for (k = 0U, p = str_znext(&e->peers, NULL); k < n;
+             k++, p = str_znext(&e->peers, p)) {
+            if (ok[k] == 0U) {
+                continue;
+            }
+            peers_incoming_ref(&ref, e->id, (unsigned)k);
+            str_addz(&del, str_cstr(&ref));
+            rp[3] = str_cstr(&ref);
+            if ((found == 0) && (git_run(rp, PROC_STDERR_NULL, &out) == GS_OK) &&
+                oid_from_hex(&tip, out.buf, out.len)) {
+                found = 1;
+                str_add(&src, p);
+            }
+        }
+    }
+    if (found != 0) {
+        chain_ref(&ref, e->id);
+        err = git_update_ref(str_cstr(&ref), &tip, NULL, "git shared: chain restored");
+    }
+    if (del.len > 0U) {
+        (void)git_delete_refs(&del);
+    }
+    if (err == GS_OK) {
+        msg_warning(MSG_WARN_CHAIN_RESTORED, str_cstr(&e->path), str_cstr(&src));
+        *t = tip;
+        /* Il cat-file aperto ha gia' visto la ref mancare e non la
+         * rileggerebbe: si riapre. */
+        git_batch_close(b);
+        err = git_batch_open(b);
+    }
+    str_free(&out);
+    str_free(&del);
+    str_free(&src);
+    str_free(&ref);
+    free(ok);
+    return err;
+}
+
 eGsErr_t receive_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
                        int all, Received_t *rv)
 {
@@ -238,8 +316,9 @@ eGsErr_t receive_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     str_reset(&rv->creator);
 
     chain_ref(&ref, e->id);
-    if (git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) {
-        err = GS_ERR_GIT;
+    if ((git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) &&
+        (receive_restore_chain(e, b, &t) != GS_OK)) {
+        err = GS_ERR_GIT; /* B-51: nessuno ha la catena */
         goto exit;
     }
     inbox_read(r, e->id, &in);

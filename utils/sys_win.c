@@ -85,6 +85,17 @@ char *sys_getenv(const char *name)
     return value;
 }
 
+int sys_setenv(const char *name, const char *value)
+{
+    wchar_t *wname = win_utf8_to_wide(name);
+    wchar_t *wvalue = win_utf8_to_wide(value);
+    int rc = (SetEnvironmentVariableW(wname, wvalue) != 0) ? 0 : -1;
+
+    free(wname);
+    free(wvalue);
+    return rc;
+}
+
 FILE *sys_fopen(const char *path, const char *mode)
 {
     wchar_t *wpath = win_utf8_to_wide(path);

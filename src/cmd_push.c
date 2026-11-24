@@ -29,6 +29,7 @@
 #include "cmd.h"
 #include "cmd_common.h"
 #include "mem.h"
+#include "receive.h"
 #include "remote.h"
 
 /*
@@ -56,7 +57,19 @@ static int become_creator(const Repo_t *r, const SharedEntry_t *e,
         msg_error(MSG_ERR_PUBLISH, label);
         goto exit;
     }
-    if (remote_push(str_cstr(url), e->id, &v) != REMOTE_PUSH_OK) {
+    switch (remote_push(str_cstr(url), e->id, &v)) {
+    case REMOTE_PUSH_OK:
+        break;
+    case REMOTE_PUSH_NEWER:
+        /* P-03 (D-112): un primo push riuscito a cui e' mancato
+         * l'update-ref ha lasciato la versione sul remoto: si riconosce e
+         * si prende quella, invece di ricrearla con un'altra data. */
+        if (remote_find_own(b, str_cstr(url), e->id, t, &creator, &v)) {
+            break;
+        }
+        msg_error(MSG_ERR_CREATOR_PUSH, label, str_cstr(url));
+        goto exit;
+    default:
         msg_error(MSG_ERR_CREATOR_PUSH, label, str_cstr(url));
         goto exit;
     }
@@ -69,7 +82,9 @@ static int become_creator(const Repo_t *r, const SharedEntry_t *e,
         goto exit;
     }
     remote_seen_ref(&ref, e->id);
-    (void)git_set_ref(str_cstr(&ref), &v, "git shared: push");
+    if (git_set_ref(str_cstr(&ref), &v, "git shared: push") == GS_OK) {
+        (void)remote_seen_write(e->id, str_cstr(url), NULL, NULL);
+    }
     printf(msg(MSG_PUSH_CREATOR_NEW), label, str_cstr(url));
     putchar('\n');
     rc = cmd_publish_entry(r, e, b, NULL, &v); /* avviso ai peer locali */
@@ -94,7 +109,7 @@ static void push_copies(const Repo_t *r, const unsigned char *sel,
     size_t m = 0U;
 
     for (i = 0U; (i < n) && (own->len > 0U); i++) {
-        if ((sel[i] != 0U) && !str_eq(&urls[i], str_cstr(own))) {
+        if ((sel[i] != 0U) && !remote_same(str_cstr(&urls[i]), str_cstr(own))) {
             str_addz(&ids, r->v[i].id);
             v[m] = tips[i];
             idx[m++] = i;
@@ -151,7 +166,8 @@ static int push_creators(const Repo_t *r, const unsigned char *sel,
         str_reset(&ids);
         m = 0U;
         for (j = i; j < n; j++) {
-            if ((sel[j] == 0U) || (done[j] != 0U) || !str_eq(&urls[j], url)) {
+            if ((sel[j] == 0U) || (done[j] != 0U) ||
+                !remote_same(str_cstr(&urls[j]), url)) {
                 continue;
             }
             done[j] = 1U;
@@ -173,7 +189,9 @@ static int push_creators(const Repo_t *r, const unsigned char *sel,
             switch ((eRemotePush_t)res[k]) {
             case REMOTE_PUSH_OK:
                 remote_seen_ref(&ref, e->id);
-                (void)git_set_ref(str_cstr(&ref), &v[k], "git shared: push");
+                if (git_set_ref(str_cstr(&ref), &v[k], "git shared: push") == GS_OK) {
+                    (void)remote_seen_write(e->id, url, NULL, NULL);
+                }
                 printf(msg(MSG_PUSH_TO_CREATOR), label, url);
                 putchar('\n');
                 break;
@@ -250,17 +268,17 @@ int cmd_push(int argc, char **argv)
     }
     opened = 1;
     if ((remote == NULL) && (o.dashdash == 0U) && (npos == 1) &&
-        (remote_url(pos[0], &own) == GS_OK)) {
+        (remote_url(str_cstr(&repo.top), pos[0], &own) == GS_OK)) {
         remote = pos[0]; /* un remote con quel nome: non e' un path */
         npos = 0;
     } else if (remote != NULL) {
-        if (remote_url(remote, &own) != GS_OK) {
+        if (remote_url(str_cstr(&repo.top), remote, &own) != GS_OK) {
             msg_error(MSG_ERR_NO_REMOTE, remote);
             rc = GS_EXIT_ERROR;
             goto exit;
         }
     } else {
-        (void)remote_url("origin", &own);
+        (void)remote_url(str_cstr(&repo.top), "origin", &own);
     }
     path = (npos == 1) ? pos[0] : NULL;
 
@@ -286,7 +304,8 @@ int cmd_push(int argc, char **argv)
         e = &repo.v[i];
         label = str_cstr(&e->path);
         chain_ref(&ref, e->id);
-        if (git_batch_query(&batch, str_cstr(&ref), &tips[i]) != GIT_OBJ_COMMIT) {
+        if ((git_batch_query(&batch, str_cstr(&ref), &tips[i]) != GIT_OBJ_COMMIT) &&
+            (receive_restore_chain(e, &batch, &tips[i]) != GS_OK)) { /* B-51 */
             msg_error(MSG_ERR_CHAIN, str_cstr(&e->name));
             rc = GS_EXIT_ERROR;
             sel[i] = 0U;
@@ -295,8 +314,12 @@ int cmd_push(int argc, char **argv)
         if (remote_creator_url(&batch, &tips[i], &urls[i]) != GS_OK) {
             str_reset(&urls[i]);
         }
+        /* L'ultima versione vista conta solo se e' stata vista su questo
+         * creatore (D-112): altrimenti push non sa che cosa ha. */
         remote_seen_ref(&ref, e->id);
-        if (git_batch_query(&batch, str_cstr(&ref), &seen[i]) != GIT_OBJ_COMMIT) {
+        if ((git_batch_query(&batch, str_cstr(&ref), &seen[i]) != GIT_OBJ_COMMIT) ||
+            (e->seen_url.len == 0U) || (urls[i].len == 0U) ||
+            !remote_same(str_cstr(&e->seen_url), str_cstr(&urls[i]))) {
             seen[i].len = 0U;
         }
         if (urls[i].len > 0U) {

@@ -140,6 +140,7 @@ typedef enum {
     MSG_WARN_BRANCHES_GONE,  /* file, branch attivi, path */
     MSG_WARN_RELOCATE_NOT_MEMBER, /* file, path */
     MSG_WARN_COPY_FAILED,    /* file, url */
+    MSG_WARN_CHAIN_RESTORED, /* file, da dove (D-112, B-51) */
     MSG_HOOK_NOT_ALIGNED,    /* file, stato, comando */
     MSG_HOOK_ANNOUNCED,      /* file */
     MSG_HOOKS_INSTALLED,
@@ -237,6 +238,8 @@ typedef enum {
     MSG_STATUS_TO_MERGE,     /* repo che ha annunciato */
     MSG_STATUS_RENAMED,      /* path di prima */
     MSG_STATUS_CREATOR_UNREACHABLE, /* url */
+    MSG_STATUS_CHAIN_MISSING, /* path (D-112, B-51) */
+    MSG_CREATOR_SEEN,        /* data (D-112, B-53) */
     MSG_CREATOR_SAME,
     MSG_CREATOR_AHEAD,
     MSG_CREATOR_BEHIND,

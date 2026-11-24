@@ -14,6 +14,7 @@
 #include "path.h"
 #include "inbox.h"
 #include "peers.h"
+#include "receive.h"
 #include "sys.h"
 
 static const char gitshared_header[] =
@@ -675,7 +676,7 @@ int cmd_select(Repo_t *r, const char *user_path, unsigned char *sel)
     return ok;
 }
 
-void cmd_fetch_creators(const Repo_t *r, GitBatch_t *b, const unsigned char *sel,
+void cmd_fetch_creators(Repo_t *r, GitBatch_t *b, const unsigned char *sel,
                         unsigned char *res, Str_t *urls)
 {
     size_t n = r->n;
@@ -695,13 +696,16 @@ void cmd_fetch_creators(const Repo_t *r, GitBatch_t *b, const unsigned char *sel
         if (sel[i] == 0U) {
             continue;
         }
+        /* Catena assente: prima si ricostruisce, senza rete (B-51). */
         chain_ref(&ref, r->v[i].id);
-        if ((git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) ||
+        if (((git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) &&
+             (receive_restore_chain(&r->v[i], b, &t) != GS_OK)) ||
             (remote_creator_url(b, &t, &urls[i]) != GS_OK)) {
             str_reset(&urls[i]);
         }
     }
-    /* Un fetch per creatore: le voci con lo stesso URL vanno insieme. */
+    /* Un fetch per creatore: le voci con lo stesso URL, anche scritto in
+     * un'altra forma (D-112, P-04), vanno insieme. */
     for (i = 0U; i < n; i++) {
         if ((sel[i] == 0U) || (urls[i].len == 0U) || (res[i] != CMD_NO_CREATOR)) {
             continue;
@@ -709,8 +713,8 @@ void cmd_fetch_creators(const Repo_t *r, GitBatch_t *b, const unsigned char *sel
         str_reset(&ids);
         m = 0U;
         for (j = i; j < n; j++) {
-            if ((sel[j] != 0U) && (res[j] == CMD_NO_CREATOR) &&
-                str_eq(&urls[j], str_cstr(&urls[i]))) {
+            if ((sel[j] != 0U) && (res[j] == CMD_NO_CREATOR) && (urls[j].len > 0U) &&
+                remote_same(str_cstr(&urls[j]), str_cstr(&urls[i]))) {
                 str_addz(&ids, r->v[j].id);
                 idx[m++] = j;
             }
@@ -718,6 +722,13 @@ void cmd_fetch_creators(const Repo_t *r, GitBatch_t *b, const unsigned char *sel
         remote_fetch_seen(str_cstr(&urls[i]), &ids, got);
         for (k = 0U; k < m; k++) {
             res[idx[k]] = got[k];
+            /* Vista adesso su questo URL (D-112): la data per status e il
+             * confronto valgono solo per l'URL su cui e' stata vista. */
+            if (got[k] == (uint8_t)REMOTE_GOT) {
+                (void)remote_seen_write(r->v[idx[k]].id, str_cstr(&urls[i]),
+                                        &r->v[idx[k]].seen_url,
+                                        &r->v[idx[k]].seen_at);
+            }
         }
     }
     str_free(&ids);

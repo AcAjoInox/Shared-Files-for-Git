@@ -17,10 +17,16 @@ DESCRIPTION
 
     For a file shared through a remote (beta) a "creator" line
     shows the repository the versions come from and, in brackets, how
-    the latest version here compares with the last one seen there: same
+    the latest version here compares with the last one seen there, and
+    when it was seen ("same version, seen 2026-11-24 10:32"): same
     version; ahead (push); newer version on the creator (update);
     diverged (update, then push); not checked yet (status --remote).
     Without --remote, status never uses the network.
+
+    If the version chain of a file is missing here, status rebuilds it
+    from the last version seen on the creator, without the network, or
+    from a local peer, and says so. If nobody has it, a note says to
+    unlink the file and link it again.
 
     aligned               you have the latest version: nothing to do
     new version to apply  a peer published a newer one: update

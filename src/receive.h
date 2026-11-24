@@ -52,4 +52,14 @@ void received_free(Received_t *rv);
 eGsErr_t receive_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
                        int all, Received_t *rv);
 
+/*
+ * Catena locale assente (D-112, reportIdea B-51): refs/shared/<id> si
+ * ricrea dall'ultima versione vista in remoto (refs/shared-authority/<id>,
+ * senza rete), altrimenti dal primo peer locale che l'ha. Un avviso dice
+ * da dove. GS_OK e T in *t se ricreata; il cat-file b viene riaperto, perche'
+ * quello aperto non vedrebbe la ref nuova. GS_ERR_GIT se nessuno l'ha.
+ * receive_entry la chiama da se'.
+ */
+eGsErr_t receive_restore_chain(const SharedEntry_t *e, GitBatch_t *b, Oid_t *t);
+
 #endif /* GS_RECEIVE_H */

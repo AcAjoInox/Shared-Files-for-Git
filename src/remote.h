@@ -8,9 +8,14 @@
  * la sua ref solo in fast-forward.
  *
  * La rete solo su richiesta (D-110): push e pull, status --remote, link
- * <url> <id>. L'ultima versione vista del creatore resta in
- * refs/shared-creator/<id>, come refs/remotes/: i comandi locali la usano
- * come la versione di un peer.
+ * <url> <id>. L'ultima versione vista resta in refs/shared-authority/<id>,
+ * come refs/remotes/: i comandi locali la usano come la versione di un
+ * peer. Da quale URL e quando e' stata vista lo dice la chiave
+ * shared.<id>.authoritySeen (D-112): il confronto con T vale solo se
+ * quell'URL e' l'autorita' di T (oggi il creatore).
+ *
+ * Nei comandi di rete GIT_TERMINAL_PROMPT=0 (D-112, P-07): un push senza
+ * permessi e' un rifiuto, non una richiesta di password.
  *
  * Il trasporto e' quello di git (push, fetch, credenziali, permessi):
  * nessun server nostro. Nessun dato locale va in remoto: solo la catena.
@@ -36,14 +41,29 @@ typedef enum {
 
 /* Esito della lettura di una catena dal creatore. */
 typedef enum {
-    REMOTE_GOT = 0,       /* refs/shared-creator/<id> aggiornata */
+    REMOTE_GOT = 0,       /* refs/shared-authority/<id> aggiornata */
     REMOTE_MISSING,       /* il creatore non ha refs/shared/<id> */
     REMOTE_UNREACHABLE    /* repo irraggiungibile o fetch fallito */
 } eRemoteFetch_t;
 
-/* URL del remote `name` della repo corrente (git remote get-url).
- * GS_ERR_GIT se la repo non ha quel remote. */
-eGsErr_t remote_url(const char *name, Str_t *url);
+/*
+ * URL del remote `name` della repo corrente (git remote get-url).
+ * GS_ERR_GIT se la repo non ha quel remote. Un path locale relativo
+ * (git remote add origin ../srv.git) diventa assoluto rispetto a `top`,
+ * la radice della repo: scritto nella catena, varrebbe per le altre repo
+ * da un'altra cartella (D-112, P-08).
+ */
+eGsErr_t remote_url(const char *top, const char *name, Str_t *url);
+
+/*
+ * 1 se a e b sono la stessa repo remota (D-112, P-04): si confrontano in
+ * forma normale. Rete: host senza utente ne' porta, path senza "/" e
+ * ".git" finali, tutto in minuscolo, quindi https://github.com/luca/A,
+ * git@github.com:luca/A.git e ssh://git@github.com/luca/A sono uguali.
+ * Path locale (anche file://): separatore '/', senza "/" finale; su
+ * Windows senza distinzione di maiuscole.
+ */
+int remote_same(const char *a, const char *b);
 
 /*
  * URL del creatore della versione `version` (voce "creator" del suo tree):
@@ -57,7 +77,7 @@ eGsErr_t remote_url_blob(const char *url, Oid_t *blob);
 
 /*
  * Catene degli ID dell'elenco compatto `ids` dalla repo remota, in
- * refs/shared-creator/<id> (D-110): un fetch per tutte, con i refspec
+ * refs/shared-authority/<id> (D-110, D-112): un fetch per tutte, con i refspec
  * sullo stdin. Se fallisce, ls-remote dice quali mancano e il fetch si
  * ripete per le altre. res[k]: esito dell'ID k.
  */
@@ -79,7 +99,32 @@ eRemotePush_t remote_push(const char *url, const char *id, const Oid_t *v);
  * (link <url> <id>, D-106). */
 eGsErr_t remote_fetch(const char *url, const char *id, const char *ref);
 
-/* Ultima versione vista del creatore: refs/shared-creator/<id>. */
+/* Ultima versione vista: refs/shared-authority/<id> (D-112; fino a
+ * v0.8.0 refs/shared-creator/<id>, che prune toglie). */
 void remote_seen_ref(Str_t *ref, const char *id);
+
+/*
+ * Scrive shared.<id>.authoritySeen = "<secondi dal 1970> <url>": la
+ * versione in refs/shared-authority/<id> e' stata vista su `url` adesso
+ * (D-112). Una sola chiave, quindi URL e data cambiano insieme. Se
+ * mem_url / mem_at non sono NULL vi copia gli stessi valori, per chi li
+ * usa nello stesso processo.
+ */
+eGsErr_t remote_seen_write(const char *id, const char *url, Str_t *mem_url,
+                           unsigned long *mem_at);
+
+/* Legge il valore di authoritySeen. 0 se non ha la forma giusta. */
+int remote_seen_parse(const char *value, Str_t *url, unsigned long *at);
+
+/*
+ * P-03 (D-112): dopo un push riuscito e un update-ref fallito la versione
+ * e' sul remoto ma non qui, e un nuovo primo push la ricreerebbe con
+ * un'altra data, rifiutata. Legge la punta di refs/shared/<id> su `url` e
+ * la riconosce come la propria se ha un solo genitore, T, lo stesso
+ * contenuto di T e la voce creator `creator` (oid del blob). 1 e la
+ * versione in *v se riconosciuta.
+ */
+int remote_find_own(GitBatch_t *b, const char *url, const char *id,
+                    const Oid_t *t, const Oid_t *creator, Oid_t *v);
 
 #endif /* GS_REMOTE_H */

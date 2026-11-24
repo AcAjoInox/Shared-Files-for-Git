@@ -47,10 +47,16 @@ DESCRIZIONE
     Per un file condiviso attraverso un remoto (beta) una riga
     "creator" mostra il repository da cui arrivano le versioni e, tra
     parentesi, com'e' l'ultima versione di qui rispetto all'ultima vista
-    li': same version (uguale); ahead (avanti: push); newer version on
-    the creator (piu' nuova sul creatore: update); diverged (divergente:
-    update, poi push); not checked yet (mai vista: status --remote).
-    Senza --remote, status non usa mai la rete.
+    li', e quando e' stata vista ("same version, seen 2026-11-24
+    10:32"): same version (uguale); ahead (avanti: push); newer version
+    on the creator (piu' nuova sul creatore: update); diverged
+    (divergente: update, poi push); not checked yet (mai vista: status
+    --remote). Senza --remote, status non usa mai la rete.
+
+    Se qui manca la catena delle versioni di un file, status la
+    ricostruisce dall'ultima versione vista sul creatore, senza rete, o
+    da un peer locale, e lo dice. Se nessuno ce l'ha, una nota dice di
+    scollegare il file (unlink) e collegarlo di nuovo.
 
 OPZIONI
     --peers

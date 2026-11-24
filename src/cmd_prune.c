@@ -15,7 +15,7 @@
  *
  * Senza <path> toglie anche le ref di lavoro rimaste senza sezione locale
  * (refs/shared/<id>, refs/shared-incoming/<id>/<k>, refs/shared-merge/<id>,
- * refs/shared-creator/<id>):
+ * refs/shared-authority/<id>, e refs/shared-creator/<id> di v0.8.0 sempre, D-112):
  * reportIdea B-27, C-22. E gli avvisi rimasti senza sezione (D-099).
  */
 #include <stdio.h>
@@ -110,14 +110,19 @@ static unsigned prune_entry(const Repo_t *r, const SharedEntry_t *e, int dry,
     return count;
 }
 
+/* Namespace delle ref di lavoro. L'ultimo e' quello di v0.8.0 per
+ * l'ultima versione vista, sostituito da refs/shared-authority/ (D-112). */
+#define OLD_SEEN_PREFIX "refs/shared-creator/"
+
 /* ID di una ref di lavoro: refs/shared/<id>, refs/shared-merge/<id>,
- * refs/shared-incoming/<id>/<k>, refs/shared-creator/<id>. 0 se il nome
- * non ha questa forma. */
+ * refs/shared-incoming/<id>/<k>, refs/shared-authority/<id>,
+ * refs/shared-creator/<id>. 0 se il nome non ha questa forma. */
 static int ref_id(const char *ref, char id[GS_ID_HEX_LEN + 1U])
 {
     static const char *const prefix[] = { "refs/shared/", "refs/shared-merge/",
                                           "refs/shared-incoming/",
-                                          "refs/shared-creator/" };
+                                          "refs/shared-authority/",
+                                          OLD_SEEN_PREFIX };
     const char *rest = NULL;
     size_t i;
     size_t len;
@@ -143,6 +148,7 @@ static unsigned prune_refs(Repo_t *r, int dry, int *rc)
     static const char *const args[] = { "for-each-ref", "--format=%(refname)",
                                         "refs/shared", "refs/shared-merge",
                                         "refs/shared-incoming",
+                                        "refs/shared-authority",
                                         "refs/shared-creator", NULL };
     const SharedEntry_t *e;
     Str_t lines = STR_INIT;
@@ -166,7 +172,10 @@ static unsigned prune_refs(Repo_t *r, int dry, int *rc)
         }
         if (ref_id(line, id)) {
             e = repo_find_id(r, id);
-            if ((e == NULL) || !e->in_config) {
+            /* il namespace vecchio si toglie anche con la sezione: nessuno
+             * lo legge piu' (D-112) */
+            if ((e == NULL) || !e->in_config ||
+                (strncmp(line, OLD_SEEN_PREFIX, sizeof OLD_SEEN_PREFIX - 1U) == 0)) {
                 str_addz(&orphans, line);
             }
         }

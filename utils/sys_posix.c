@@ -25,6 +25,11 @@ char *sys_getenv(const char *name)
     return (value != NULL) ? xstrdup(value) : NULL;
 }
 
+int sys_setenv(const char *name, const char *value)
+{
+    return setenv(name, value, 1);
+}
+
 void sys_init(int *argc, char ***argv)
 {
     (void)argc;

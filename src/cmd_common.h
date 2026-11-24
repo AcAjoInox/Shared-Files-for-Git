@@ -161,7 +161,7 @@ int cmd_select(Repo_t *r, const char *user_path, unsigned char *sel);
  * dal chiamante. Dopo, il cat-file va riaperto: deve vedere le ref nuove.
  */
 #define CMD_NO_CREATOR 0xFFU
-void cmd_fetch_creators(const Repo_t *r, GitBatch_t *b, const unsigned char *sel,
+void cmd_fetch_creators(Repo_t *r, GitBatch_t *b, const unsigned char *sel,
                         unsigned char *res, Str_t *urls);
 
 /*

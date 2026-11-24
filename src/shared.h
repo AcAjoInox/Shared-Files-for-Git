@@ -34,6 +34,9 @@ typedef struct {
     Str_t pending_branch; /* attesa: branch del comando ("" = HEAD staccata, D-077) */
     Str_t pending_path;   /* attesa: path del file, solo per i messaggi (D-077) */
     Str_t pending_commit; /* unlink in attesa: HEAD al comando (D-081) */
+    Str_t seen_url;    /* authoritySeen: URL su cui e' stata vista
+                        * refs/shared-authority/<id> ("" = mai, D-112) */
+    unsigned long seen_at; /* authoritySeen: quando, secondi dal 1970 */
     char id[GS_ID_HEX_LEN + 1U]; /* "" se in .gitshared non e' valido */
     unsigned in_gitshared : 1U; /* sezione in .gitshared (working tree) */
     unsigned in_config : 1U;    /* sezione [shared "<id>"] in .git/config */

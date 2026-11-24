@@ -31,6 +31,13 @@ DESCRIZIONE
     <remote> se questo repository ha un remote con quel nome; dopo '--'
     e' sempre un path.
 
+    push non chiede mai la password: usa le credenziali che git ha gia'
+    (credential helper, chiavi ssh). Se mancano, la versione non e'
+    accettata; un normale 'git fetch' o 'git push' verso quel remote le
+    imposta. Un remote dato come path relativo si scrive nella catena
+    come path assoluto. Lo stesso remote scritto in un'altra forma
+    (https:// o git@, con o senza .git) vale come lo stesso.
+
 ESEMPI
     git shared push origin common.h   # origin diventa il creatore
     git commit -am "Corretto il timeout in common.h"

@@ -19,7 +19,8 @@ DESCRIZIONE
 
     Se il creatore non risponde, o non ha piu' il file, quel file non si
     aggiorna e pull fallisce; gli altri file proseguono. I file senza
-    creatore vengono solo aggiornati, come con update.
+    creatore vengono solo aggiornati, come con update. pull non chiede
+    mai la password: usa le credenziali che git ha gia'.
 
     Per concludere un'unione o rinunciarvi (--ours, --theirs, --abort)
     non serve la rete: si usa update.
