@@ -49,6 +49,20 @@ git shared update
 git commit -m "aggiorno common.h"
 ```
 
+```mermaid
+sequenceDiagram
+    participant A as Progetto A
+    participant B as Progetto B
+    Note over A: git shared set include/common.h<br/>git commit
+    B->>A: git shared link
+    A-->>B: storia di common.h
+    Note over B: git commit
+    Note over A,B: A e B sono peer
+    Note over B: modifico common.h<br/>git commit
+    B->>A: git shared publish (avviso)
+    Note over A: git shared status: versione nuova da applicare<br/>git shared update<br/>git commit
+```
+
 ## Come funziona
 
 - **Nessuna repo principale.** Tutte le repo che usano il file (i *peer*) sono alla pari, e tutte possono modificarlo. Non c'è un server: le repo si parlano direttamente.
@@ -106,6 +120,19 @@ Il flusso principale funziona: su GitHub `push`, `pull` e `status --remote` funz
 
 Ogni file ha un **creatore**: la repository remota del suo primo `git shared push`. Il suo URL sta nella storia delle versioni del file, quindi chi ha il file sa da dove arrivano le versioni nuove. Si inviano e si scaricano solo quella storia, mai il progetto.
 
+```mermaid
+flowchart LR
+    C[("Creatore<br/>github.com/tu/A<br/>storia ufficiale di common.h")]
+    A["Repository A<br/>può scrivere"]
+    B["Repository B<br/>può scrivere"]
+    R["Repository R<br/>solo lettura"]
+    A -- "git shared push" --> C
+    B -- "git shared push" --> C
+    C -- "git shared pull" --> A
+    C -- "git shared pull" --> B
+    C -- "git shared pull" --> R
+```
+
 Come in git, la rete si usa solo quando la chiedi: `publish`, `update` e `status` restano locali; `push` invia al creatore, `pull` riceve da lui e applica, `status --remote` controlla se c'è qualcosa di nuovo.
 
 ```bash
@@ -127,7 +154,27 @@ git shared pull -c
 
 Chi non può scrivere sul creatore tiene la sua versione come proposta. Non c'è ancora: collegare per nome, ricevere una proposta con un comando, le firme.
 
-Il creatore non cambia mai. Se non c'è più o si è spostato, `git shared crown <remote> <file>` dà al file un **sovrano**: il remoto da cui ora arrivano le versioni e verso cui vanno. Un cambio di autorità non è mai automatico: chi lo riceve lo accetta o lo rifiuta con `git shared crown --accept` o `--reject`, e `git shared crown --restore` torna alla linea del creatore.
+Il **creatore** è la repository remota da cui tutto è iniziato, e non cambia mai. Può capitare però che quella repository venga cancellata o spostata, o che tu non riesca più a raggiungerla. Non si perde nulla: ogni repository che usa il file conserva tutta la storia. Basta eleggere un nuovo punto di riferimento, che qui si chiama **sovrano**.
+
+Chi può scrivere su un'altra repository remota, anche creata apposta, la nomina sovrano con il comando `git shared crown <remote> <file>`. Gli altri lanciano lo stesso comando con l'URL del sovrano: per loro `crown` si limita a seguirlo, e non servono permessi di scrittura. Da lì in poi `push` e `pull` passano dal sovrano. Se il vecchio remoto è stato solo spostato e risponde ancora, `crown` avvisa anche lui, così chi lo segue lo scopre.
+
+Il cambio non avviene mai da solo, perché un programma non sa distinguere un remoto sparito da uno che in questo momento non risponde: è sempre l'utente a decidere. Se il cambio ti arriva da un peer locale, `git shared status` lo segnala, e tu lo accetti con `git shared crown --accept` o lo rifiuti con `--reject`. Se il creatore torna raggiungibile, `git shared crown --restore` riporta l'autorità a lui.
+
+```mermaid
+sequenceDiagram
+    participant C as Creatore github.com/tu/A
+    participant S as Remoto nuovo github.com/tu/A2
+    participant X as Repository X
+    participant Y as Repository Y
+    Note over C: eliminato: pull e push falliscono
+    Note over X,Y: hanno ancora tutta la storia
+    X->>S: git shared crown github.com/tu/A2 common.h
+    Note over S: sovrano: le versioni ora arrivano da qui e vanno qui
+    Y->>S: git shared crown github.com/tu/A2 common.h
+    Note over Y: lo segue, senza permessi di scrittura
+    X->>S: git shared push
+    S->>Y: git shared pull
+```
 
 ## Limiti della prima versione
 

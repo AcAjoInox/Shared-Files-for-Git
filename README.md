@@ -52,6 +52,20 @@ git shared update
 git commit -m "update common.h"
 ```
 
+```mermaid
+sequenceDiagram
+    participant A as Project A
+    participant B as Project B
+    Note over A: git shared set include/common.h<br/>git commit
+    B->>A: git shared link
+    A-->>B: history of common.h
+    Note over B: git commit
+    Note over A,B: A and B are peers
+    Note over B: change common.h<br/>git commit
+    B->>A: git shared publish (notice)
+    Note over A: git shared status: new version to apply<br/>git shared update<br/>git commit
+```
+
 ## How it works
 
 - **No main repository.** All the repositories that use the file (the *peers*) are equal, and all of them can change it. There is no server: the repositories talk to each other directly.
@@ -109,6 +123,19 @@ The main flow works: on GitHub `push`, `pull` and `status --remote` work and are
 
 Each file gets a **creator**: the remote repository of its first `git shared push`. Its URL is stored in the version history of the file, so whoever has the file knows where new versions come from. Only that history is pushed and fetched, never the project.
 
+```mermaid
+flowchart LR
+    C[("Creator<br/>github.com/you/A<br/>official history of common.h")]
+    A["Repository A<br/>can write"]
+    B["Repository B<br/>can write"]
+    R["Repository R<br/>read only"]
+    A -- "git shared push" --> C
+    B -- "git shared push" --> C
+    C -- "git shared pull" --> A
+    C -- "git shared pull" --> B
+    C -- "git shared pull" --> R
+```
+
 As in git, the network is used only when you ask: `publish`, `update` and `status` stay local; `push` sends to the creator, `pull` receives from it and applies, `status --remote` checks for something new.
 
 ```bash
@@ -130,7 +157,27 @@ git shared pull -c
 
 Who cannot write to the creator keeps their version as a proposal. Not there yet: linking by name, receiving a proposal with a command, signatures.
 
-The creator never changes. If it is gone or moved, `git shared crown <remote> <file>` gives the file a **sovereign**: the remote that its versions now come from and go to. A change of authority is never automatic: whoever receives it accepts or rejects it with `git shared crown --accept` or `--reject`, and `git shared crown --restore` goes back to the line of the creator.
+The **creator** is the remote repository where it all started, and it never changes. But that repository may get deleted or moved, or you may no longer be able to reach it. Nothing is lost: every repository that uses the file keeps its whole history. You just elect a new point of reference, which here is called a **sovereign**.
+
+Someone who can write to another remote repository, even one created for the purpose, makes it the sovereign with the command `git shared crown <remote> <file>`. The others run the same command with the URL of the sovereign: for them `crown` simply follows it, and no write permission is needed. From then on `push` and `pull` go through the sovereign. If the old remote was only moved and still answers, `crown` tells it too, so whoever follows it finds out.
+
+The switch never happens by itself, because a program cannot tell a remote that is gone from one that is down right now: the user always decides. If the change reaches you from a local peer, `git shared status` points it out, and you accept it with `git shared crown --accept` or refuse it with `--reject`. If the creator becomes reachable again, `git shared crown --restore` gives the authority back to it.
+
+```mermaid
+sequenceDiagram
+    participant C as Creator github.com/you/A
+    participant S as New remote github.com/you/A2
+    participant X as Repository X
+    participant Y as Repository Y
+    Note over C: deleted: pull and push fail
+    Note over X,Y: both still have the whole history
+    X->>S: git shared crown github.com/you/A2 common.h
+    Note over S: sovereign: versions now come from here and go here
+    Y->>S: git shared crown github.com/you/A2 common.h
+    Note over Y: follows it, no write permission needed
+    X->>S: git shared push
+    S->>Y: git shared pull
+```
 
 ## Limits of the first release
 
