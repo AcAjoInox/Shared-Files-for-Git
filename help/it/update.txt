@@ -80,5 +80,16 @@ OPZIONI
         versione non cambia. Senza <path>, tutti i file shared con
         un'unione in corso.
 
+NOTE
+    Fine riga: tutte le repo devono normalizzare il file allo stesso
+    modo. Se la sorgente lo committa con CRLF e questa repo ha
+    l'attributo 'text' o 'eol' per quel file, la versione appena
+    applicata risulta modificata, e committarla crea una versione nuova
+    che cambia ogni riga. Dai al file lo stesso attributo ovunque, per
+    esempio la riga '<path> text' nel .gitattributes.
+
+    Il bit di esecuzione non si condivide: il file si scrive sempre con
+    modo 100644.
+
 VEDI ANCHE
     git shared publish --help, git shared status --help

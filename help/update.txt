@@ -78,5 +78,16 @@ OPTIONS
         and the latest version does not change. Without <path>, every
         shared file with a merge in progress.
 
+NOTES
+    Line endings: every repository must normalize the file the same
+    way. If the source commits it with CRLF and this repository has the
+    'text' or 'eol' attribute for it, the version just applied looks
+    modified, and committing it makes a new version that changes every
+    line. Give the file the same attribute everywhere, for example the
+    line '<path> text' in .gitattributes.
+
+    The executable bit is not shared: the file is always written with
+    mode 100644.
+
 SEE ALSO
     git shared publish --help, git shared status --help
