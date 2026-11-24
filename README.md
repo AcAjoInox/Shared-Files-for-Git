@@ -134,7 +134,6 @@ The creator never changes. If it is gone or moved, `git shared crown <remote> <f
 
 ## Limits of the first release
 
-- Repositories on the same machine (Linux and Windows); remote repositories in beta.
 - Only single files, text or binary: no folders. A binary file is never merged: on a conflict you keep one of the two versions (`git shared update --ours` or `--theirs`).
 - At most 32 peers per file.
 - The extension must be installed on every machine that publishes or applies versions. Anyone without it uses the repository as usual.
