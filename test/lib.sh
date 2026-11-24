@@ -19,6 +19,12 @@ trap 'rm -rf "$TRASH"' EXIT
 
 # Ambiente isolato e riproducibile.
 HOME="$TRASH"
+# git non risale oltre la cartella di $TRASH: se TMPDIR sta dentro una repo,
+# le cartelle "fuori da una repo" dei test restano tali. Su Windows il path
+# in forma C:/..., quella che legge git.exe (pwd -W, solo in MSYS).
+GIT_CEILING_DIRECTORIES=$(cd "$(dirname "$TRASH")" &&
+	{ pwd -W 2>/dev/null || pwd; })
+export GIT_CEILING_DIRECTORIES
 GIT_CONFIG_NOSYSTEM=1
 GIT_AUTHOR_NAME="Test Author"
 GIT_AUTHOR_EMAIL="author@example.com"
