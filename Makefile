@@ -1,7 +1,9 @@
 # git shared - build
 #
 #   make            compila build/git-shared (build/git-shared.exe su Windows)
-#   make test       compila ed esegue i test in test/ (serve sh: Git Bash)
+#   make test       compila ed esegue i test in test/ (serve sh: Git Bash),
+#                   JOBS alla volta: di default meta' dei processori,
+#                   make test JOBS=1 per uno alla volta
 #   make doc        pagina HTML e man page di "git shared --help"
 #   make install    copia l'eseguibile in $(PREFIX) e installa la pagina di
 #                   "git shared --help" (HTML in git --html-path su Windows,

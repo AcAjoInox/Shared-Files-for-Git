@@ -21,9 +21,12 @@ The file stays a regular file: anyone using the repository without the extension
 make            # build
 make install    # copy git-shared to ~/bin (Windows: %USERPROFILE%\bin)
 git shared -h   # check
+make test       # run the test suite (on Windows, from Git Bash)
 ```
 
 If `git shared` is not found, add that folder to your `PATH`. On Windows, to also get `git shared --help`, run `make install` as administrator.
+
+The tests run several files at a time: by default half of the logical processors of the machine. Set `JOBS` to choose another number, for example `make test JOBS=4`, or `make test JOBS=1` to run them one at a time.
 
 ## Two-minute tour
 
