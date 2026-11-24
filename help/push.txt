@@ -26,6 +26,10 @@ DESCRIPTION
     'git shared pull', commit and push again. If you cannot write there,
     the version stays here (and in your remote) as a proposal.
 
+    If the file has a sovereign (git shared crown), push sends to the
+    sovereign instead: it is the authority of the file. The creator
+    never changes.
+
     Without <path>, all the files that have a creator, with one push for
     each creator; files without a creator are skipped. The first
     argument is a <remote> when this repository has a remote with that
@@ -46,4 +50,4 @@ EXAMPLES
 
 SEE ALSO
     git shared pull --help, git shared publish --help,
-    git shared status --help
+    git shared status --help, git shared crown --help

@@ -86,6 +86,8 @@ typedef enum {
 typedef struct {
     Proc_t p;
     Str_t line;
+    unsigned long size; /* dimensione dell'oggetto dell'ultima domanda; 0 se
+                         * mancava */
 } GitBatch_t;
 
 eGsErr_t git_batch_open(GitBatch_t *b);

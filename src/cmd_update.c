@@ -122,10 +122,11 @@ static eStep_t merge_step(const Repo_t *r, const SharedEntry_t *e,
     const char *top = str_cstr(&r->top);
     const char *path = str_cstr(&e->path);
     Str_t ref = STR_INIT;
+    AuthBlobs_t auth;
     Oid_t empty;
-    Oid_t creator;
     Oid_t v;
     int conflict = 0;
+    int auth_conflict = 0;
     eGsErr_t err = GS_OK;
     eStep_t step = STEP_ERROR;
 
@@ -174,11 +175,19 @@ static eStep_t merge_step(const Repo_t *r, const SharedEntry_t *e,
     /* 3. Unione pulita: la versione nasce prima del commit, cosi' dopo lo
      * stato e' "da committare" senza altri dati salvati. */
     if ((p2 != NULL) || !oid_eq(result, tip_blob)) {
-        /* Il creatore passa alla versione di unione: quello di T, o della
-         * versione unita se T non l'ha ancora (D-103). */
-        chain_creator(b, tip, p2, &creator);
+        /* Creatore e sovrani: unione a 3 vie della voce autorita' (D-111).
+         * Cambiata in modo diverso da entrambi i lati: vince la versione
+         * del peer solo se la sua autorita' e' stata accettata, come
+         * l'utente ha scelto (REQ-F-030); altrimenti resta quella di T. */
+        if (auth_merge(b, tip, p2, &auth, &auth_conflict) != GS_OK) {
+            msg_error(MSG_ERR_MERGE, path);
+            goto exit;
+        }
+        if ((auth_conflict != 0) && receive_auth_accepted(e, b, p2)) {
+            auth_blobs(b, p2, &auth);
+        }
         chain_ref(&ref, e->id);
-        if ((chain_commit(result, tip, p2, &creator, str_cstr(&e->name), &v) != GS_OK) ||
+        if ((chain_commit(result, tip, p2, &auth, str_cstr(&e->name), &v) != GS_OK) ||
             (git_update_ref(str_cstr(&ref), &v, tip, "git shared: merge") != GS_OK)) {
             /* es. un peer ha inviato una versione nel frattempo: il
              * risultato resta nell'index, il prossimo update riparte */
@@ -349,6 +358,9 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         printf(msg(MSG_UPD_RECEIVED), label);
         putchar('\n');
     }
+    /* Un cambio di autorita' ricevuto si decide prima (D-111): T si e'
+     * fermata all'ultima versione con l'autorita' di prima. */
+    cmd_print_auth_changes(e, &rv, 1);
     if (!settle_merge(r, e, b, o, touched, rc, batch_ok)) {
         go_on = (*batch_ok != 0);
         goto exit;

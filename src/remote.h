@@ -25,6 +25,7 @@
 
 #include <stdint.h>
 
+#include "auth.h"
 #include "err.h"
 #include "git.h"
 #include "str.h"
@@ -47,6 +48,13 @@ typedef enum {
 } eRemoteFetch_t;
 
 /*
+ * 1 se un URL scritto da altri (nella catena) si puo' usare (D-107): non
+ * vuoto, al piu' GS_PATH_MAX caratteri, senza '-' in testa (diventerebbe
+ * un'opzione di git) ne' caratteri di controllo.
+ */
+int remote_url_ok(const char *url);
+
+/*
  * URL del remote `name` della repo corrente (git remote get-url).
  * GS_ERR_GIT se la repo non ha quel remote. Un path locale relativo
  * (git remote add origin ../srv.git) diventa assoluto rispetto a `top`,
@@ -54,6 +62,17 @@ typedef enum {
  * da un'altra cartella (D-112, P-08).
  */
 eGsErr_t remote_url(const char *top, const char *name, Str_t *url);
+
+/*
+ * URL scritto dall'utente (crown, D-111): il nome di un remote della repo
+ * (come remote_url), altrimenti l'URL stesso; un path locale relativo
+ * diventa assoluto rispetto a `cwd`, la cartella da cui e' stato lanciato
+ * il comando. Una parola senza separatori e' un remote che non c'e', non
+ * un path (per una cartella: "./x"). GS_ERR_FORMAT se l'URL non si puo'
+ * usare (remote_url_ok).
+ */
+eGsErr_t remote_arg_url(const char *top, const char *cwd, const char *arg,
+                        Str_t *url);
 
 /*
  * 1 se a e b sono la stessa repo remota (D-112, P-04): si confrontano in
@@ -120,11 +139,13 @@ int remote_seen_parse(const char *value, Str_t *url, unsigned long *at);
  * P-03 (D-112): dopo un push riuscito e un update-ref fallito la versione
  * e' sul remoto ma non qui, e un nuovo primo push la ricreerebbe con
  * un'altra data, rifiutata. Legge la punta di refs/shared/<id> su `url` e
- * la riconosce come la propria se ha un solo genitore, T, lo stesso
- * contenuto di T e la voce creator `creator` (oid del blob). 1 e la
- * versione in *v se riconosciuta.
+ * la riconosce come la propria se ha per genitori T e p2 (NULL: solo T),
+ * lo stesso contenuto di T e le voci `auth` (creator e sovereigns). Vale
+ * anche per insediare un sovrano (D-111), dove p2 e' la punta dell'URL.
+ * 1 e la versione in *v se riconosciuta.
  */
 int remote_find_own(GitBatch_t *b, const char *url, const char *id,
-                    const Oid_t *t, const Oid_t *creator, Oid_t *v);
+                    const Oid_t *t, const Oid_t *p2, const AuthBlobs_t *auth,
+                    Oid_t *v);
 
 #endif /* GS_REMOTE_H */

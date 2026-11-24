@@ -93,9 +93,9 @@ int cmd_publish(int argc, char **argv)
                                   (st == STATE_TO_PUBLISH) ? &si : NULL,
                                   &tip) != GS_EXIT_OK) {
                 rc = GS_EXIT_ERROR;
-            } else if ((rv.creator.len > 0U) && !oid_eq(&rv.creator_tip, &tip)) {
+            } else if ((rv.authority.len > 0U) && !oid_eq(&rv.auth_tip, &tip)) {
                 /* In remoto la versione non va da sola (D-110). */
-                printf(msg(MSG_PUB_NOT_ON_CREATOR), label);
+                printf(msg(MSG_PUB_NOT_ON_CREATOR), label, auth_role(rv.sovereign));
                 putchar('\n');
             } else {
                 /* pubblicato */

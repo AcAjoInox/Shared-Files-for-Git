@@ -163,6 +163,7 @@ static int remote_source(GitBatch_t *b, const char *url, const char *id,
     Str_t ref = STR_INIT;
     Str_t creator = STR_INIT;
     Oid_t tip;
+    int sovereign = 0;
     int rc = GS_EXIT_ERROR;
 
     peers_incoming_ref(&ref, id, 0U);
@@ -177,6 +178,13 @@ static int remote_source(GitBatch_t *b, const char *url, const char *id,
         str_addz(&creator, str_cstr(&ref));
         (void)git_delete_refs(&creator);
         goto exit;
+    }
+    /* Da una copia (D-111): chi governa il file, perche' il file seguira'
+     * l'autorita' scritta nella catena, non l'URL dato. */
+    if ((auth_target(b, &tip, &creator, &sovereign) == GS_OK) && (creator.len > 0U) &&
+        !remote_same(str_cstr(&creator), url)) {
+        printf(msg(MSG_LINK_COPY), url, str_cstr(&creator));
+        putchar('\n');
     }
     version_name(&tip, id, name);
     str_add(&s->top, url);

@@ -75,6 +75,7 @@ static void hook_warn(void)
     Repo_t repo = REPO_INIT;
     GitBatch_t batch;
     BranchNames_t names = BRANCHNAMES_INIT;
+    Received_t rv = RECEIVED_INIT;
     Str_t list = STR_INIT;
     const SharedEntry_t *e;
     const char *command;
@@ -113,6 +114,12 @@ static void hook_warn(void)
             if (is_live(&repo, e) && announced(&repo, e, &batch)) {
                 msg_warning(MSG_HOOK_ANNOUNCED, str_cstr(&e->path));
             }
+            /* Cambio di autorita' da decidere (D-111): una nota, senza
+             * rete ne' domande. */
+            if (is_live(&repo, e) &&
+                (receive_pending_auth(&repo, e, &batch, &rv) == GS_OK)) {
+                cmd_print_auth_changes(e, &rv, 1);
+            }
         }
         git_batch_close(&batch);
     }
@@ -120,6 +127,7 @@ static void hook_warn(void)
 exit:
     repo_close(&repo);
     branchnames_free(&names);
+    received_free(&rv);
     str_free(&list);
 }
 

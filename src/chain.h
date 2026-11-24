@@ -3,14 +3,14 @@
  *
  * Ogni versione e' un commit il cui tree ha la voce a nome fisso
  * "100644 blob <oid>	content" (§6.3). Da quando il file e' in remoto
- * (D-103) il tree ha anche la voce "creator": un blob con l'URL della repo
- * remota da cui arrivano le versioni ufficiali, seguito da un fine riga.
- * Ogni versione nuova la eredita dal primo genitore (o dal secondo, se il
- * primo non l'ha).
+ * (D-103) il tree ha anche la voce "creator" e, da quando il file ha un
+ * sovrano, la voce "sovereigns" (D-111, auth.h). Ogni versione nuova le
+ * prende con l'unione a 3 vie dell'autorita' (auth_merge).
  */
 #ifndef GS_CHAIN_H
 #define GS_CHAIN_H
 
+#include "auth.h"
 #include "err.h"
 #include "git.h"
 #include "str.h"
@@ -21,20 +21,13 @@ void chain_ref(Str_t *ref, const char *id);
 /*
  * Commit di versione con il blob dato e i genitori dati: parent = NULL per
  * la prima versione; parent2 != NULL per l'unione di due versioni (D-078).
- * Autore e data dell'utente (D-013), messaggio "shared: <name>". creator:
- * blob della voce "creator" (D-103), NULL o len = 0 per nessuna. Non tocca
- * nessuna ref.
+ * Autore e data dell'utente (D-013), messaggio "shared: <name>". auth:
+ * blob delle voci "creator" (D-103) e "sovereigns" (D-111), ognuna solo se
+ * len > 0; NULL per nessuna. Non tocca nessuna ref.
  */
 eGsErr_t chain_commit(const Oid_t *blob, const Oid_t *parent,
-                      const Oid_t *parent2, const Oid_t *creator,
+                      const Oid_t *parent2, const AuthBlobs_t *auth,
                       const char *name, Oid_t *out);
-
-/*
- * Blob della voce "creator" della versione v1, o di v2 se v1 non l'ha (v2
- * puo' essere NULL): out->len = 0 se nessuna delle due l'ha. Nessun
- * processo: una domanda al cat-file.
- */
-void chain_creator(GitBatch_t *b, const Oid_t *v1, const Oid_t *v2, Oid_t *out);
 
 /* Prima versione: chain_commit + ref creata solo se non esiste. */
 eGsErr_t chain_create_first(const char *id, const Oid_t *blob,

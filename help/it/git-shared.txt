@@ -36,6 +36,7 @@ COMANDI
     update     riceve le versioni nuove e le applica, unendo se serve
     push       invia al creatore le versioni pubblicate (remoto)
     pull       riceve le versioni del creatore e le applica (remoto)
+    crown      sposta l'autorita' di un file su un altro remoto (remoto)
     branch     sceglie i branch su cui un file e' shared
     prune      dimentica i peer che non esistono piu'
     relocate   avvisa i peer che questo repository e' stato spostato o copiato

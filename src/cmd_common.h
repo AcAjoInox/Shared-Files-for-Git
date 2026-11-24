@@ -9,6 +9,7 @@
 #include "err.h"
 #include "git.h"
 #include "msg.h"
+#include "receive.h"
 #include "shared.h"
 #include "state.h"
 
@@ -154,15 +155,17 @@ int cmd_repo_path(const Repo_t *r, const char *user_path, Str_t *out);
 int cmd_select(Repo_t *r, const char *user_path, unsigned char *sel);
 
 /*
- * Ultima versione vista del creatore per le voci scelte (D-110): un fetch
- * per creatore, con tutte le sue catene (remote_fetch_seen). res[i] =
- * CMD_NO_CREATOR se T non ha un creatore, altrimenti un eRemoteFetch_t;
- * urls[i] = URL del creatore ("" = nessuno), r->n elementi inizializzati
- * dal chiamante. Dopo, il cat-file va riaperto: deve vedere le ref nuove.
+ * Ultima versione vista sull'autorita' per le voci scelte (D-110, D-111):
+ * un fetch per autorita', con tutte le sue catene (remote_fetch_seen).
+ * res[i] = CMD_NO_CREATOR se T non ha un creatore, altrimenti un
+ * eRemoteFetch_t; urls[i] = URL dell'autorita' di T ("" = nessuna), r->n
+ * elementi inizializzati dal chiamante; sov[i] (se sov non e' NULL) = 1 se
+ * l'autorita' e' un sovrano (auth_role). Dopo, il cat-file va riaperto:
+ * deve vedere le ref nuove.
  */
 #define CMD_NO_CREATOR 0xFFU
 void cmd_fetch_creators(Repo_t *r, GitBatch_t *b, const unsigned char *sel,
-                        unsigned char *res, Str_t *urls);
+                        unsigned char *res, Str_t *urls, unsigned char *sov);
 
 /*
  * Il cuore di update (REQ-F-009) per le voci scelte, dopo le opzioni e
@@ -173,6 +176,22 @@ void cmd_fetch_creators(Repo_t *r, GitBatch_t *b, const unsigned char *sel,
  */
 int cmd_update_run(Repo_t *r, GitBatch_t *b, const unsigned char *sel,
                    CmdOpts_t *o, int rc, int *batch_ok);
+
+/*
+ * Cambi di autorita' da decidere (D-111, REQ-F-030) ricevuti in rv. warn
+ * = 0: righe di status ("authority -> <url>, <provenienza> (version ...)",
+ * il creatore nuovo se cambia, il comando per decidere); warn = 1: un
+ * avviso per cambio (update, pull, hook).
+ */
+void cmd_print_auth_changes(const SharedEntry_t *e, const Received_t *rv, int warn);
+
+/* Provenienza ("crowned by the local peer <path>", ...) e versione
+ * ("<oid breve>, <autore>, <data>") di un cambio di autorita'. */
+void cmd_auth_describe(const AuthChange_t *c, Str_t *from, Str_t *info);
+
+/* Argomento di crown --accept per un cambio: "<path>", o "<url> <path>"
+ * se ce n'e' piu' d'uno. */
+void cmd_auth_how(const SharedEntry_t *e, const Received_t *rv, size_t k, Str_t *how);
 
 /* Avviso per publish/update lanciati a mano su un branch sospeso (atto
  * esplicito: si fa); se nessun branch attivo esiste, anche il rimedio. */

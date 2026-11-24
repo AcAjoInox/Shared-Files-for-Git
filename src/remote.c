@@ -9,6 +9,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "auth.h"
 #include "bounds.h"
 #include "chain.h"
 #include "mem.h"
@@ -21,7 +22,7 @@
  * righe. Si rifiutano un trattino in testa, i caratteri di controllo e gli
  * URL troppo lunghi (REQ-NF-011).
  */
-static int url_ok(const char *url)
+int remote_url_ok(const char *url)
 {
     const unsigned char *c;
     size_t n = strlen(url);
@@ -131,7 +132,39 @@ eGsErr_t remote_url(const char *top, const char *name, Str_t *url)
             err = GS_ERR_FORMAT;
         }
     }
-    if ((err == GS_OK) && !url_ok(str_cstr(url))) {
+    if ((err == GS_OK) && !remote_url_ok(str_cstr(url))) {
+        err = GS_ERR_FORMAT;
+    }
+    if (err != GS_OK) {
+        str_reset(url);
+    }
+    str_free(&abs);
+    return err;
+}
+
+eGsErr_t remote_arg_url(const char *top, const char *cwd, const char *arg,
+                        Str_t *url)
+{
+    Str_t abs = STR_INIT;
+    eGsErr_t err = GS_OK;
+
+    if (remote_url(top, arg, url) == GS_OK) {
+        return GS_OK; /* un remote con quel nome */
+    }
+    str_reset(url);
+    if (url_is_path(arg) && (strchr(arg, '/') == NULL) && (strchr(arg, '\\') == NULL)) {
+        err = GS_ERR_FORMAT; /* una parola: un remote che non c'e' ("./x" per
+                              * una cartella) */
+    } else if (url_is_path(arg) && !path_is_absolute(arg)) {
+        if (join_abs(cwd, arg, &abs)) {
+            str_add(url, str_cstr(&abs));
+        } else {
+            err = GS_ERR_FORMAT;
+        }
+    } else {
+        str_add(url, arg);
+    }
+    if ((err == GS_OK) && !remote_url_ok(str_cstr(url))) {
         err = GS_ERR_FORMAT;
     }
     if (err != GS_OK) {
@@ -228,54 +261,20 @@ int remote_same(const char *a, const char *b)
     return same;
 }
 
-/*
- * URL dei blob "creator" gia' letti. Un blob non cambia mai (l'oid e' il
- * suo contenuto), quindi la copia vale per tutto il processo: piu' file con
- * lo stesso creatore costano un solo cat-file blob. Memoria statica e
- * limitata (D-066): oltre REMOTE_URL_CACHE creatori diversi si rilegge.
- * Solo URL validi (url_ok: al piu' GS_PATH_MAX caratteri).
- */
-#define REMOTE_URL_CACHE 4U
-static Oid_t url_cache_blob[REMOTE_URL_CACHE];
-static char url_cache_text[REMOTE_URL_CACHE][GS_PATH_MAX + 1U];
-static size_t url_cache_n = 0U;
-
 eGsErr_t remote_creator_url(GitBatch_t *b, const Oid_t *version, Str_t *url)
 {
-    const char *args[] = { "cat-file", "blob", NULL, NULL };
-    char hex[OID_HEX_SIZE];
-    Oid_t blob;
-    size_t k;
-    eGsErr_t err = GS_OK;
+    Auth_t a = AUTH_INIT;
+    AuthBlobs_t ab;
+    eGsErr_t err;
 
     str_reset(url);
-    chain_creator(b, version, NULL, &blob);
-    if (blob.len == 0U) {
-        return GS_OK; /* nessun creatore */
+    auth_blobs(b, version, &ab);
+    ab.sovereigns.len = 0U; /* solo il creatore */
+    err = auth_read(b, &ab, &a);
+    if (err == GS_OK) {
+        str_add(url, str_cstr(&a.creator));
     }
-    for (k = 0U; k < url_cache_n; k++) {
-        if (oid_eq(&url_cache_blob[k], &blob)) {
-            str_add(url, url_cache_text[k]);
-            return GS_OK;
-        }
-    }
-    oid_to_hex(&blob, hex);
-    args[2] = hex;
-    err = git_run(args, 0U, url); /* senza il fine riga finale */
-    /* Un byte nullo dentro il blob accorcerebbe l'URL: non valido. */
-    if ((err == GS_OK) &&
-        ((strlen(str_cstr(url)) != url->len) || !url_ok(str_cstr(url)))) {
-        err = GS_ERR_FORMAT;
-    }
-    if (err != GS_OK) {
-        str_reset(url);
-    } else if (url_cache_n < REMOTE_URL_CACHE) {
-        url_cache_blob[url_cache_n] = blob;
-        memcpy(url_cache_text[url_cache_n], str_cstr(url), url->len + 1U);
-        url_cache_n++;
-    } else {
-        /* cache piena: la prossima volta si rilegge */
-    }
+    auth_free(&a);
     return err;
 }
 
@@ -287,7 +286,7 @@ eGsErr_t remote_url_blob(const char *url, Oid_t *blob)
     int code = 0;
     eGsErr_t err;
 
-    if (!url_ok(url)) {
+    if (!remote_url_ok(url)) {
         return GS_ERR_FORMAT;
     }
     err = git_start(&p, args, PROC_STDIN_PIPE);
@@ -404,7 +403,7 @@ void remote_fetch_seen(const char *url, const Str_t *ids, uint8_t *res)
     for (k = 0U; k < n; k++) {
         res[k] = (uint8_t)REMOTE_UNREACHABLE;
     }
-    if ((n == 0U) || !url_ok(url)) {
+    if ((n == 0U) || !remote_url_ok(url)) {
         goto exit;
     }
     if (fetch_specs(url, ids, NULL)) {
@@ -458,7 +457,7 @@ static void push_chunk(const char *url, const char *const *idv, const Oid_t *v,
     for (k = 0U; k < n; k++) {
         res[k] = (uint8_t)REMOTE_PUSH_REFUSED;
     }
-    if (!url_ok(url)) {
+    if (!remote_url_ok(url)) {
         goto exit;
     }
     args[na++] = "push";
@@ -585,7 +584,7 @@ int remote_seen_parse(const char *value, Str_t *url, unsigned long *at)
         return 0;
     }
     v = strtoul(value, &end, 10);
-    if ((end == NULL) || (*end != ' ') || !url_ok(end + 1)) {
+    if ((end == NULL) || (*end != ' ') || !remote_url_ok(end + 1)) {
         return 0;
     }
     str_add(url, end + 1);
@@ -594,7 +593,8 @@ int remote_seen_parse(const char *value, Str_t *url, unsigned long *at)
 }
 
 int remote_find_own(GitBatch_t *b, const char *url, const char *id,
-                    const Oid_t *t, const Oid_t *creator, Oid_t *v)
+                    const Oid_t *t, const Oid_t *p2, const AuthBlobs_t *auth,
+                    Oid_t *v)
 {
     const char *rp[] = { "rev-parse", "--verify", "-q", NULL, NULL };
     char hex[OID_HEX_SIZE];
@@ -602,6 +602,7 @@ int remote_find_own(GitBatch_t *b, const char *url, const char *id,
     Str_t del = STR_INIT;
     Str_t name = STR_INIT;
     Str_t out = STR_INIT;
+    AuthBlobs_t got;
     Oid_t tip;
     Oid_t oid;
     Oid_t mine;
@@ -619,7 +620,7 @@ int remote_find_own(GitBatch_t *b, const char *url, const char *id,
         goto exit;
     }
     oid_to_hex(&tip, hex);
-    /* un solo genitore, T */
+    /* i genitori: T, e p2 se c'e' */
     str_addf(&name, "%s^1", hex);
     if ((git_batch_query(b, str_cstr(&name), &oid) != GIT_OBJ_COMMIT) ||
         !oid_eq(&oid, t)) {
@@ -627,7 +628,9 @@ int remote_find_own(GitBatch_t *b, const char *url, const char *id,
     }
     str_reset(&name);
     str_addf(&name, "%s^2", hex);
-    if (git_batch_query(b, str_cstr(&name), &oid) != GIT_OBJ_MISSING) {
+    if ((p2 == NULL) ? (git_batch_query(b, str_cstr(&name), &oid) != GIT_OBJ_MISSING)
+                     : ((git_batch_query(b, str_cstr(&name), &oid) != GIT_OBJ_COMMIT) ||
+                        !oid_eq(&oid, p2))) {
         goto exit;
     }
     /* lo stesso contenuto di T */
@@ -642,9 +645,9 @@ int remote_find_own(GitBatch_t *b, const char *url, const char *id,
     if (!git_batch_blob(b, str_cstr(&name), &mine) || !oid_eq(&oid, &mine)) {
         goto exit;
     }
-    /* la voce creator che questo push scriverebbe */
-    chain_creator(b, &tip, NULL, &oid);
-    if ((oid.len == 0U) || !oid_eq(&oid, creator)) {
+    /* le voci creator e sovereigns che questo push scriverebbe */
+    auth_blobs(b, &tip, &got);
+    if ((got.creator.len == 0U) || !auth_blobs_eq(&got, auth)) {
         goto exit;
     }
     *v = tip;
@@ -667,7 +670,7 @@ eGsErr_t remote_fetch(const char *url, const char *id, const char *ref)
     Str_t spec = STR_INIT;
     eGsErr_t err = GS_ERR_GIT;
 
-    if (url_ok(url)) {
+    if (remote_url_ok(url)) {
         no_prompt();
         str_addf(&spec, "+refs/shared/%s:%s", id, ref);
         args[6] = str_cstr(&spec);

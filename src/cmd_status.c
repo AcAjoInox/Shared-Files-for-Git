@@ -93,14 +93,15 @@ static const char *seen_date(unsigned long at, char *buf, size_t size)
 
 /*
  * Riga "creator <url> (<rispetto al creatore>)" (D-110): T confrontata con
- * l'ultima versione vista. Un processo solo se le due sono diverse.
- * fetched: esito di status --remote per il file (CMD_NO_CREATOR = non
- * chiesto).
+ * l'ultima versione vista. Un processo solo se le due sono diverse. Con un
+ * sovrano (D-111) la riga "creator" dice solo l'URL e il confronto passa
+ * alla riga "authority <url> (...)". fetched: esito di status --remote per
+ * il file (CMD_NO_CREATOR = non chiesto).
  */
 static void print_creator(const SharedEntry_t *e, GitBatch_t *b,
                           const Received_t *rv, unsigned char fetched)
 {
-    const Oid_t *seen = &rv->creator_tip;
+    const Oid_t *seen = &rv->auth_tip;
     Str_t ref = STR_INIT;
     char date[32];
     eMsgId_t rel;
@@ -123,8 +124,13 @@ static void print_creator(const SharedEntry_t *e, GitBatch_t *b,
     } else {
         rel = MSG_CREATOR_DIVERGED;
     }
-    printf("    %-6s %s (%s", msg(MSG_STATUS_FIELD_CREATOR),
-           str_cstr(&rv->creator), msg(rel));
+    if (rv->sovereign != 0) {
+        printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_CREATOR), str_cstr(&rv->creator));
+    }
+    printf("    %-6s %s (", msg((rv->sovereign != 0) ? MSG_STATUS_FIELD_AUTHORITY
+                                                    : MSG_STATUS_FIELD_CREATOR),
+           str_cstr(&rv->authority));
+    printf(msg(rel), auth_role(rv->sovereign));
     /* Quando e' stata vista (D-112, B-53): senza, "same version" dopo
      * giorni senza rete sembrerebbe un controllo appena fatto. */
     if ((seen->len > 0U) && (rel != MSG_CREATOR_MISSING) && (e->seen_at > 0UL)) {
@@ -134,8 +140,17 @@ static void print_creator(const SharedEntry_t *e, GitBatch_t *b,
     fputs(")\n", stdout);
     if (fetched == (unsigned char)REMOTE_UNREACHABLE) {
         printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
-        printf(msg(MSG_STATUS_CREATOR_UNREACHABLE), str_cstr(&rv->creator));
+        printf(msg(MSG_STATUS_CREATOR_UNREACHABLE), auth_role(rv->sovereign),
+               str_cstr(&rv->authority));
         putchar('\n');
+        /* Un sovrano che non risponde: si suggerisce soltanto, mai da
+         * soli (D-111: irraggiungibile non vuol dire distrutto). */
+        if (rv->sovereign != 0) {
+            printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+            printf(msg(MSG_STATUS_AUTH_RESTORE), str_cstr(&rv->creator),
+                   str_cstr(&e->path));
+            putchar('\n');
+        }
     }
     str_free(&ref);
 }
@@ -288,7 +303,7 @@ int cmd_status(int argc, char **argv)
                      : 0U;
     }
     if (with_remote) {
-        cmd_fetch_creators(&repo, &batch, sel, fetched, urls);
+        cmd_fetch_creators(&repo, &batch, sel, fetched, urls, NULL);
         git_batch_close(&batch);
         batch_open = 0;
         if (git_batch_open(&batch) != GS_OK) {
@@ -333,6 +348,11 @@ int cmd_status(int argc, char **argv)
              * rispetto al creatore (D-110). */
             if (received && (rv.creator.len > 0U)) {
                 print_creator(e, &batch, &rv, fetched[i]);
+            }
+            /* Cambi di autorita' da decidere (D-111): una riga, non uno
+             * stato. */
+            if (received) {
+                cmd_print_auth_changes(e, &rv, 0);
             }
             /* Catena assente e non ricostruita (D-112, B-51): l'unica
              * uscita e' unlink, poi di nuovo link. */

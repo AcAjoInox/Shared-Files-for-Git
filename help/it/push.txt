@@ -26,6 +26,9 @@ DESCRIZIONE
     'git shared pull', committa e lancia di nuovo push. Se non puoi
     scrivere li', la versione resta qui (e nel tuo remote) come proposta.
 
+    Se il file ha un sovrano (git shared crown), push invia al sovrano:
+    e' lui l'autorita' del file. Il creatore non cambia mai.
+
     Senza <path>, tutti i file che hanno un creatore, con un push per
     creatore; i file senza creatore si saltano. Il primo argomento e' un
     <remote> se questo repository ha un remote con quel nome; dopo '--'
@@ -46,4 +49,4 @@ ESEMPI
 
 VEDI ANCHE
     git shared pull --help, git shared publish --help,
-    git shared status --help
+    git shared status --help, git shared crown --help

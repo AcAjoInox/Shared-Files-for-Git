@@ -9,6 +9,7 @@
 #define GS_CMD_H
 
 int cmd_branch(int argc, char **argv);
+int cmd_crown(int argc, char **argv);
 int cmd_help(int argc, char **argv);
 int cmd_hook(int argc, char **argv);
 int cmd_lang(int argc, char **argv);

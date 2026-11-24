@@ -96,6 +96,35 @@ int sys_setenv(const char *name, const char *value)
     return rc;
 }
 
+int sys_stdin_is_tty(void)
+{
+    HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD mode;
+    struct {
+        FILE_NAME_INFO info;
+        WCHAR more[MAX_PATH];
+    } name;
+    const WCHAR *n;
+
+    if ((h == NULL) || (h == INVALID_HANDLE_VALUE)) {
+        return 0;
+    }
+    if (GetConsoleMode(h, &mode) != 0) {
+        return 1; /* console di Windows */
+    }
+    if (GetFileType(h) != FILE_TYPE_PIPE) {
+        return 0;
+    }
+    memset(&name, 0, sizeof name);
+    if (GetFileInformationByHandleEx(h, FileNameInfo, &name,
+                                     (DWORD)(sizeof name - sizeof(WCHAR))) == 0) {
+        return 0;
+    }
+    n = name.info.FileName;
+    return ((wcsstr(n, L"msys-") != NULL) || (wcsstr(n, L"cygwin-") != NULL)) &&
+           (wcsstr(n, L"-pty") != NULL);
+}
+
 FILE *sys_fopen(const char *path, const char *mode)
 {
     wchar_t *wpath = win_utf8_to_wide(path);

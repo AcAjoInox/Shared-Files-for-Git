@@ -19,6 +19,7 @@ static const char *const msg_en[] = {
         "    update    get the new versions and apply them\n"
         "    push      send the published versions to the creator (remote)\n"
         "    pull      get the versions of the creator and apply them\n"
+        "    crown     move the authority of a file to another remote\n"
         "    prune     forget the peers that no longer exist\n"
         "    branch    choose the branches where a file is shared\n"
         "    relocate  tell the peers that this repository was moved\n"
@@ -153,6 +154,21 @@ static const char *const msg_en[] = {
         "Send the published versions to the creator of each file, and a\n"
         "copy to <remote> (default: origin). The first time, with <remote>\n"
         "and <path>: <remote> becomes the creator of the file.\n",
+    [MSG_USAGE_CROWN] =
+        "usage: git shared crown [--yes] <remote> <path>\n"
+        "   or: git shared crown [--yes] --restore <path>\n"
+        "   or: git shared crown [--yes] --accept [<url>] <path>\n"
+        "   or: git shared crown --reject [<url>] <path>\n"
+        "\n"
+        "Move the authority of a file, the remote its official versions\n"
+        "come from, to <remote> (a remote name or a URL): follow it if it\n"
+        "already governs the file, otherwise make it the sovereign. The\n"
+        "creator never changes.\n"
+        "\n"
+        "    --restore    follow the line of the creator again\n"
+        "    --accept     accept an authority change received\n"
+        "    --reject     reject it: its versions are ignored\n"
+        "    --yes        do not ask for confirmation\n",
     [MSG_USAGE_PULL] =
         "usage: git shared pull [-f] [--all] [-c | -m <message>] [<path>]\n"
         "\n"
@@ -317,14 +333,17 @@ static const char *const msg_en[] = {
     [MSG_ERR_CREATOR_PUSH] =
         "%s: cannot push to %s: this repository did not become the creator",
     [MSG_ERR_CREATOR_NEWER] =
-        "%s: the creator %s has a newer version: run 'git shared pull'",
+        "%s: the %s %s has a newer version: run 'git shared pull'",
     [MSG_ERR_CREATOR_REFUSED] =
-        "%s: not accepted by the creator %s (no write access, or not "
+        "%s: not accepted by the %s %s (no write access, or not "
         "reachable): the version stays here as a proposal",
     [MSG_ERR_CREATOR_MISSING] =
-        "%s: the creator %s does not have this file: not updated",
+        "%s: the %s %s does not have this file: not updated",
     [MSG_ERR_CREATOR_UNREACHABLE] =
-        "%s: creator %s not reachable: not updated",
+        "%s: %s %s not reachable: not updated",
+    [MSG_ERR_AUTH_DECIDE_FIRST] =
+        "%s: authority change pending on %s: decide first with "
+        "'git shared crown --accept %s' or '--reject'",
     [MSG_ERR_PUSH_NO_CREATOR] =
         "%s: no creator yet: run 'git shared push <remote> %s' to choose it",
     [MSG_ERR_PUSH_NOTHING] =
@@ -369,6 +388,9 @@ static const char *const msg_en[] = {
         "%s: none of its active branches exists (%s): "
         "run 'git shared branch %s -a <branch>'",
     [MSG_WARN_RELOCATE_NOT_MEMBER] = "%s: %s does not share this file: skipped",
+    [MSG_WARN_AUTH_PENDING] =
+        "%s: authority change pending (-> %s): decide first with "
+        "'git shared crown --accept %s' or '--reject'",
     [MSG_WARN_COPY_FAILED] = "%s: cannot copy the versions to %s",
     [MSG_WARN_CHAIN_RESTORED] =
         "%s: the version chain was missing: restored from %s",
@@ -446,12 +468,12 @@ static const char *const msg_en[] = {
         "%s: a version from a peer does not follow this one: run "
         "'git shared update' to merge it first",
     [MSG_PUB_NOT_ON_CREATOR] =
-        "%s: not on the creator yet: run 'git shared push'",
+        "%s: not on the %s yet: run 'git shared push'",
     [MSG_PUB_COPIED] = "%s: versions copied to %s",
     [MSG_PUSH_CREATOR_NEW] =
         "%s: pushed to %s, which is now the creator of the file",
-    [MSG_PUSH_TO_CREATOR] = "%s: pushed to the creator %s",
-    [MSG_PUSH_ON_CREATOR] = "%s: already on the creator %s",
+    [MSG_PUSH_TO_CREATOR] = "%s: pushed to the %s %s",
+    [MSG_PUSH_ON_CREATOR] = "%s: already on the %s %s",
     [MSG_SKIP_STATE] = "%s: %s, nothing to do",
     [MSG_UPD_RECEIVED] = "%s: new version received",
     [MSG_UPD_ABORTED] =
@@ -482,6 +504,9 @@ static const char *const msg_en[] = {
     [MSG_STATUS_FIELD_NOTE] = "note",
     [MSG_STATUS_FIELD_PEERS] = "peers",
     [MSG_STATUS_FIELD_CREATOR] = "creator",
+    [MSG_STATUS_FIELD_AUTHORITY] = "authority",
+    [MSG_ROLE_CREATOR] = "creator",
+    [MSG_ROLE_SOVEREIGN] = "sovereign",
     [MSG_PEER_SAME] = "same version",
     [MSG_PEER_BEHIND] = "older version: run 'git shared publish'",
     [MSG_PEER_NEWER] =
@@ -499,10 +524,14 @@ static const char *const msg_en[] = {
     [MSG_STATUS_TO_MERGE] =
         "the version of %s must be merged: run 'git shared update'",
     [MSG_STATUS_CREATOR_UNREACHABLE] =
-        "creator %s not reachable: state from the last version seen",
+        "%s %s not reachable: state from the last version seen",
+    [MSG_LINK_COPY] = "%s is a copy: the authority of the file is %s",
+    [MSG_STATUS_AUTH_RESTORE] =
+        "if it is gone: the creator is %s, 'git shared crown --restore %s' "
+        "follows its line, or crown another remote",
     [MSG_CREATOR_SAME] = "same version",
     [MSG_CREATOR_AHEAD] = "ahead: run 'git shared push'",
-    [MSG_CREATOR_BEHIND] = "newer version on the creator: run 'git shared update'",
+    [MSG_CREATOR_BEHIND] = "newer version on the %s: run 'git shared update'",
     [MSG_CREATOR_DIVERGED] =
         "diverged: run 'git shared update', then 'git shared push'",
     [MSG_CREATOR_UNSEEN] = "not checked yet: run 'git shared status --remote'",
@@ -511,11 +540,76 @@ static const char *const msg_en[] = {
         "the version chain is missing and no copy was found: "
         "run 'git shared unlink %s', then link the file again",
     [MSG_CREATOR_SEEN] = "seen %s",
+    [MSG_AUTH_CHANGE] = "-> %s, %s (version %s)",
+    [MSG_AUTH_BY_PEER] = "crowned by the local peer %s",
+    [MSG_AUTH_BY_AUTHORITY] = "moved by the authority itself",
+    [MSG_AUTH_BY_UNKNOWN] = "crowned elsewhere",
+    [MSG_AUTH_NEW_CREATOR] =
+        "the creator changes too, to %s: accept only if you know why",
+    [MSG_AUTH_HOW] = "accept with 'git shared crown --accept %s', or '--reject'",
     [MSG_STATUS_RENAMED] =
         "renamed from '%s': commit it with .gitshared to confirm",
     [MSG_STATUS_BRANCHES_GONE] =
         "none of its active branches exists (%s): "
         "git shared branch %s -a <branch>",
+
+    [MSG_ERR_CROWN_ARGS] = "crown needs a remote or URL and a path, or "
+                           "--restore, --accept or --reject with a path",
+    [MSG_ERR_CROWN_NO_CREATOR] =
+        "%s: never published to a remote: there is no authority to move",
+    [MSG_ERR_CROWN_MERGING] =
+        "%s: merge in progress: finish it with 'git shared update' first",
+    [MSG_ERR_CROWN_BAD_URL] =
+        "'%s' is neither a remote of this repository nor a usable URL",
+    [MSG_ERR_CROWN_BAD_CHAIN] =
+        "%s: the latest version at %s is not valid: nothing changed",
+    [MSG_ERR_CROWN_OTHER_CREATOR] =
+        "%s: %s has this file with another creator (%s): it is not the "
+        "same file, nothing changed",
+    [MSG_ERR_CROWN_PUSH] =
+        "%s: cannot push to %s (no write access, or not reachable): "
+        "nothing changed",
+    [MSG_ERR_CROWN_RESTORE] =
+        "%s: the creator %s cannot be reached or does not have the file: "
+        "nothing changed",
+    [MSG_ERR_CROWN_NO_TTY] =
+        "%s: no terminal to confirm: add --yes to confirm from a script",
+    [MSG_ERR_NO_AUTH_CHANGE] = "%s: no authority change to decide",
+    [MSG_ERR_AUTH_CHANGE_UNKNOWN] = "%s: no pending authority change to %s",
+    [MSG_ERR_AUTH_CHANGES_URL] =
+        "%s: %u authority changes pending: say which one, for example "
+        "'git shared crown %s %s'",
+    [MSG_WARN_CROWN_OLD_NOT_TOLD] = "%s: readers of %s will not be told",
+    [MSG_CROWN_ALREADY] = "%s: %s is already the authority: nothing to do",
+    [MSG_CROWN_RESTORE_ALREADY] =
+        "%s: already follows the creator's line (%s): nothing to do",
+    [MSG_CROWN_LAST_SEEN] = "last seen %s",
+    [MSG_CROWN_NEVER_SEEN] = "never seen",
+    [MSG_CROWN_NOTICE_FROM] = "%s: the authority moves from %s (%s) to %s.",
+    [MSG_CROWN_NOTICE_LINE] = "    The creator's line points to %s.",
+    [MSG_CROWN_NOTICE_FOLLOW] =
+        "    %s already governs the file: it is followed, no write access "
+        "needed.",
+    [MSG_CROWN_NOTICE_INSTALL] =
+        "    %s becomes the sovereign of the file: write access needed.",
+    [MSG_CROWN_NOTICE_LOST] =
+        "    %s has %lu versions not here: their content will be replaced.",
+    [MSG_CROWN_NOTICE_PEERS] = "    %u local peers will have to accept it.",
+    [MSG_CROWN_ACCEPT_NOTICE] =
+        "%s: the authority moves from %s to %s, %s (version %s).",
+    [MSG_CROWN_CONTINUE] = "Continue? [y/N] ",
+    [MSG_CROWN_CANCELLED] = "%s: nothing changed",
+    [MSG_CROWN_FOLLOWED] = "%s: now follows %s",
+    [MSG_CROWN_FOLLOW_AHEAD] =
+        "%s: the versions made here are not on %s: 'git shared push' "
+        "proposes them",
+    [MSG_CROWN_TO_MERGE] =
+        "%s: the version of the authority must be merged: run "
+        "'git shared update'",
+    [MSG_CROWN_INSTALLED] = "%s: pushed to %s, now the sovereign of the file",
+    [MSG_CROWN_OLD_TOLD] = "%s: pushed to %s too: its readers will be told",
+    [MSG_CROWN_ACCEPTED] = "%s: authority %s accepted",
+    [MSG_CROWN_REJECTED] = "%s: authority %s rejected: its versions are ignored",
 
     [MSG_STATE_ALIGNED] = "aligned",
     [MSG_STATE_TO_APPLY] = "new version to apply",

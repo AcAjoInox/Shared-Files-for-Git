@@ -17,6 +17,10 @@ DESCRIZIONE
     pull, o un 'git shared status --remote', update e status lavorano
     senza rete.
 
+    Se il file ha un sovrano (git shared crown), pull scarica dal
+    sovrano. Un cambio di autorita' ricevuto pull non lo applica mai:
+    aspetta 'git shared crown --accept' o '--reject'.
+
     Se il creatore non risponde, o non ha piu' il file, quel file non si
     aggiorna e pull fallisce; gli altri file proseguono. I file senza
     creatore vengono solo aggiornati, come con update. pull non chiede
@@ -43,4 +47,4 @@ ESEMPI
 
 VEDI ANCHE
     git shared push --help, git shared update --help,
-    git shared status --help
+    git shared status --help, git shared crown --help

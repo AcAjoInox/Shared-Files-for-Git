@@ -77,6 +77,7 @@ git commit -m "aggiorno common.h"
 | `git shared update [--all] [<file>]` | Riceve e applica l'ultima versione; `--ours` / `--theirs` tiene una versione, `--abort` rinuncia a un'unione |
 | `git shared push [<remote>] [<file>]` | Remoto (beta): invia al creatore le versioni pubblicate; la prima volta `<remote>` diventa il creatore |
 | `git shared pull [<file>]` | Remoto (beta): riceve le versioni del creatore, poi `update` |
+| `git shared crown <remote> <file>` | Remoto (beta): sposta l'autorità del file su un altro remoto, il creatore resta; `--restore` torna al creatore, `--accept` / `--reject` decidono un cambio ricevuto |
 | `git shared branch <file> [-a\|-rm <branch>]` | Sceglie i branch su cui il file è shared; sugli altri è un file normale |
 | `git shared prune [-n]` | Toglie i peer cancellati o che non condividono più il file |
 | `git shared relocate [--copy]` | Avvisa i peer che la repo è stata spostata o copiata |
@@ -125,6 +126,8 @@ git shared pull -c
 ```
 
 Chi non può scrivere sul creatore tiene la sua versione come proposta. Non c'è ancora: collegare per nome, ricevere una proposta con un comando, le firme.
+
+Il creatore non cambia mai. Se non c'è più o si è spostato, `git shared crown <remote> <file>` dà al file un **sovrano**: il remoto da cui ora arrivano le versioni e verso cui vanno. Un cambio di autorità non è mai automatico: chi lo riceve lo accetta o lo rifiuta con `git shared crown --accept` o `--reject`, e `git shared crown --restore` torna alla linea del creatore.
 
 ## Limiti della prima versione
 

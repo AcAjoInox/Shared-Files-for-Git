@@ -30,6 +30,11 @@ int sys_setenv(const char *name, const char *value)
     return setenv(name, value, 1);
 }
 
+int sys_stdin_is_tty(void)
+{
+    return isatty(STDIN_FILENO) != 0;
+}
+
 void sys_init(int *argc, char ***argv)
 {
     (void)argc;

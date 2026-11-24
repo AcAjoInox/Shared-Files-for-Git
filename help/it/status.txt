@@ -53,6 +53,13 @@ DESCRIZIONE
     (divergente: update, poi push); not checked yet (mai vista: status
     --remote). Senza --remote, status non usa mai la rete.
 
+    Se l'autorita' del file e' un sovrano scelto con 'git shared crown',
+    la riga "creator" mostra solo il creatore, e una riga "authority"
+    mostra il sovrano con il confronto. Un cambio di autorita' ricevuto
+    e non ancora deciso e' una riga "authority -> <url>", con da dove
+    arriva e il comando per accettarlo o rifiutarlo: fino ad allora
+    l'ultima versione non va oltre.
+
     Se qui manca la catena delle versioni di un file, status la
     ricostruisce dall'ultima versione vista sul creatore, senza rete, o
     da un peer locale, e lo dice. Se nessuno ce l'ha, una nota dice di

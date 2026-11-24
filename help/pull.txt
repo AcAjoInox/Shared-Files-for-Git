@@ -16,6 +16,11 @@ DESCRIPTION
     pull, or a 'git shared status --remote', update and status work
     without the network.
 
+    If the file has a sovereign (git shared crown), pull fetches from
+    the sovereign instead. A change of authority received is never
+    applied by pull: it waits for 'git shared crown --accept' or
+    '--reject'.
+
     If the creator cannot be reached, or no longer has the file, that
     file is not updated and pull fails; the other files go on. Files
     without a creator are only updated, as with update. pull never asks
@@ -42,4 +47,4 @@ EXAMPLES
 
 SEE ALSO
     git shared push --help, git shared update --help,
-    git shared status --help
+    git shared status --help, git shared crown --help

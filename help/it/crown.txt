@@ -1,0 +1,76 @@
+GIT-SHARED-CROWN(1)
+
+NOME
+    git shared crown - sposta l'autorita' di un file su un altro remoto
+
+SINTASSI
+    git shared crown [--yes] <remote> <path>
+    git shared crown [--yes] --restore <path>
+    git shared crown [--yes] --accept [<url>] <path>
+    git shared crown --reject [<url>] <path>
+
+DESCRIZIONE
+    Un file condiviso attraverso un remoto (beta) ha un creatore: il
+    remoto del suo primo 'git shared push <remote>'. Il creatore non
+    cambia mai: e' l'origine del file, e nessun comando lo modifica.
+    L'autorita' del file e' il remoto da cui arrivano le versioni
+    ufficiali (pull, status --remote) e verso cui vanno (push): il
+    creatore, o l'ultimo sovrano scelto con crown. Se il creatore non
+    c'e' piu', si e' spostato, o il file ha bisogno di un'altra casa,
+    crown gliela da' senza toccare il creatore.
+
+    <remote> e' il nome di un remote di questo repository, o un URL.
+
+    Se <remote> governa gia' il file (lo dice la sua ultima versione),
+    crown lo segue: li' non servono permessi di scrittura, come per
+    ogni lettore. Le versioni fatte qui che l'autorita' non ha
+    diventano una versione nuova che 'git shared push' le propone.
+
+    Altrimenti crown fa di <remote> il sovrano del file, e li' servono
+    i permessi di scrittura: una versione nuova con il contenuto
+    dell'ultima versione di qui e <remote> come autorita' va prima su
+    <remote>, poi qui, poi se si riesce sull'autorita' di prima, cosi'
+    chi la segue lo sa. Se <remote> aveva gia' versioni del file che
+    qui non ci sono, il loro contenuto viene sostituito, e l'avviso lo
+    dice prima di chiedere.
+
+    Prima di cambiare qualcosa crown mostra dove si sposta l'autorita',
+    quando quella attuale e' stata vista l'ultima volta e quanti peer
+    locali dovranno accettare il cambio, e chiede conferma. Senza un
+    terminale rifiuta, salvo --yes. Non succede mai da solo: un
+    programma non distingue un remoto che non c'e' piu' da uno che
+    adesso non risponde.
+
+    Nemmeno ricevere un cambio di autorita', da un peer locale o
+    dall'autorita' stessa, e' automatico: l'ultima versione resta
+    all'ultima con l'autorita' di prima finche' il cambio non viene
+    accettato o rifiutato. 'git shared status' lo mostra nella riga
+    'authority -> <url>'.
+
+OPZIONI
+    --restore
+        Torna a seguire la linea del creatore: il creatore, o
+        l'autorita' che ha scelto lui. Non servono permessi di
+        scrittura. Se il creatore non risponde, non cambia nulla.
+
+    --accept [<url>]
+        Accetta un cambio di autorita' ricevuto: l'ultima versione
+        avanza, o la versione e' da unire. <url> serve solo se i cambi
+        in attesa sono piu' d'uno.
+
+    --reject [<url>]
+        Lo rifiuta: le sue versioni vengono ignorate. Un --accept
+        successivo lo riprende. Non chiede conferma.
+
+    --yes
+        Non chiede conferma.
+
+ESEMPI
+    git shared crown origin inc/common.h
+    git shared crown https://github.com/anna/A inc/common.h
+    git shared crown --restore inc/common.h
+    git shared crown --accept inc/common.h
+
+VEDI ANCHE
+    git shared push --help, git shared pull --help,
+    git shared status --help

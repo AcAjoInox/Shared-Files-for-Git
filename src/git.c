@@ -243,10 +243,12 @@ eGsErr_t git_delete_refs(const Str_t *refs)
 eGsErr_t git_batch_open(GitBatch_t *b)
 {
     static const char *const args[] = {
-        "cat-file", "--batch-check=%(objecttype) %(objectname)", NULL
+        "cat-file", "--batch-check=%(objecttype) %(objectname) %(objectsize)",
+        NULL
     };
 
     str_init(&b->line);
+    b->size = 0UL;
     return git_start(&b->p, args, PROC_STDIN_PIPE);
 }
 
@@ -262,24 +264,31 @@ eGitObj_t git_batch_query(GitBatch_t *b, const char *name, Oid_t *oid)
     };
     const char *line;
     const char *sp;
+    const char *sz;
     size_t type_len;
     size_t i;
     eGitObj_t type = GIT_OBJ_ERROR;
 
     oid->len = 0U;
+    b->size = 0UL;
     /* cat-file svuota il proprio output a ogni risposta: domanda, fflush,
      * risposta, senza rischio di blocco (proc.h). */
     if ((fputs(name, b->p.in) < 0) || (fputc('\n', b->p.in) == EOF) ||
         (fflush(b->p.in) != 0) || (proc_read(&b->p, '\n', &b->line) == 0)) {
         goto exit;
     }
-    /* Risposta: "<tipo> <oid>", oppure "<nome> missing" (o "ambiguous").
-     * Il nome puo' contenere spazi, l'oid no: conta cio' che segue il
-     * primo spazio, che deve essere un oid valido. */
+    /* Risposta: "<tipo> <oid> <dimensione>", oppure "<nome> missing" (o
+     * "ambiguous"). Il nome puo' contenere spazi, oid e dimensione no:
+     * conta cio' che segue il primo spazio, che deve essere un oid valido,
+     * uno spazio e sole cifre. */
     type = GIT_OBJ_MISSING;
     line = str_cstr(&b->line);
     sp = strchr(line, ' ');
-    if ((sp != NULL) && oid_from_hex(oid, sp + 1, strlen(sp + 1))) {
+    sz = (sp != NULL) ? strchr(sp + 1, ' ') : NULL;
+    if ((sz != NULL) && (sz[1] != '\0') &&
+        (strspn(sz + 1, "0123456789") == strlen(sz + 1)) &&
+        oid_from_hex(oid, sp + 1, (size_t)(sz - (sp + 1)))) {
+        b->size = strtoul(sz + 1, NULL, 10);
         type = GIT_OBJ_OTHER;
         type_len = (size_t)(sp - line);
         for (i = 0U; i < (sizeof types / sizeof types[0]); i++) {

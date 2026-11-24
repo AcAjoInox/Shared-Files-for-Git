@@ -42,6 +42,8 @@ static void entry_init(SharedEntry_t *e)
     str_init(&e->pending_path);
     str_init(&e->pending_commit);
     str_init(&e->seen_url);
+    str_init(&e->auth_accepted);
+    str_init(&e->auth_rejected);
     e->seen_at = 0UL;
     e->id[0] = '\0';
     e->in_gitshared = 0U;
@@ -64,6 +66,8 @@ static void entry_free(SharedEntry_t *e)
     str_free(&e->pending_path);
     str_free(&e->pending_commit);
     str_free(&e->seen_url);
+    str_free(&e->auth_accepted);
+    str_free(&e->auth_rejected);
 }
 
 void repo_close(Repo_t *r)
@@ -360,6 +364,10 @@ static void parse_local_rec(Repo_t *r, const char *rec)
         } else if (field_is(&k, "authorityseen")) {
             /* D-112: un valore malformato vale come mai visto */
             (void)remote_seen_parse(k.value, &e->seen_url, &e->seen_at);
+        } else if (field_is(&k, "authorityaccepted")) {
+            str_addz(&e->auth_accepted, k.value); /* D-111 */
+        } else if (field_is(&k, "authorityrejected")) {
+            str_addz(&e->auth_rejected, k.value);
         } else {
             /* campi sconosciuti: ignorati */
         }
@@ -626,6 +634,48 @@ static eGsErr_t config_unset(const char *id, const char *field)
     return err;
 }
 
+/* Chiave della decisione su un'autorita' (D-111). */
+static const char *auth_field(int accepted)
+{
+    return (accepted != 0) ? "authorityAccepted" : "authorityRejected";
+}
+
+eGsErr_t repo_auth_add(SharedEntry_t *e, int accepted, const char *value)
+{
+    const char *args[] = { "config", "--add", NULL, value, NULL };
+    Str_t key = STR_INIT;
+    eGsErr_t err;
+
+    str_addf(&key, "shared.%s.%s", e->id, auth_field(accepted));
+    args[2] = str_cstr(&key);
+    err = git_run(args, 0U, NULL);
+    if (err == GS_OK) {
+        str_addz((accepted != 0) ? &e->auth_accepted : &e->auth_rejected, value);
+    }
+    str_free(&key);
+    return err;
+}
+
+eGsErr_t repo_auth_drop(const char *id, int accepted, const char *value)
+{
+    const char *args[] = { "config", "--fixed-value", "--unset-all", NULL,
+                           value, NULL };
+    Str_t key = STR_INIT;
+    Str_t out = STR_INIT;
+    int code = 0;
+    eGsErr_t err;
+
+    str_addf(&key, "shared.%s.%s", id, auth_field(accepted));
+    args[3] = str_cstr(&key);
+    err = git_capture(args, PROC_STDERR_NULL, &out, &code);
+    if ((err == GS_OK) && (code != 0) && (code != 5)) { /* 5 = non c'era */
+        err = GS_ERR_GIT;
+    }
+    str_free(&out);
+    str_free(&key);
+    return err;
+}
+
 /* Fine dell'attesa: per ultima, cosi' un'interruzione si puo' ripetere. */
 static eGsErr_t end_pending(SharedEntry_t *e)
 {
@@ -706,6 +756,7 @@ static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
     Oid_t *tips;
     size_t n;
     size_t k;
+    int sovereign = 0;
     eGsErr_t err = copy_branches(r, e, committed);
 
     if (err != GS_OK) {
@@ -740,11 +791,12 @@ static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
 
     /* Link remoto (D-106): chi riceve dal creatore non e' un peer di
      * nessuno e il creatore non registra nulla. Le versioni arrivano dal
-     * creatore, con pull (D-110). Se la catena viene dal creatore, la sua
-     * punta e' anche l'ultima versione vista; da una copia no. Gli URL si
-     * confrontano in forma normale (D-112, P-04). */
+     * creatore, con pull (D-110). Se la catena viene dall'autorita' (D-111:
+     * l'ultimo sovrano, o il creatore), la sua punta e' anche l'ultima
+     * versione vista; da una copia no. Gli URL si confrontano in forma
+     * normale (D-112, P-04). */
     if (e->pending_remote != 0U) {
-        if ((remote_creator_url(b, &t, &found) == GS_OK) && (found.len > 0U) &&
+        if ((auth_target(b, &t, &found, &sovereign) == GS_OK) && (found.len > 0U) &&
             remote_same(str_cstr(&found), str_cstr(&e->pending_src))) {
             remote_seen_ref(&ref, e->id);
             if (git_set_ref(str_cstr(&ref), &t, "git shared: link") == GS_OK) {

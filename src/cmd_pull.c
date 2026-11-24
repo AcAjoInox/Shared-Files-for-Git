@@ -14,6 +14,7 @@
 
 #include "cmd.h"
 #include "cmd_common.h"
+#include "auth.h"
 #include "mem.h"
 #include "remote.h"
 
@@ -24,6 +25,7 @@ int cmd_pull(int argc, char **argv)
     GitBatch_t batch;
     unsigned char *sel = NULL;
     unsigned char *res = NULL;
+    unsigned char *sov = NULL;
     Str_t *urls = NULL;
     const char *path;
     const char *label;
@@ -54,6 +56,7 @@ int cmd_pull(int argc, char **argv)
     n = repo.n;
     sel = xmalloc((n > 0U) ? n : 1U);
     res = xmalloc((n > 0U) ? n : 1U);
+    sov = xmalloc((n > 0U) ? n : 1U);
     urls = xmalloc(((n > 0U) ? n : 1U) * sizeof *urls);
     for (i = 0U; i < n; i++) {
         str_init(&urls[i]);
@@ -63,8 +66,8 @@ int cmd_pull(int argc, char **argv)
         goto exit;
     }
 
-    /* 1. fetch dai creatori */
-    cmd_fetch_creators(&repo, &batch, sel, res, urls);
+    /* 1. fetch dalle autorita' (D-111: l'ultimo sovrano, o il creatore) */
+    cmd_fetch_creators(&repo, &batch, sel, res, urls, sov);
     for (i = 0U; i < n; i++) {
         if (sel[i] == 0U) {
             continue;
@@ -77,11 +80,13 @@ int cmd_pull(int argc, char **argv)
                 sel[i] = 0U;
             } /* senza path: update come per ogni file locale */
         } else if (res[i] == (unsigned char)REMOTE_MISSING) {
-            msg_error(MSG_ERR_CREATOR_MISSING, label, str_cstr(&urls[i]));
+            msg_error(MSG_ERR_CREATOR_MISSING, label, auth_role(sov[i]),
+                      str_cstr(&urls[i]));
             rc = GS_EXIT_ERROR;
             sel[i] = 0U;
         } else if (res[i] == (unsigned char)REMOTE_UNREACHABLE) {
-            msg_error(MSG_ERR_CREATOR_UNREACHABLE, label, str_cstr(&urls[i]));
+            msg_error(MSG_ERR_CREATOR_UNREACHABLE, label, auth_role(sov[i]),
+                      str_cstr(&urls[i]));
             rc = GS_EXIT_ERROR;
             sel[i] = 0U;
         } else {
@@ -106,6 +111,7 @@ exit:
         }
     }
     free(urls);
+    free(sov);
     free(res);
     free(sel);
     if (opened != 0) {

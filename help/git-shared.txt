@@ -36,6 +36,7 @@ COMMANDS
     update     get the new versions and apply them, merging if needed
     push       send the published versions to the creator (remote)
     pull       get the versions of the creator and apply them (remote)
+    crown      move the authority of a file to another remote (remote)
     branch     choose the branches where a file is shared
     prune      forget the peers that no longer exist
     relocate   tell the peers that this repository was moved or copied

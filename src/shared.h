@@ -37,6 +37,9 @@ typedef struct {
     Str_t seen_url;    /* authoritySeen: URL su cui e' stata vista
                         * refs/shared-authority/<id> ("" = mai, D-112) */
     unsigned long seen_at; /* authoritySeen: quando, secondi dal 1970 */
+    Str_t auth_accepted; /* authorityAccepted: autorita' accettate, elenco
+                          * compatto di valori auth_key (D-111) */
+    Str_t auth_rejected; /* authorityRejected: autorita' rifiutate */
     char id[GS_ID_HEX_LEN + 1U]; /* "" se in .gitshared non e' valido */
     unsigned in_gitshared : 1U; /* sezione in .gitshared (working tree) */
     unsigned in_config : 1U;    /* sezione [shared "<id>"] in .git/config */
@@ -162,6 +165,15 @@ eGsErr_t repo_declaring_branch(const char *id, GitBatch_t *b, Str_t *branch,
  * [shared "<id>"] spariscono. Un peer irraggiungibile e' un avviso.
  */
 eGsErr_t repo_forget(const Repo_t *r, SharedEntry_t *e, GitBatch_t *b);
+
+/*
+ * Decisioni sui cambi di autorita' (D-111, REQ-F-030): accepted = 1 per
+ * shared.<id>.authorityAccepted, 0 per authorityRejected; value come
+ * auth_key. repo_auth_add aggiunge il valore anche alla voce in memoria;
+ * repo_auth_drop toglie dalla config ogni copia del valore (non c'era: ok).
+ */
+eGsErr_t repo_auth_add(SharedEntry_t *e, int accepted, const char *value);
+eGsErr_t repo_auth_drop(const char *id, int accepted, const char *value);
 
 /* Scrive shared.selfPath (REQ-F-017). */
 eGsErr_t repo_set_self(Repo_t *r, const char *path);

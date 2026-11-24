@@ -9,6 +9,7 @@
 
 #define GS_PATH_MAX   4096U /* caratteri di un path o di un URL */
 #define GS_PEER_MAX   32U   /* peer per file shared */
+#define GS_SOVEREIGN_MAX 16U /* sovrani nella voce "sovereigns" (D-111) */
 #define GS_ID_HEX_LEN 32U   /* cifre esadecimali dell'ID (128 bit, D-006) */
 #define GS_ID_RAW_LEN 16U   /* byte dell'ID */
 

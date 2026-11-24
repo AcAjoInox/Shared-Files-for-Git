@@ -80,6 +80,7 @@ git commit -m "update common.h"
 | `git shared update [--all] [<file>]` | Receives and applies the latest version; `--ours` / `--theirs` keeps one version, `--abort` gives up a merge |
 | `git shared push [<remote>] [<file>]` | Remote (beta): sends the published versions to the creator; the first time, `<remote>` becomes the creator |
 | `git shared pull [<file>]` | Remote (beta): receives the versions of the creator, then `update` |
+| `git shared crown <remote> <file>` | Remote (beta): moves the authority of the file to another remote, the creator stays; `--restore` goes back to the creator, `--accept` / `--reject` decide a change received |
 | `git shared branch <file> [-a\|-rm <branch>]` | Chooses the branches where the file is shared; on the others it is a regular file |
 | `git shared prune [-n]` | Removes peers that were deleted or no longer share the file |
 | `git shared relocate [--copy]` | Tells the peers that the repository was moved or copied |
@@ -128,6 +129,8 @@ git shared pull -c
 ```
 
 Who cannot write to the creator keeps their version as a proposal. Not there yet: linking by name, receiving a proposal with a command, signatures.
+
+The creator never changes. If it is gone or moved, `git shared crown <remote> <file>` gives the file a **sovereign**: the remote that its versions now come from and go to. A change of authority is never automatic: whoever receives it accepts or rejects it with `git shared crown --accept` or `--reject`, and `git shared crown --restore` goes back to the line of the creator.
 
 ## Limits of the first release
 

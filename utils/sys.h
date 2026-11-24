@@ -38,6 +38,14 @@ char *sys_getenv(const char *name);
  */
 int sys_setenv(const char *name, const char *value);
 
+/*
+ * 1 se lo standard input e' un terminale, a cui si puo' fare una domanda
+ * (crown, D-111). Windows: la console, oppure il terminale di Git Bash
+ * (mintty), che per un programma nativo e' una pipe di nome
+ * "msys-...-pty..." o "cygwin-...-pty...", come lo riconosce git.
+ */
+int sys_stdin_is_tty(void);
+
 FILE *sys_fopen(const char *path, const char *mode);
 int sys_remove(const char *path);
 

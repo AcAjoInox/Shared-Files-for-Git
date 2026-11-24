@@ -484,19 +484,19 @@ int cmd_reopen(Repo_t *r, GitBatch_t *b)
     return cmd_open(r, b);
 }
 
-/* Nuova versione: blob di HEAD, genitore T, creatore di T (D-103), ref
- * condizionata a T. H e T sono quelli da cui e' stato ricavato lo stato
- * (reportIdea B-31). */
+/* Nuova versione: blob di HEAD, genitore T, creatore e sovrani di T
+ * (D-103, D-111), ref condizionata a T. H e T sono quelli da cui e' stato
+ * ricavato lo stato (reportIdea B-31). */
 static eGsErr_t new_version(const SharedEntry_t *e, GitBatch_t *b,
                             const StateInfo_t *si, Oid_t *v_out)
 {
     Str_t ref = STR_INIT;
-    Oid_t creator;
+    AuthBlobs_t auth;
     Oid_t v;
     eGsErr_t err;
 
-    chain_creator(b, &si->tip, NULL, &creator);
-    err = chain_commit(&si->h, &si->tip, NULL, &creator, str_cstr(&e->name), &v);
+    auth_blobs(b, &si->tip, &auth);
+    err = chain_commit(&si->h, &si->tip, NULL, &auth, str_cstr(&e->name), &v);
 
     if (err == GS_OK) {
         /* Condizionata: se nel frattempo un peer ha cambiato T, non si
@@ -551,7 +551,7 @@ int cmd_publish_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     unsigned npeers = (unsigned)str_zcount(&e->peers);
     unsigned have = 0U; /* peer che hanno gia' T */
     Oid_t t = *tip;
-    Oid_t creator;
+    AuthBlobs_t auth;
     int rc = GS_EXIT_OK;
 
     if (create != NULL) {
@@ -567,8 +567,8 @@ int cmd_publish_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     if (npeers == 0U) {
         /* Con un creatore le versioni vanno in remoto: niente da dire qui
          * (D-104). */
-        chain_creator(b, &t, NULL, &creator);
-        if (creator.len == 0U) {
+        auth_blobs(b, &t, &auth);
+        if (auth.creator.len == 0U) {
             printf(msg(MSG_PUB_NO_PEERS), label);
             putchar('\n');
         }
@@ -608,6 +608,84 @@ exit:
     str_free(&todo);
     str_free(&push);
     return rc;
+}
+
+void cmd_auth_how(const SharedEntry_t *e, const Received_t *rv, size_t k, Str_t *how)
+{
+    str_reset(how);
+    if (receive_pending_changes(rv) > 1U) {
+        str_addf(how, "%s ", str_cstr(&rv->changes[k].authority));
+    }
+    str_add(how, str_cstr(&e->path));
+}
+
+/* "<oid breve>, <autore>, <data>" di una versione: chi l'ha creata
+ * (D-111; chi l'ha spinta git non lo registra). */
+static void version_info(const Oid_t *v, Str_t *out)
+{
+    const char *args[] = { "log", "-1", "--format=%h, %an, %as", NULL, NULL };
+    char hex[OID_HEX_SIZE];
+
+    oid_to_hex(v, hex);
+    args[3] = hex;
+    str_reset(out);
+    if ((git_run(args, 0U, out) != GS_OK) || (out->len == 0U)) {
+        str_reset(out);
+        str_add(out, hex);
+    }
+}
+
+void cmd_auth_describe(const AuthChange_t *c, Str_t *from, Str_t *info)
+{
+    version_info(&c->version, info);
+    str_reset(from);
+    if (c->by_authority != 0U) {
+        str_add(from, msg(MSG_AUTH_BY_AUTHORITY));
+    } else if (c->from.len > 0U) {
+        str_addf(from, msg(MSG_AUTH_BY_PEER), str_cstr(&c->from));
+    } else {
+        str_add(from, msg(MSG_AUTH_BY_UNKNOWN));
+    }
+}
+
+void cmd_print_auth_changes(const SharedEntry_t *e, const Received_t *rv, int warn)
+{
+    const AuthChange_t *c;
+    const char *tab;
+    Str_t how = STR_INIT;
+    Str_t info = STR_INIT;
+    Str_t from = STR_INIT;
+    size_t k;
+
+    for (k = 0U; k < rv->nchanges; k++) {
+        c = &rv->changes[k];
+        if (c->rejected != 0U) {
+            continue; /* gia' deciso */
+        }
+        cmd_auth_how(e, rv, k, &how);
+        if (warn != 0) {
+            msg_warning(MSG_WARN_AUTH_PENDING, str_cstr(&e->path),
+                        str_cstr(&c->authority), str_cstr(&how));
+            continue;
+        }
+        cmd_auth_describe(c, &from, &info);
+        printf("    %-6s ", msg(MSG_STATUS_FIELD_AUTHORITY));
+        printf(msg(MSG_AUTH_CHANGE), str_cstr(&c->authority), str_cstr(&from),
+               str_cstr(&info));
+        putchar('\n');
+        tab = strchr(str_cstr(&c->key), '\t');
+        if ((c->creator != 0U) && (tab != NULL)) {
+            printf("    %-9s ", "");
+            printf(msg(MSG_AUTH_NEW_CREATOR), tab + 1);
+            putchar('\n');
+        }
+        printf("    %-9s ", "");
+        printf(msg(MSG_AUTH_HOW), str_cstr(&how));
+        putchar('\n');
+    }
+    str_free(&from);
+    str_free(&info);
+    str_free(&how);
 }
 
 void cmd_warn_suspended(const SharedEntry_t *e, BranchNames_t *bn)
@@ -677,7 +755,7 @@ int cmd_select(Repo_t *r, const char *user_path, unsigned char *sel)
 }
 
 void cmd_fetch_creators(Repo_t *r, GitBatch_t *b, const unsigned char *sel,
-                        unsigned char *res, Str_t *urls)
+                        unsigned char *res, Str_t *urls, unsigned char *sov)
 {
     size_t n = r->n;
     uint8_t *got = xmalloc((n > 0U) ? n : 1U);
@@ -689,22 +767,27 @@ void cmd_fetch_creators(Repo_t *r, GitBatch_t *b, const unsigned char *sel,
     size_t j;
     size_t k;
     size_t m;
+    int sovereign;
 
     for (i = 0U; i < n; i++) {
         res[i] = CMD_NO_CREATOR;
         str_reset(&urls[i]);
-        if (sel[i] == 0U) {
-            continue;
+        sovereign = 0;
+        if (sel[i] != 0U) {
+            /* Catena assente: prima si ricostruisce, senza rete (B-51). */
+            chain_ref(&ref, r->v[i].id);
+            if (((git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) &&
+                 (receive_restore_chain(&r->v[i], b, &t) != GS_OK)) ||
+                (auth_target(b, &t, &urls[i], &sovereign) != GS_OK)) {
+                str_reset(&urls[i]);
+                sovereign = 0;
+            }
         }
-        /* Catena assente: prima si ricostruisce, senza rete (B-51). */
-        chain_ref(&ref, r->v[i].id);
-        if (((git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) &&
-             (receive_restore_chain(&r->v[i], b, &t) != GS_OK)) ||
-            (remote_creator_url(b, &t, &urls[i]) != GS_OK)) {
-            str_reset(&urls[i]);
+        if (sov != NULL) {
+            sov[i] = (unsigned char)sovereign;
         }
     }
-    /* Un fetch per creatore: le voci con lo stesso URL, anche scritto in
+    /* Un fetch per autorita': le voci con lo stesso URL, anche scritto in
      * un'altra forma (D-112, P-04), vanno insieme. */
     for (i = 0U; i < n; i++) {
         if ((sel[i] == 0U) || (urls[i].len == 0U) || (res[i] != CMD_NO_CREATOR)) {

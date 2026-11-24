@@ -44,16 +44,17 @@ static int become_creator(const Repo_t *r, const SharedEntry_t *e,
     const char *label = str_cstr(&e->path);
     char hex[OID_HEX_SIZE];
     Str_t ref = STR_INIT;
+    AuthBlobs_t auth;
     Oid_t blob;
-    Oid_t creator;
     Oid_t v;
     int rc = GS_EXIT_ERROR;
 
     oid_to_hex(t, hex);
     str_addf(&ref, "%s:content", hex);
+    auth.sovereigns.len = 0U; /* un creatore, mai incoronato */
     if (!git_batch_blob(b, str_cstr(&ref), &blob) ||
-        (remote_url_blob(str_cstr(url), &creator) != GS_OK) ||
-        (chain_commit(&blob, t, NULL, &creator, str_cstr(&e->name), &v) != GS_OK)) {
+        (remote_url_blob(str_cstr(url), &auth.creator) != GS_OK) ||
+        (chain_commit(&blob, t, NULL, &auth, str_cstr(&e->name), &v) != GS_OK)) {
         msg_error(MSG_ERR_PUBLISH, label);
         goto exit;
     }
@@ -64,7 +65,7 @@ static int become_creator(const Repo_t *r, const SharedEntry_t *e,
         /* P-03 (D-112): un primo push riuscito a cui e' mancato
          * l'update-ref ha lasciato la versione sul remoto: si riconosce e
          * si prende quella, invece di ricrearla con un'altra data. */
-        if (remote_find_own(b, str_cstr(url), e->id, t, &creator, &v)) {
+        if (remote_find_own(b, str_cstr(url), e->id, t, NULL, &auth, &v)) {
             break;
         }
         msg_error(MSG_ERR_CREATOR_PUSH, label, str_cstr(url));
@@ -95,7 +96,9 @@ exit:
 }
 
 /* Copia delle catene nel proprio remote: per chi clona questa repo. Si
- * salta il file il cui creatore e' il proprio remote. */
+ * salta il file la cui autorita' e' il proprio remote (D-111: non il
+ * creatore, altrimenti dopo un passaggio di consegne si salterebbe proprio
+ * la copia che informa i lettori). */
 static void push_copies(const Repo_t *r, const unsigned char *sel,
                         const Str_t *urls, const Oid_t *tips, const Str_t *own)
 {
@@ -134,12 +137,38 @@ static void push_copies(const Repo_t *r, const unsigned char *sel,
 }
 
 /*
- * Versioni ufficiali: un push per creatore, con le catene il cui T non e'
- * gia' l'ultima versione vista. GS_EXIT_ERROR se il creatore ne rifiuta
- * qualcuna.
+ * Push rifiutato perche' l'autorita' e' piu' avanti: se la sua versione,
+ * gia' qui, porta un cambio di autorita' da decidere, pull non servirebbe
+ * (riporterebbe lo stesso cambio) e si dice di decidere (D-111). 1 se e'
+ * cosi', con l'argomento di crown --accept in how.
  */
-static int push_creators(const Repo_t *r, const unsigned char *sel,
-                         const Str_t *urls, const Oid_t *tips, const Oid_t *seen)
+static int pending_on_authority(const Repo_t *r, const SharedEntry_t *e,
+                                GitBatch_t *b, Str_t *how)
+{
+    Received_t rv = RECEIVED_INIT;
+    size_t k;
+    int found = 0;
+
+    if (receive_pending_auth(r, e, b, &rv) == GS_OK) {
+        for (k = 0U; (k < rv.nchanges) && (found == 0); k++) {
+            if ((rv.changes[k].by_authority != 0U) && (rv.changes[k].rejected == 0U)) {
+                cmd_auth_how(e, &rv, k, how);
+                found = 1;
+            }
+        }
+    }
+    received_free(&rv);
+    return found;
+}
+
+/*
+ * Versioni ufficiali: un push per autorita', con le catene il cui T non e'
+ * gia' l'ultima versione vista. GS_EXIT_ERROR se l'autorita' ne rifiuta
+ * qualcuna. sov[i]: l'autorita' e' un sovrano (per i messaggi).
+ */
+static int push_creators(const Repo_t *r, GitBatch_t *b, const unsigned char *sel,
+                         const Str_t *urls, const unsigned char *sov,
+                         const Oid_t *tips, const Oid_t *seen)
 {
     size_t n = r->n;
     Oid_t *v = xmalloc(((n > 0U) ? n : 1U) * sizeof *v);
@@ -172,7 +201,8 @@ static int push_creators(const Repo_t *r, const unsigned char *sel,
             }
             done[j] = 1U;
             if (oid_eq(&seen[j], &tips[j])) {
-                printf(msg(MSG_PUSH_ON_CREATOR), str_cstr(&r->v[j].path), url);
+                printf(msg(MSG_PUSH_ON_CREATOR), str_cstr(&r->v[j].path),
+                       auth_role(sov[j]), url);
                 putchar('\n');
             } else {
                 str_addz(&ids, r->v[j].id);
@@ -192,15 +222,20 @@ static int push_creators(const Repo_t *r, const unsigned char *sel,
                 if (git_set_ref(str_cstr(&ref), &v[k], "git shared: push") == GS_OK) {
                     (void)remote_seen_write(e->id, url, NULL, NULL);
                 }
-                printf(msg(MSG_PUSH_TO_CREATOR), label, url);
+                printf(msg(MSG_PUSH_TO_CREATOR), label, auth_role(sov[idx[k]]), url);
                 putchar('\n');
                 break;
             case REMOTE_PUSH_NEWER:
-                msg_error(MSG_ERR_CREATOR_NEWER, label, url);
+                if (pending_on_authority(r, e, b, &ref)) {
+                    msg_error(MSG_ERR_AUTH_DECIDE_FIRST, label, url, str_cstr(&ref));
+                } else {
+                    msg_error(MSG_ERR_CREATOR_NEWER, label, auth_role(sov[idx[k]]), url);
+                }
                 rc = GS_EXIT_ERROR;
                 break;
             default:
-                msg_error(MSG_ERR_CREATOR_REFUSED, label, url);
+                msg_error(MSG_ERR_CREATOR_REFUSED, label, auth_role(sov[idx[k]]),
+                          url);
                 rc = GS_EXIT_ERROR;
                 break;
             }
@@ -222,7 +257,8 @@ int cmd_push(int argc, char **argv)
     GitBatch_t batch;
     unsigned char *sel = NULL;
     Str_t own = STR_INIT;  /* URL del proprio remote, "" = nessuno */
-    Str_t *urls = NULL;    /* creatore di ogni voce, "" = nessuno */
+    Str_t *urls = NULL;    /* autorita' di ogni voce, "" = nessuna */
+    unsigned char *sov = NULL; /* l'autorita' e' un sovrano */
     Oid_t *tips = NULL;    /* T di ogni voce */
     Oid_t *seen = NULL;    /* ultima versione vista del creatore */
     Str_t ref = STR_INIT;
@@ -234,6 +270,7 @@ int cmd_push(int argc, char **argv)
     size_t n = 0U;
     size_t i;
     int npos;
+    int sovereign;
     int first;
     int any = 0;
     int opened = 0;
@@ -285,6 +322,7 @@ int cmd_push(int argc, char **argv)
     n = repo.n;
     sel = xmalloc((n > 0U) ? n : 1U);
     urls = xmalloc(((n > 0U) ? n : 1U) * sizeof *urls);
+    sov = xmalloc((n > 0U) ? n : 1U);
     tips = xmalloc(((n > 0U) ? n : 1U) * sizeof *tips);
     seen = xmalloc(((n > 0U) ? n : 1U) * sizeof *seen);
     for (i = 0U; i < n; i++) {
@@ -311,11 +349,14 @@ int cmd_push(int argc, char **argv)
             sel[i] = 0U;
             continue;
         }
-        if (remote_creator_url(&batch, &tips[i], &urls[i]) != GS_OK) {
+        sovereign = 0;
+        if (auth_target(&batch, &tips[i], &urls[i], &sovereign) != GS_OK) {
             str_reset(&urls[i]);
+            sovereign = 0;
         }
-        /* L'ultima versione vista conta solo se e' stata vista su questo
-         * creatore (D-112): altrimenti push non sa che cosa ha. */
+        sov[i] = (unsigned char)sovereign;
+        /* L'ultima versione vista conta solo se e' stata vista su questa
+         * autorita' (D-112): altrimenti push non sa che cosa ha. */
         remote_seen_ref(&ref, e->id);
         if ((git_batch_query(&batch, str_cstr(&ref), &seen[i]) != GIT_OBJ_COMMIT) ||
             (e->seen_url.len == 0U) || (urls[i].len == 0U) ||
@@ -344,7 +385,7 @@ int cmd_push(int argc, char **argv)
         goto exit;
     }
     push_copies(&repo, sel, urls, tips, &own);
-    if (push_creators(&repo, sel, urls, tips, seen) != GS_EXIT_OK) {
+    if (push_creators(&repo, &batch, sel, urls, sov, tips, seen) != GS_EXIT_OK) {
         rc = GS_EXIT_ERROR;
     }
 
@@ -356,6 +397,7 @@ exit:
     }
     free(seen);
     free(tips);
+    free(sov);
     free(urls);
     free(sel);
     if (opened != 0) {

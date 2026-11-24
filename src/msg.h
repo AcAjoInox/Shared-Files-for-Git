@@ -26,6 +26,7 @@ typedef enum {
     MSG_USAGE_STATUS,
     MSG_USAGE_PUSH,
     MSG_USAGE_PULL,
+    MSG_USAGE_CROWN,
     MSG_USAGE_HOOK,
 
     MSG_ERR_UNKNOWN_CMD,     /* sottocomando */
@@ -114,10 +115,11 @@ typedef enum {
     MSG_ERR_NO_CREATOR,      /* id, url */
     MSG_ERR_BAD_ID,          /* id */
     MSG_ERR_CREATOR_PUSH,    /* file, url */
-    MSG_ERR_CREATOR_NEWER,   /* file, url */
-    MSG_ERR_CREATOR_REFUSED, /* file, url */
-    MSG_ERR_CREATOR_MISSING, /* file, url */
-    MSG_ERR_CREATOR_UNREACHABLE, /* file, url */
+    MSG_ERR_CREATOR_NEWER,   /* file, ruolo, url */
+    MSG_ERR_CREATOR_REFUSED, /* file, ruolo, url */
+    MSG_ERR_CREATOR_MISSING, /* file, ruolo, url */
+    MSG_ERR_CREATOR_UNREACHABLE, /* file, ruolo, url */
+    MSG_ERR_AUTH_DECIDE_FIRST, /* file, url, [url] path (D-111) */
     MSG_ERR_PUSH_NO_CREATOR, /* file, path */
     MSG_ERR_PUSH_NOTHING,
     MSG_ERR_PULL_NO_CREATOR, /* file, path */
@@ -139,6 +141,7 @@ typedef enum {
     MSG_WARN_MOVED,          /* path ricordato */
     MSG_WARN_BRANCHES_GONE,  /* file, branch attivi, path */
     MSG_WARN_RELOCATE_NOT_MEMBER, /* file, path */
+    MSG_WARN_AUTH_PENDING,   /* file, url, [url] path (D-111) */
     MSG_WARN_COPY_FAILED,    /* file, url */
     MSG_WARN_CHAIN_RESTORED, /* file, da dove (D-112, B-51) */
     MSG_HOOK_NOT_ALIGNED,    /* file, stato, comando */
@@ -196,11 +199,11 @@ typedef enum {
     MSG_PUB_DIVERGED,        /* file */
     MSG_PUB_MERGING,         /* file */
     MSG_PUB_TO_MERGE,        /* file */
-    MSG_PUB_NOT_ON_CREATOR,  /* file */
+    MSG_PUB_NOT_ON_CREATOR,  /* file, ruolo */
     MSG_PUB_COPIED,          /* file, url */
     MSG_PUSH_CREATOR_NEW,    /* file, url */
-    MSG_PUSH_TO_CREATOR,     /* file, url */
-    MSG_PUSH_ON_CREATOR,     /* file, url */
+    MSG_PUSH_TO_CREATOR,     /* file, ruolo, url */
+    MSG_PUSH_ON_CREATOR,     /* file, ruolo, url */
     MSG_SKIP_STATE,          /* file, stato */
     MSG_UPD_RECEIVED,        /* file */
     MSG_UPD_APPLIED,         /* file */
@@ -224,6 +227,9 @@ typedef enum {
     MSG_STATUS_FIELD_NOTE,
     MSG_STATUS_FIELD_PEERS,
     MSG_STATUS_FIELD_CREATOR,
+    MSG_STATUS_FIELD_AUTHORITY,
+    MSG_ROLE_CREATOR,        /* ruolo dell'autorita' nei messaggi (D-111) */
+    MSG_ROLE_SOVEREIGN,
     MSG_PEER_SAME,
     MSG_PEER_BEHIND,
     MSG_PEER_NEWER,
@@ -237,15 +243,58 @@ typedef enum {
     MSG_STATUS_ANNOUNCED,    /* repo che ha annunciato */
     MSG_STATUS_TO_MERGE,     /* repo che ha annunciato */
     MSG_STATUS_RENAMED,      /* path di prima */
-    MSG_STATUS_CREATOR_UNREACHABLE, /* url */
+    MSG_STATUS_CREATOR_UNREACHABLE, /* ruolo, url */
+    MSG_STATUS_AUTH_RESTORE, /* url del creatore, path (D-111) */
+    MSG_LINK_COPY,           /* url, autorita' (D-111) */
     MSG_STATUS_CHAIN_MISSING, /* path (D-112, B-51) */
     MSG_CREATOR_SEEN,        /* data (D-112, B-53) */
+    MSG_AUTH_CHANGE,         /* url, provenienza, versione (D-111) */
+    MSG_AUTH_BY_PEER,        /* peer */
+    MSG_AUTH_BY_AUTHORITY,
+    MSG_AUTH_BY_UNKNOWN,
+    MSG_AUTH_NEW_CREATOR,    /* url */
+    MSG_AUTH_HOW,            /* [url] path */
     MSG_CREATOR_SAME,
     MSG_CREATOR_AHEAD,
-    MSG_CREATOR_BEHIND,
+    MSG_CREATOR_BEHIND,      /* ruolo */
     MSG_CREATOR_DIVERGED,
     MSG_CREATOR_UNSEEN,
     MSG_CREATOR_MISSING,
+
+    /* crown (D-111) */
+    MSG_ERR_CROWN_ARGS,
+    MSG_ERR_CROWN_NO_CREATOR,     /* file */
+    MSG_ERR_CROWN_MERGING,        /* file */
+    MSG_ERR_CROWN_BAD_URL,        /* argomento */
+    MSG_ERR_CROWN_BAD_CHAIN,      /* file, url */
+    MSG_ERR_CROWN_OTHER_CREATOR,  /* file, url, creatore */
+    MSG_ERR_CROWN_PUSH,           /* file, url */
+    MSG_ERR_CROWN_RESTORE,        /* file, url del creatore */
+    MSG_ERR_CROWN_NO_TTY,         /* file */
+    MSG_ERR_NO_AUTH_CHANGE,       /* file */
+    MSG_ERR_AUTH_CHANGE_UNKNOWN,  /* file, url */
+    MSG_ERR_AUTH_CHANGES_URL,     /* file, quanti, opzione, [url] path */
+    MSG_WARN_CROWN_OLD_NOT_TOLD,  /* file, url */
+    MSG_CROWN_ALREADY,            /* file, url */
+    MSG_CROWN_RESTORE_ALREADY,    /* file, url */
+    MSG_CROWN_LAST_SEEN,          /* data */
+    MSG_CROWN_NEVER_SEEN,
+    MSG_CROWN_NOTICE_FROM,        /* file, da, quando, a */
+    MSG_CROWN_NOTICE_LINE,        /* url */
+    MSG_CROWN_NOTICE_FOLLOW,      /* url */
+    MSG_CROWN_NOTICE_INSTALL,     /* url */
+    MSG_CROWN_NOTICE_LOST,        /* url, quante */
+    MSG_CROWN_NOTICE_PEERS,       /* quanti */
+    MSG_CROWN_ACCEPT_NOTICE,      /* file, da, a, provenienza, versione */
+    MSG_CROWN_CONTINUE,
+    MSG_CROWN_CANCELLED,          /* file */
+    MSG_CROWN_FOLLOWED,           /* file, url */
+    MSG_CROWN_FOLLOW_AHEAD,       /* file, url */
+    MSG_CROWN_TO_MERGE,           /* file */
+    MSG_CROWN_INSTALLED,          /* file, url */
+    MSG_CROWN_OLD_TOLD,           /* file, url */
+    MSG_CROWN_ACCEPTED,           /* file, url */
+    MSG_CROWN_REJECTED,           /* file, url */
 
     MSG_STATE_ALIGNED,
     MSG_STATE_TO_APPLY,

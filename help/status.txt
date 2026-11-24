@@ -23,6 +23,13 @@ DESCRIPTION
     diverged (update, then push); not checked yet (status --remote).
     Without --remote, status never uses the network.
 
+    If the authority of the file is a sovereign chosen with
+    'git shared crown', the "creator" line shows only the creator, and an
+    "authority" line shows the sovereign with the comparison. A change
+    of authority received and not decided yet is an "authority -> <url>"
+    line, with where it comes from and the command to accept or reject
+    it: until then the latest version does not move past it.
+
     If the version chain of a file is missing here, status rebuilds it
     from the last version seen on the creator, without the network, or
     from a local peer, and says so. If nobody has it, a note says to
