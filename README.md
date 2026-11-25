@@ -159,16 +159,16 @@ git shared push
 git shared pull -c
 ```
 
-Who cannot write to the creator keeps their version as a proposal, here and in the copy on their own remote. Not there yet: linking by name, receiving a proposal with a command, signatures.
+Who cannot write to the creator keeps their version for themselves, locally and on their own remote. Not supported yet: linking by name, receiving a proposal with a command, signatures.
 
 ### When the creator is gone
 
-The creator never changes: it is the identity of the file. But its repository may get deleted, or you may no longer reach it. Nothing is lost, because every repository that uses the file keeps its whole history; only the meeting point is lost. git shared lets you choose a new one, the **sovereign**, while the creator stays where it is. The remote the versions come from and go to, the creator or the last sovereign, is the **authority** of the file.
+The creator never changes: it is the identity of the file. But its repository may get deleted, or you may no longer reach it. Nothing is lost, because every repository that uses the file keeps its whole history; only the meeting point is lost. git shared lets you choose a new one: the **sovereign**, while the creator stays unchanged. The remote the versions come from and go to, the creator or the last sovereign, is the **authority** of the file.
 
 Three rules make this work:
 
-- **The heirs are known in advance.** The first two people who push the file to the authority from their own remote, and can write there, become its **heirs** (Adam and Eve). Their addresses travel in the version history, so every repository knows them before they are needed, and `git shared status` lists them. The two heirs belong to different **houses**: a house is an owner on a hosting, so `github.com/you/A` and `github.com/you/B` are one house, and they usually disappear together. Each new sovereign gets its own heirs in the same way. To keep your remote out: `git config shared.heir false`.
-- **A person decides, never a program.** A program cannot tell a remote that is gone from one that is down right now, so no remote becomes the authority by itself. When the authority stops answering, `push` tells an heir that it can take over with `git shared crown <file>` (without a remote, `crown` crowns your own `origin`).
+- **The heirs are known in advance.** The first two repositories that push the file to the authority from their own remote, and have write permission there, become its **heirs** (Adam and Eve). Their addresses travel in the version history, so every repository knows them before they are needed, and `git shared status` lists them. The two heirs belong to different **houses**: a house is an owner on a hosting, for example `github.com/you/A` and `github.com/you/B` are one house, and they usually disappear together (when an account is deleted, for instance). Each new sovereign gets its own heirs in the same way. To exclude your remote from the heirs: `git config shared.heir false`.
+- **The user decides.** There is no way to tell a remote that is gone from one that is temporarily not answering, so no remote becomes the authority by itself. When the authority stops answering, `push` tells an heir that it can take over with `git shared crown <file>` (without a remote, `crown` crowns your own `origin`).
 - **The others find the new sovereign by themselves.** `git shared pull` tries the authority, then the heirs in order of succession. When one of them has crowned itself, `pull` follows it without asking, because that heir is written in the history the reader already has.
 
 ```mermaid
@@ -203,7 +203,7 @@ If D stops answering, `pull` tries G, then H, then B.
 
 The heirs are a suggestion, not an obligation. Whoever can write to any other remote can make it the sovereign with `git shared crown <remote> <file>`; the others follow it with the same command and its URL, without write permission. `pull` points out a sovereign that is not an heir, with the command to follow it, but does not follow it by itself. A change of authority that reaches you from a local peer, or from the authority itself, waits until you accept it (`git shared crown --accept`) or refuse it (`--reject`).
 
-The creator can come back. `git shared status --remote` says so, and `git shared crown --restore` follows it again. A sovereign that was one of its heirs can also give the crown back, and all its readers go back with it.
+The creator can always come back. `git shared status --remote` points it out, and `git shared crown --restore` lets you follow it again. A sovereign that was one of its heirs can also give the crown back, and all its readers go back with it.
 
 ## Limits of the first release
 
