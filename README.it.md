@@ -116,9 +116,13 @@ Ogni comando ha la sua pagina: `git shared <comando> --help`. Le stesse pagine s
 
 ## Repository remote (beta)
 
-Il flusso principale funziona: su GitHub `push`, `pull` e `status --remote` funzionano e sono provati; permessi, credenziali e i casi meno comuni non sono ancora provati, GitLab per niente. C'è nell'eseguibile Windows di `dist/windows/` (v0.10.0) e nei sorgenti.
+Su GitHub il flusso principale è provato: `push`, `pull` e `status --remote`. Sovrani ed eredi, descritti sotto, sono provati solo tra repository sulla stessa macchina; permessi, credenziali e GitLab non sono ancora provati. C'è nell'eseguibile Windows di `dist/windows/` (v0.10.0) e nei sorgenti.
 
-Ogni file ha un **creatore**: la repository remota del suo primo `git shared push`. Il suo URL sta nella storia delle versioni del file, quindi chi ha il file sa da dove arrivano le versioni nuove. Si inviano e si scaricano solo quella storia, mai il progetto.
+Non c'è un server apposta: git shared usa il trasporto di git e i permessi dell'hosting. Viaggia solo la storia delle versioni del file, mai il progetto.
+
+### Il creatore
+
+Ogni file ha un **creatore**: la repository remota del suo primo `git shared push`. Il suo URL sta nella storia delle versioni del file, quindi chi ha il file sa da dove arrivano le versioni nuove. Chi può scrivere sul creatore ci invia le versioni; tutti ricevono da lui.
 
 ```mermaid
 flowchart LR
@@ -152,33 +156,51 @@ git shared push
 git shared pull -c
 ```
 
-Chi non può scrivere sul creatore tiene la sua versione come proposta. Non c'è ancora: collegare per nome, ricevere una proposta con un comando, le firme.
+Chi non può scrivere sul creatore tiene la sua versione come proposta, qui e nella copia sul suo remote. Non c'è ancora: collegare per nome, ricevere una proposta con un comando, le firme.
 
-Il **creatore** è la repository remota da cui tutto è iniziato, e non cambia mai. Può capitare però che quella repository venga cancellata o spostata, o che tu non riesca più a raggiungerla. Non si perde nulla: ogni repository che usa il file conserva tutta la storia. Basta eleggere un nuovo punto di riferimento, che qui si chiama **sovrano**.
+### Quando il creatore sparisce
 
-Chi può scrivere su un'altra repository remota, anche creata apposta, la nomina sovrano con il comando `git shared crown <remote> <file>`. Gli altri lanciano lo stesso comando con l'URL del sovrano: per loro `crown` si limita a seguirlo, e non servono permessi di scrittura. Da lì in poi `push` e `pull` passano dal sovrano. Se il vecchio remoto è stato solo spostato e risponde ancora, `crown` avvisa anche lui, così chi lo segue lo scopre.
+Il creatore non cambia mai: è l'identità del file. Può capitare però che la sua repository venga cancellata, o che tu non riesca più a raggiungerla. Non si perde nulla, perché ogni repository che usa il file conserva tutta la storia; si perde solo il punto d'incontro. git shared ti fa sceglierne uno nuovo, il **sovrano**, mentre il creatore resta dov'è. Il remoto da cui arrivano e verso cui vanno le versioni, il creatore o l'ultimo sovrano, è l'**autorità** del file.
 
-Il cambio non avviene mai da solo, perché un programma non sa distinguere un remoto sparito da uno che in questo momento non risponde: è sempre l'utente a decidere. Se il cambio ti arriva da un peer locale, `git shared status` lo segnala, e tu lo accetti con `git shared crown --accept` o lo rifiuti con `--reject`. Se il creatore torna raggiungibile, `git shared crown --restore` riporta l'autorità a lui.
+Tre regole lo fanno funzionare:
+
+- **Gli eredi si conoscono prima.** Le prime due persone che fanno push del file sull'autorità dal proprio remote, e che possono scriverci, diventano i suoi **eredi** (Adamo ed Eva). I loro indirizzi viaggiano nella storia delle versioni, quindi ogni repository li conosce prima che servano, e `git shared status` li elenca. I due eredi sono di **casate** diverse: una casata è un proprietario su un hosting, quindi `github.com/tu/A` e `github.com/tu/B` sono una casata, e di solito spariscono insieme. Ogni nuovo sovrano ha i suoi eredi allo stesso modo. Per tenere fuori il tuo remote: `git config shared.heir false`.
+- **Decide una persona, mai un programma.** Un programma non sa distinguere un remoto sparito da uno che in questo momento non risponde, quindi nessun remoto diventa autorità da solo. Quando l'autorità smette di rispondere, `push` dice a un erede che può prenderne il posto con `git shared crown <file>` (senza remoto, `crown` incorona il tuo `origin`).
+- **Gli altri trovano il nuovo sovrano da soli.** `git shared pull` prova l'autorità, poi gli eredi nell'ordine di successione. Quando uno di loro si è incoronato, `pull` lo segue senza chiedere, perché quell'erede è scritto nella storia che il lettore ha già.
 
 ```mermaid
 sequenceDiagram
     participant C as Creatore github.com/tu/A
-    participant S as Remoto nuovo github.com/tu/A2
+    participant H as Remote di X, erede 1 github.com/anna/X
     participant X as Repository X
     participant Y as Repository Y
-    Note over C: eliminato: pull e push falliscono
-    Note over X,Y: hanno ancora tutta la storia
-    X->>S: git shared crown github.com/tu/A2 common.h
-    Note over S: sovrano: le versioni ora arrivano da qui e vanno qui
-    Y->>S: git shared crown github.com/tu/A2 common.h
-    Note over Y: lo segue, senza permessi di scrittura
-    X->>S: git shared push
-    S->>Y: git shared pull
+    Note over C: eliminato: push e pull non hanno risposta
+    Note over X,Y: entrambe conoscono gli eredi: sono nella storia
+    X->>C: git shared push
+    Note over X: "you are heir 1: git shared crown common.h"
+    X->>H: git shared crown common.h
+    Note over H: sovrano: le versioni ora arrivano da qui e vanno qui
+    Y->>C: git shared pull: nessuna risposta
+    Y->>H: prova l'erede 1: si è incoronato
+    Note over Y: lo segue, nulla da accettare
+    H->>Y: le versioni nuove
 ```
 
-Ma come fa Y a sapere il nuovo indirizzo, se nessuno glielo dice? Con gli **eredi**. Le prime due persone che fanno push del file sul creatore dal proprio remote, e che possono scriverci, diventano i suoi eredi (Adamo ed Eva), e ogni sovrano ha i suoi eredi allo stesso modo. I loro indirizzi viaggiano nella catena delle versioni, quindi ogni repository li conosce prima che servano: `git shared status` li elenca nell'ordine di successione. I due eredi di un sovrano sono di casate diverse (una casata è un proprietario su un hosting: `github.com/tu/A` e `github.com/tu/B` sono una casata, e di solito spariscono insieme).
+L'ordine di successione è quello di un'eredità: prima gli eredi dell'autorità, poi i suoi fratelli, poi su per l'albero fino al creatore.
 
-Quando l'autorità smette di rispondere nessuno prende il suo posto da solo: `push` dice a un erede che può farlo con `git shared crown <file>` (senza remoto, `crown` vuol dire il tuo `origin`). Quando un erede si è incoronato, `git shared pull` nelle altre repository prova gli eredi in ordine, lo trova e lo segue senza chiedere. Un sovrano che non è un erede viene solo segnalato, con il comando per seguirlo. E se il creatore torna, `git shared status --remote` lo dice: tornare da lui resta una tua scelta. Per tenere il tuo remoto fuori dagli eredi: `git config shared.heir false`.
+```mermaid
+flowchart TD
+    C["Creatore<br/>github.com/tu/A"] --> B["erede 1<br/>github.com/tu/B"]
+    C --> D["erede 2, ora sovrano<br/>github.com/anna/D"]
+    D --> G["erede 1<br/>github.com/marco/G"]
+    D --> H["erede 2<br/>github.com/sara/H"]
+```
+
+Se D smette di rispondere, `pull` prova G, poi H, poi B.
+
+Gli eredi sono un suggerimento, non un obbligo. Chi può scrivere su un qualsiasi altro remoto può farne il sovrano con `git shared crown <remote> <file>`; gli altri lo seguono con lo stesso comando e il suo URL, senza permessi di scrittura. Un sovrano che non è un erede `pull` lo segnala, con il comando per seguirlo, ma non lo segue da solo. Un cambio di autorità che ti arriva da un peer locale, o dall'autorità stessa, aspetta che tu lo accetti (`git shared crown --accept`) o lo rifiuti (`--reject`).
+
+Il creatore può tornare. `git shared status --remote` lo dice, e `git shared crown --restore` torna a seguirlo. Un sovrano che era uno dei suoi eredi può anche restituirgli la corona, e tutti i suoi lettori tornano con lui.
 
 ## Limiti della prima versione
 
