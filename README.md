@@ -13,7 +13,7 @@ The file stays a regular file: anyone using the repository without the extension
 
 ## Installation
 
-**Windows, without compiling.** Download [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (built from the latest tag, v0.9.1) and put it in a folder of your `PATH`, for example `%USERPROFILE%\bin`. It needs only git 2.34 or later. Check with `git shared -h`; the manual is in `git shared help`. The file is not signed, so Windows may warn you the first time you run it.
+**Windows, without compiling.** Download [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (built from the latest tag, v0.10.0) and put it in a folder of your `PATH`, for example `%USERPROFILE%\bin`. It needs only git 2.34 or later. Check with `git shared -h`; the manual is in `git shared help`. The file is not signed, so Windows may warn you the first time you run it.
 
 **From the sources.** You need git 2.34 or later, `make` and `gcc` (MinGW-w64 on Windows).
 
@@ -119,7 +119,7 @@ Each command has its own page: `git shared <command> --help`. The same pages are
 
 ## Remote repositories (beta)
 
-The main flow works: on GitHub `push`, `pull` and `status --remote` work and are tested; permissions, credentials and the less common cases are not tested yet, and GitLab not at all. It is in the Windows executable of `dist/windows/` (v0.9.1) and in the sources.
+The main flow works: on GitHub `push`, `pull` and `status --remote` work and are tested; permissions, credentials and the less common cases are not tested yet, and GitLab not at all. It is in the Windows executable of `dist/windows/` (v0.10.0) and in the sources.
 
 Each file gets a **creator**: the remote repository of its first `git shared push`. Its URL is stored in the version history of the file, so whoever has the file knows where new versions come from. Only that history is pushed and fetched, never the project.
 
