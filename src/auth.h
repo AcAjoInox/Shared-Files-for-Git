@@ -19,6 +19,11 @@
  *
  * Due versioni hanno la stessa autorita' se hanno lo stesso creatore e la
  * stessa autorita', confrontati in forma normale (remote_same, D-112).
+ *
+ * Accanto, la voce "heirs" (D-114): gli eredi dei sovrani, la linea di
+ * successione (heirs.h). Viaggia con le altre e si unisce con loro
+ * (auth_merge), ma non fa parte dell'autorita': auth_blobs_eq e auth_same
+ * non la guardano.
  */
 #ifndef GS_AUTH_H
 #define GS_AUTH_H
@@ -34,6 +39,7 @@
 typedef struct {
     Oid_t creator;    /* len = 0: nessuna voce (file solo locale) */
     Oid_t sovereigns; /* len = 0: nessuna voce (mai incoronato) */
+    Oid_t heirs;      /* len = 0: nessuna voce (nessun erede, D-114) */
 } AuthBlobs_t;
 
 /* Le stesse voci lette. */
@@ -47,12 +53,26 @@ typedef struct {
 
 void auth_free(Auth_t *a);
 
-/* Blob delle due voci della versione v: due domande al cat-file, nessun
+/* Blob delle tre voci della versione v: tre domande al cat-file, nessun
  * processo. */
 void auth_blobs(GitBatch_t *b, const Oid_t *v, AuthBlobs_t *out);
 
-/* 1 se le due versioni hanno le stesse voci, blob per blob. */
+/* 1 se le due versioni hanno la stessa autorita' blob per blob: creator e
+ * sovereigns, non heirs. */
 int auth_blobs_eq(const AuthBlobs_t *a, const AuthBlobs_t *b);
+
+/* 1 se anche la voce heirs e' la stessa (le versioni che si riconoscono,
+ * remote_find_own). */
+int auth_blobs_eq_all(const AuthBlobs_t *a, const AuthBlobs_t *b);
+
+/*
+ * Testo di un blob scritto da altri, al piu' max byte, senza il fine riga
+ * finale: GS_ERR_FORMAT se e' piu' grande (controllato prima di leggerlo) o
+ * contiene un byte nullo. Un processo (cat-file blob) per blob non ancora
+ * letto in questo processo. Per le voci della catena (anche heirs.h).
+ */
+eGsErr_t auth_blob_text(GitBatch_t *b, const Oid_t *blob, unsigned long max,
+                        Str_t *out);
 
 /*
  * Legge le voci: un processo (cat-file blob) per blob non ancora letto in
@@ -87,7 +107,9 @@ int auth_creator_same(const Auth_t *a, const Auth_t *b);
  * Voci di una versione che insedia `url` (crown): lo stesso creatore,
  * `url` in fondo all'elenco dei sovrani. Un URL gia' nell'elenco (in forma
  * normale) si sposta in fondo; oltre GS_SOVEREIGN_MAX righe si toglie la
- * piu' vecchia (REQ-NF-011). Scrive il blob nella repo.
+ * piu' vecchia (REQ-NF-011). Scrive il blob nella repo. La voce heirs resta
+ * quella di cur: gli eredi di un sovrano uscito li toglie il chiamante
+ * (heirs_prune, D-114).
  */
 eGsErr_t auth_crown(const Auth_t *cur, const AuthBlobs_t *curb, const char *url,
                     AuthBlobs_t *out);
@@ -99,6 +121,9 @@ eGsErr_t auth_crown(const Auth_t *cur, const AuthBlobs_t *curb, const char *url,
  * solo lato -> quel lato; da entrambi allo stesso modo -> ours; da
  * entrambi in modo diverso -> *conflict = 1 e out = ours: decide il
  * chiamante (vince il lato la cui autorita' e' stata accettata, REQ-F-030).
+ * La voce heirs (D-114) a parte, con la stessa base: cambiata da un solo
+ * lato -> quel lato; da entrambi in modo diverso -> theirs, il lato
+ * ricevuto, senza conflitto (gli eredi non decidono chi comanda).
  * theirs = NULL: le voci di ours.
  */
 eGsErr_t auth_merge(GitBatch_t *b, const Oid_t *ours, const Oid_t *theirs,

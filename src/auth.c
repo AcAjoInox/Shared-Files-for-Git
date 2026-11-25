@@ -47,6 +47,7 @@ void auth_blobs(GitBatch_t *b, const Oid_t *v, AuthBlobs_t *out)
 
     out->creator.len = 0U;
     out->sovereigns.len = 0U;
+    out->heirs.len = 0U;
     if ((v == NULL) || (v->len == 0U)) {
         return;
     }
@@ -59,6 +60,11 @@ void auth_blobs(GitBatch_t *b, const Oid_t *v, AuthBlobs_t *out)
     str_addf(&name, "%s:sovereigns", hex);
     if (git_batch_blob(b, str_cstr(&name), &out->sovereigns) == 0) {
         out->sovereigns.len = 0U;
+    }
+    str_reset(&name);
+    str_addf(&name, "%s:heirs", hex);
+    if (git_batch_blob(b, str_cstr(&name), &out->heirs) == 0) {
+        out->heirs.len = 0U;
     }
     str_free(&name);
 }
@@ -75,9 +81,13 @@ int auth_blobs_eq(const AuthBlobs_t *a, const AuthBlobs_t *b)
     return entry_eq(&a->creator, &b->creator) && entry_eq(&a->sovereigns, &b->sovereigns);
 }
 
-/* Testo di un blob, al piu' max byte (senza il fine riga finale). */
-static eGsErr_t blob_text(GitBatch_t *b, const Oid_t *blob, unsigned long max,
-                          Str_t *out)
+int auth_blobs_eq_all(const AuthBlobs_t *a, const AuthBlobs_t *b)
+{
+    return auth_blobs_eq(a, b) && entry_eq(&a->heirs, &b->heirs);
+}
+
+eGsErr_t auth_blob_text(GitBatch_t *b, const Oid_t *blob, unsigned long max,
+                        Str_t *out)
 {
     const char *args[] = { "cat-file", "blob", NULL, NULL };
     char hex[OID_HEX_SIZE];
@@ -126,13 +136,13 @@ eGsErr_t auth_read(GitBatch_t *b, const AuthBlobs_t *ab, Auth_t *a)
 
     auth_reset(a);
     if (ab->creator.len > 0U) {
-        err = blob_text(b, &ab->creator, AUTH_CREATOR_MAX, &a->creator);
+        err = auth_blob_text(b, &ab->creator, AUTH_CREATOR_MAX, &a->creator);
         if ((err == GS_OK) && !remote_url_ok(str_cstr(&a->creator))) {
             err = GS_ERR_FORMAT;
         }
     }
     if ((err == GS_OK) && (ab->sovereigns.len > 0U)) {
-        err = blob_text(b, &ab->sovereigns, AUTH_SOVEREIGNS_MAX, &text);
+        err = auth_blob_text(b, &ab->sovereigns, AUTH_SOVEREIGNS_MAX, &text);
     }
     /* Un URL per riga: nessuna riga vuota, al piu' GS_SOVEREIGN_MAX. */
     for (line = str_cstr(&text); (err == GS_OK) && (text.len > 0U) && (line != NULL);
@@ -255,6 +265,7 @@ eGsErr_t auth_crown(const Auth_t *cur, const AuthBlobs_t *curb, const char *url,
     }
     from = (n >= GS_SOVEREIGN_MAX) ? ((n + 1U) - GS_SOVEREIGN_MAX) : 0U;
     out->creator = curb->creator;
+    out->heirs = curb->heirs;
     err = git_start(&proc, args, PROC_STDIN_PIPE);
     if (err != GS_OK) {
         return err;
@@ -299,7 +310,7 @@ eGsErr_t auth_merge(GitBatch_t *b, const Oid_t *ours, const Oid_t *theirs,
         return GS_OK;
     }
     auth_blobs(b, theirs, &t);
-    if (auth_blobs_eq(&o, &t)) {
+    if (auth_blobs_eq_all(&o, &t)) {
         return GS_OK; /* il caso comune: nessun processo */
     }
     err = merge_base(ours, theirs, &mb);
@@ -307,11 +318,17 @@ eGsErr_t auth_merge(GitBatch_t *b, const Oid_t *ours, const Oid_t *theirs,
         goto exit;
     }
     auth_blobs(b, (mb.len > 0U) ? &mb : NULL, &base);
-    if (auth_blobs_eq(&base, &t)) {
-        goto exit; /* cambiata solo da ours */
+    /* Gli eredi (D-114): cambiati da un solo lato -> quel lato; da
+     * entrambi -> il lato ricevuto. */
+    if (!entry_eq(&o.heirs, &t.heirs) && !entry_eq(&base.heirs, &t.heirs)) {
+        out->heirs = t.heirs;
+    }
+    if (auth_blobs_eq(&o, &t) || auth_blobs_eq(&base, &t)) {
+        goto exit; /* uguali, o cambiata solo da ours */
     }
     if (auth_blobs_eq(&base, &o)) {
-        *out = t; /* cambiata solo da theirs */
+        out->creator = t.creator; /* cambiata solo da theirs */
+        out->sovereigns = t.sovereigns;
         goto exit;
     }
     /* Blob diversi: lo stesso URL puo' essere scritto in due forme. Una
@@ -322,7 +339,8 @@ eGsErr_t auth_merge(GitBatch_t *b, const Oid_t *ours, const Oid_t *theirs,
     if (auth_same(&ao, &at) || auth_same(&abase, &at)) {
         /* uguali, o theirs come la base: resta ours */
     } else if (auth_same(&abase, &ao)) {
-        *out = t;
+        out->creator = t.creator;
+        out->sovereigns = t.sovereigns;
     } else {
         *conflict = 1;
     }

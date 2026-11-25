@@ -22,8 +22,8 @@ void chain_ref(Str_t *ref, const char *id);
  * Commit di versione con il blob dato e i genitori dati: parent = NULL per
  * la prima versione; parent2 != NULL per l'unione di due versioni (D-078).
  * Autore e data dell'utente (D-013), messaggio "shared: <name>". auth:
- * blob delle voci "creator" (D-103) e "sovereigns" (D-111), ognuna solo se
- * len > 0; NULL per nessuna. Non tocca nessuna ref.
+ * blob delle voci "creator" (D-103), "sovereigns" (D-111) e "heirs"
+ * (D-114), ognuna solo se len > 0; NULL per nessuna. Non tocca nessuna ref.
  */
 eGsErr_t chain_commit(const Oid_t *blob, const Oid_t *parent,
                       const Oid_t *parent2, const AuthBlobs_t *auth,

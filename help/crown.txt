@@ -4,7 +4,7 @@ NAME
     git shared crown - move the authority of a file to another remote
 
 SYNOPSIS
-    git shared crown [--yes] <remote> <path>
+    git shared crown [--yes] [<remote>] <path>
     git shared crown [--yes] --restore <path>
     git shared crown [--yes] --accept [<url>] <path>
     git shared crown --reject [<url>] <path>
@@ -20,6 +20,7 @@ DESCRIPTION
     the creator.
 
     <remote> is the name of a remote of this repository, or a URL.
+    Without it, origin: your own remote takes the file.
 
     If <remote> already governs the file (its latest version says so),
     crown follows it: no write access is needed there, as for any
@@ -42,10 +43,32 @@ DESCRIPTION
     does not answer now.
 
     Receiving a change of authority, from a local peer or from the
-    authority itself, is never automatic either: the latest version
+    authority itself, is not automatic either: the latest version
     stays at the last one with the old authority until the change is
     accepted or rejected. 'git shared status' shows it on the line
-    'authority -> <url>'.
+    'authority -> <url>'. The one exception is an heir (below).
+
+HEIRS
+    The first two editors who push the file to the creator, or to a
+    sovereign, from their own remote become its heirs: they say where
+    to look if the authority stops answering. 'git shared status' shows
+    them on the "heirs" line, in order of succession: the heirs of the
+    authority first, then its brothers, up to the creator. The two
+    heirs of an authority belong to different houses (owner and
+    hosting: github.com/luca/A and github.com/luca/B are one house).
+
+    No remote becomes the authority by itself. When the authority does
+    not answer, push tells an heir how to take over, with
+    'git shared crown <path>'. Once an heir has crowned itself,
+    'git shared pull' finds it by trying the heirs in order and follows
+    it without asking, since the authority did not answer and the heir
+    is in the chain. A sovereign that is not an heir is only shown:
+    follow it with crown. When the creator answers again, nobody
+    follows it by itself: 'git shared status --remote' says so, and
+    'crown --restore' goes back to it.
+
+    To keep your remote out of the heirs (its URL ends up in the history
+    of the file): git config shared.heir false.
 
 OPTIONS
     --restore
@@ -66,6 +89,7 @@ OPTIONS
         Do not ask for confirmation.
 
 EXAMPLES
+    git shared crown inc/common.h              # your own remote
     git shared crown origin inc/common.h
     git shared crown https://github.com/anna/A inc/common.h
     git shared crown --restore inc/common.h

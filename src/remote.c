@@ -261,6 +261,32 @@ int remote_same(const char *a, const char *b)
     return same;
 }
 
+/* La casata: la forma normale senza l'ultimo componente del path. */
+static void house_key(const char *u, Str_t *key)
+{
+    const char *slash;
+
+    url_key(u, key);
+    slash = strrchr(str_cstr(key), '/');
+    if (slash != NULL) {
+        str_setlen(key, (size_t)(slash - key->buf));
+    }
+}
+
+int remote_same_house(const char *a, const char *b)
+{
+    Str_t ka = STR_INIT;
+    Str_t kb = STR_INIT;
+    int same;
+
+    house_key(a, &ka);
+    house_key(b, &kb);
+    same = str_eq(&ka, str_cstr(&kb));
+    str_free(&kb);
+    str_free(&ka);
+    return same;
+}
+
 eGsErr_t remote_creator_url(GitBatch_t *b, const Oid_t *version, Str_t *url)
 {
     Auth_t a = AUTH_INIT;
@@ -390,6 +416,17 @@ static int remote_has(const char *url, const Str_t *ids, uint8_t *has)
         }
     }
     str_free(&out);
+    return ok;
+}
+
+int remote_reachable(const char *url)
+{
+    Str_t none = STR_INIT;
+    uint8_t has = 0U;
+    int ok;
+
+    ok = remote_url_ok(url) && remote_has(url, &none, &has);
+    str_free(&none);
     return ok;
 }
 
@@ -645,9 +682,9 @@ int remote_find_own(GitBatch_t *b, const char *url, const char *id,
     if (!git_batch_blob(b, str_cstr(&name), &mine) || !oid_eq(&oid, &mine)) {
         goto exit;
     }
-    /* le voci creator e sovereigns che questo push scriverebbe */
+    /* le voci creator, sovereigns e heirs che questo push scriverebbe */
     auth_blobs(b, &tip, &got);
-    if ((got.creator.len == 0U) || !auth_blobs_eq(&got, auth)) {
+    if ((got.creator.len == 0U) || !auth_blobs_eq_all(&got, auth)) {
         goto exit;
     }
     *v = tip;

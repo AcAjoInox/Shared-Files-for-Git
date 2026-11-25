@@ -31,8 +31,9 @@ eGsErr_t chain_commit(const Oid_t *blob, const Oid_t *parent,
     int code = 0;
     eGsErr_t err;
 
-    /* 1. Tree con la voce "content" e, in remoto, "creator" (D-103) e
-     * "sovereigns" (D-111). mktree legge lo stdin e ordina le voci. */
+    /* 1. Tree con la voce "content" e, in remoto, "creator" (D-103),
+     * "sovereigns" (D-111) e "heirs" (D-114). mktree legge lo stdin e
+     * ordina le voci. */
     oid_to_hex(blob, hex);
     err = git_start(&p, a_mktree, PROC_STDIN_PIPE);
     if (err != GS_OK) {
@@ -50,6 +51,12 @@ eGsErr_t chain_commit(const Oid_t *blob, const Oid_t *parent,
     if ((auth != NULL) && (auth->sovereigns.len > 0U)) {
         oid_to_hex(&auth->sovereigns, hex);
         if (fprintf(p.in, "100644 blob %s\tsovereigns\n", hex) < 0) {
+            err = GS_ERR_GIT;
+        }
+    }
+    if ((auth != NULL) && (auth->heirs.len > 0U)) {
+        oid_to_hex(&auth->heirs, hex);
+        if (fprintf(p.in, "100644 blob %s\theirs\n", hex) < 0) {
             err = GS_ERR_GIT;
         }
     }

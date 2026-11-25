@@ -85,6 +85,21 @@ eGsErr_t remote_arg_url(const char *top, const char *cwd, const char *arg,
 int remote_same(const char *a, const char *b);
 
 /*
+ * 1 se a e b sono della stessa casata (D-114): la forma normale senza
+ * l'ultimo componente del path, cioe' lo stesso proprietario sullo stesso
+ * hosting (github.com/luca per github.com/luca/A e github.com/luca/B); per
+ * un path locale la cartella che contiene la repo.
+ */
+int remote_same_house(const char *a, const char *b);
+
+/*
+ * 1 se la repo remota risponde (ls-remote delle sue refs/shared/), anche
+ * senza il file: per distinguere un'autorita' irraggiungibile da un push
+ * rifiutato per permessi (D-114).
+ */
+int remote_reachable(const char *url);
+
+/*
  * URL del creatore della versione `version` (voce "creator" del suo tree):
  * url vuoto se non c'e'. Nessun processo se la versione non ha la voce; un
  * processo (cat-file) per leggerla.

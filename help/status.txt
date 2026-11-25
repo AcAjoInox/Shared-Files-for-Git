@@ -30,6 +30,12 @@ DESCRIPTION
     line, with where it comes from and the command to accept or reject
     it: until then the latest version does not move past it.
 
+    A "heirs" line lists the heirs of the file in order of succession
+    (git shared crown --help, HEIRS). With --remote, if the authority
+    does not answer, a note says which heir took its place (pull follows
+    it), or that nobody did; if the authority is a sovereign and the
+    creator answers again, a note says so.
+
     If the version chain of a file is missing here, status rebuilds it
     from the last version seen on the creator, without the network, or
     from a local peer, and says so. If nobody has it, a note says to

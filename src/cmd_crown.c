@@ -5,8 +5,9 @@
  * cui arrivano le versioni ufficiali (auth.h). Il creatore non cambia mai:
  * l'autorita' passa a un sovrano.
  *
- *   crown [--yes] <remote|url> <path>
- *       se all'URL c'e' gia' un'autorita' del file (la sua ultima versione
+ *   crown [--yes] [<remote|url>] <path>
+ *       senza <remote|url> vale origin, la propria repo remota (D-114).
+ *       Se all'URL c'e' gia' un'autorita' del file (la sua ultima versione
  *       dichiara l'URL stesso), la SEGUE: nessun permesso, come ogni
  *       lettore. Altrimenti la INSEDIA: versione nuova con il tree di T e
  *       l'URL in fondo ai sovrani, genitori T e, se l'URL ha versioni che
@@ -24,6 +25,11 @@
  * stata vista l'ultima volta e quanti peer locali dovranno accettare, e
  * chiede [y/N]; senza terminale il comando rifiuta, salvo --yes. Mai
  * automatico. --reject non chiede: e' la direzione sicura.
+ *
+ * Gli eredi (D-114, heirs.h): cmd_heirs_visit, per pull e status --remote,
+ * prova gli eredi nell'ordine di successione quando l'autorita' non
+ * risponde; un erede che si e' incoronato si segue senza domande (follow
+ * con quiet). Insediare toglie gli eredi di un sovrano uscito dall'elenco.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,6 +40,7 @@
 #include "chain.h"
 #include "cmd.h"
 #include "cmd_common.h"
+#include "heirs.h"
 #include "mem.h"
 #include "merge.h"
 #include "peers.h"
@@ -56,6 +63,8 @@ typedef struct {
     Received_t *rv;  /* ricezione appena fatta: creatore, autorita' di T */
     Oid_t t;         /* T */
     int yes;         /* --yes */
+    int quiet;       /* niente avviso ne' domanda: un erede seguito da
+                      * solo (D-114) */
     int batch_ok;    /* 0 se il cat-file non si e' riaperto */
 } Crown_t;
 
@@ -250,18 +259,20 @@ static int follow(Crown_t *c, const char *seen_url, const Oid_t *u, const Auth_t
     int ok;
     int rc = GS_EXIT_ERROR;
 
-    notice_from(c, to);
-    if (line != 0) {
-        printf(msg(MSG_CROWN_NOTICE_LINE), to);
+    if (c->quiet == 0) {
+        notice_from(c, to);
+        if (line != 0) {
+            printf(msg(MSG_CROWN_NOTICE_LINE), to);
+            putchar('\n');
+        }
+        printf(msg(MSG_CROWN_NOTICE_FOLLOW), to);
         putchar('\n');
-    }
-    printf(msg(MSG_CROWN_NOTICE_FOLLOW), to);
-    putchar('\n');
-    notice_peers(c);
-    ok = confirm(c->yes, label);
-    if (ok <= 0) {
-        rc = refused(ok);
-        goto exit;
+        notice_peers(c);
+        ok = confirm(c->yes, label);
+        if (ok <= 0) {
+            rc = refused(ok);
+            goto exit;
+        }
     }
     /* L'autorita' accettata, e la versione vista su quell'URL. */
     auth_key(au, 0, &key); /* lo stesso creatore: controllato prima */
@@ -325,6 +336,8 @@ static int install(Crown_t *c, const char *url, const Oid_t *u)
     char hu[OID_HEX_SIZE];
     char ht[OID_HEX_SIZE];
     Auth_t ta = AUTH_INIT;
+    Auth_t na = AUTH_INIT;
+    Heirs_t h = HEIRS_INIT;
     AuthBlobs_t tb;
     AuthBlobs_t nb;
     Str_t ref = STR_INIT;
@@ -350,6 +363,13 @@ static int install(Crown_t *c, const char *url, const Oid_t *u)
     }
     if ((auth_of(c->b, &c->t, &ta, &tb) != GS_OK) ||
         (auth_crown(&ta, &tb, url, &nb) != GS_OK)) {
+        msg_error(MSG_ERR_PUBLISH, label);
+        goto exit;
+    }
+    /* Gli eredi di un sovrano uscito dall'elenco escono con lui (D-114). */
+    if ((nb.heirs.len > 0U) && (heirs_read(c->b, &nb.heirs, &ta, &h) == GS_OK) &&
+        (auth_read(c->b, &nb, &na) == GS_OK) && heirs_prune(&h, &na) &&
+        (heirs_write(&h, &nb.heirs) != GS_OK)) {
         msg_error(MSG_ERR_PUBLISH, label);
         goto exit;
     }
@@ -410,6 +430,8 @@ static int install(Crown_t *c, const char *url, const Oid_t *u)
     rc = cmd_publish_entry(c->r, c->e, c->b, NULL, &v); /* i peer locali */
 
 exit:
+    heirs_free(&h);
+    auth_free(&na);
     auth_free(&ta);
     str_free(&out);
     str_free(&ref);
@@ -693,6 +715,175 @@ exit:
     return rc;
 }
 
+/*
+ * Un indirizzo della linea di successione (D-114): 1 se dichiara
+ * un'autorita' nuova (esito in out; con apply e un erede, seguito), 0 se
+ * non risponde o non dice nulla di nuovo: un'altra famiglia, una versione
+ * che T contiene gia', la stessa autorita' di T, un'autorita' rifiutata.
+ */
+static int visit_one(Crown_t *c, const char *url, const Auth_t *ta,
+                     const Heirs_t *h, const Str_t *order, int apply,
+                     HeirVisit_t *out)
+{
+    const char *label = str_cstr(&c->e->path);
+    Auth_t au = AUTH_INIT;
+    Str_t old = STR_INIT;
+    const char *to;
+    Oid_t u;
+    int found = 0;
+
+    fetch_tip(c, url, &u);
+    if ((c->batch_ok == 0) || (u.len == 0U) ||
+        (auth_of(c->b, &u, &au, NULL) != GS_OK) || !auth_creator_same(ta, &au) ||
+        merge_is_ancestor(&u, &c->t)) {
+        goto exit;
+    }
+    to = auth_authority(&au);
+    if (remote_same(to, auth_authority(ta)) || rejected_had(c->e, to)) {
+        goto exit;
+    }
+    found = 1;
+    str_add(&out->where, url);
+    str_add(&out->to, to);
+    out->pos = heirs_position(order, to);
+    if (!heirs_find(h, to, NULL)) {
+        out->kind = HEIR_VISIT_OTHER; /* non un erede: lo decide l'utente */
+        goto exit;
+    }
+    out->kind = HEIR_VISIT_FOUND;
+    if (apply != 0) {
+        str_add(&old, auth_authority(ta));
+        printf(msg(MSG_PULL_HEIR_FOLLOWED), label, out->pos, to, str_cstr(&old));
+        putchar('\n');
+        out->kind = (follow(c, url, &u, &au, 0) == GS_EXIT_OK) ? HEIR_VISIT_FOLLOWED
+                                                               : HEIR_VISIT_ERROR;
+    }
+
+exit:
+    drop_tmp(c);
+    str_free(&old);
+    auth_free(&au);
+    return found;
+}
+
+void heirvisit_free(HeirVisit_t *v)
+{
+    str_free(&v->where);
+    str_free(&v->to);
+}
+
+int cmd_heirs_visit(Repo_t *r, SharedEntry_t *e, GitBatch_t *b, int apply,
+                    HeirVisit_t *out)
+{
+    Received_t rv = RECEIVED_INIT;
+    Auth_t ta = AUTH_INIT;
+    Auth_t ac = AUTH_INIT;
+    Heirs_t h = HEIRS_INIT;
+    Str_t order = STR_INIT;
+    Str_t ref = STR_INIT;
+    Crown_t c;
+    const char *url;
+    Oid_t uc;
+
+    str_reset(&out->where);
+    str_reset(&out->to);
+    out->kind = HEIR_VISIT_NONE;
+    out->pos = 0U;
+    c.r = r;
+    c.e = e;
+    c.b = b;
+    c.rv = &rv;
+    c.yes = 1;
+    c.quiet = 1;
+    c.batch_ok = 1;
+    chain_ref(&ref, e->id);
+    if ((receive_entry(r, e, b, 0, &rv) != GS_OK) ||
+        (git_batch_query(b, str_cstr(&ref), &c.t) != GIT_OBJ_COMMIT) ||
+        (heirs_of(b, &c.t, &ta, NULL, &h) != GS_OK) || (ta.creator.len == 0U)) {
+        out->kind = HEIR_VISIT_ERROR;
+        goto exit;
+    }
+    heirs_order(&ta, &h, &order);
+    for (url = str_znext(&order, NULL); url != NULL; url = str_znext(&order, url)) {
+        if (visit_one(&c, url, &ta, &h, &order, apply, out)) {
+            goto exit;
+        }
+        if (c.batch_ok == 0) {
+            out->kind = HEIR_VISIT_ERROR;
+            goto exit;
+        }
+    }
+    /* Nessun erede: il creatore, se l'autorita' e' un sovrano. Tornato, non
+     * si segue da solo: decidono le persone (crown --restore). */
+    url = str_cstr(&ta.creator);
+    if (!remote_same(url, auth_authority(&ta))) {
+        fetch_tip(&c, url, &uc);
+        if ((c.batch_ok != 0) && (uc.len > 0U) &&
+            (auth_of(b, &uc, &ac, NULL) == GS_OK) && auth_creator_same(&ta, &ac) &&
+            !remote_same(auth_authority(&ac), auth_authority(&ta))) {
+            out->kind = HEIR_VISIT_CREATOR;
+            str_add(&out->where, url);
+        }
+        drop_tmp(&c);
+    }
+
+exit:
+    if (c.batch_ok == 0) {
+        out->kind = HEIR_VISIT_ERROR;
+    }
+    str_free(&ref);
+    str_free(&order);
+    heirs_free(&h);
+    auth_free(&ac);
+    auth_free(&ta);
+    received_free(&rv);
+    return c.batch_ok;
+}
+
+int cmd_creator_back(Repo_t *r, SharedEntry_t *e, GitBatch_t *b, int *back)
+{
+    Received_t rv = RECEIVED_INIT;
+    Auth_t ta = AUTH_INIT;
+    Auth_t ac = AUTH_INIT;
+    Str_t ref = STR_INIT;
+    Crown_t c;
+    const char *creator;
+    Oid_t uc;
+
+    *back = 0;
+    c.r = r;
+    c.e = e;
+    c.b = b;
+    c.rv = &rv;
+    c.yes = 1;
+    c.quiet = 1;
+    c.batch_ok = 1;
+    chain_ref(&ref, e->id);
+    if ((git_batch_query(b, str_cstr(&ref), &c.t) != GIT_OBJ_COMMIT) ||
+        (auth_of(b, &c.t, &ta, NULL) != GS_OK) || (ta.creator.len == 0U)) {
+        goto exit;
+    }
+    creator = str_cstr(&ta.creator);
+    if (remote_same(creator, auth_authority(&ta))) {
+        goto exit; /* l'autorita' e' il creatore */
+    }
+    fetch_tip(&c, creator, &uc);
+    /* Tornato, e la sua linea non porta all'autorita' di T. */
+    if ((c.batch_ok != 0) && (uc.len > 0U) &&
+        (auth_of(b, &uc, &ac, NULL) == GS_OK) && auth_creator_same(&ta, &ac) &&
+        !remote_same(auth_authority(&ac), auth_authority(&ta))) {
+        *back = 1;
+    }
+    drop_tmp(&c);
+
+exit:
+    str_free(&ref);
+    auth_free(&ac);
+    auth_free(&ta);
+    received_free(&rv);
+    return c.batch_ok;
+}
+
 int cmd_crown(int argc, char **argv)
 {
     Repo_t repo = REPO_INIT;
@@ -740,9 +931,9 @@ int cmd_crown(int argc, char **argv)
             npos++;
         }
     }
-    /* <remote|url> <path>; --restore <path>; --accept/--reject [<url>] <path> */
+    /* [<remote|url>] <path>; --restore <path>; --accept/--reject [<url>]
+     * <path>. Senza <remote|url> vale origin (D-114). */
     if ((nmode > 1) || (npos == 0) || (npos > 2) ||
-        ((mode == CROWN_URL) && (npos != 2)) ||
         ((mode == CROWN_RESTORE) && (npos != 1))) {
         msg_error((npos > 2) ? MSG_ERR_TOO_MANY_ARGS : MSG_ERR_CROWN_ARGS);
         fputs(msg(MSG_USAGE_CROWN), stderr);
@@ -773,6 +964,7 @@ int cmd_crown(int argc, char **argv)
     c.b = &batch;
     c.rv = &rv;
     c.yes = yes;
+    c.quiet = 0;
     rc = GS_EXIT_ERROR;
     /* Prima la ricezione locale: T, l'autorita' e i cambi in attesa. */
     if (receive_entry(&repo, c.e, &batch, 0, &rv) != GS_OK) {
@@ -804,6 +996,14 @@ int cmd_crown(int argc, char **argv)
                       str_cstr(&rv.changes[i].authority), str_cstr(&ref));
             goto exit; /* prima si decide quello (D-111) */
         }
+    }
+    if ((mode == CROWN_URL) && (npos == 1)) {
+        /* la propria repo remota (D-114) */
+        if (remote_url(str_cstr(&repo.top), "origin", &ref) != GS_OK) {
+            msg_error(MSG_ERR_NO_REMOTE, "origin");
+            goto exit;
+        }
+        pos[0] = "origin";
     }
     rc = (mode == CROWN_RESTORE) ? crown_restore(&c) : crown_url(&c, pos[0]);
 

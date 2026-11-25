@@ -18,6 +18,16 @@
  *     proposta (ideeRemote §4.7).
  * Riuscito il push al creatore, l'ultima versione vista diventa T.
  *
+ * Eredi (D-114, heirs.h): se il proprio remote puo' diventare erede
+ * dell'autorita' (c'e' posto, un'altra casata, shared.heir non e' false),
+ * al posto di T va una versione con lo stesso contenuto e il proprio
+ * remote tra gli eredi. Come il primo push va prima sull'autorita' e solo
+ * dopo, se riesce, nella catena locale: rifiutata non lascia nulla. Se non
+ * c'era altro da mandare, il rifiuto non e' un errore: un lettore resta
+ * "already on". La copia sul proprio remote viene dopo l'autorita', con
+ * la versione che e' rimasta. Se l'autorita' non risponde e il proprio
+ * remote e' un erede, una nota dice come prenderne il posto.
+ *
  * Il primo argomento e' un <remote> se la repo ha un remote con quel nome,
  * come in "git push <repository>"; "--" lo fa leggere come path.
  */
@@ -28,6 +38,7 @@
 #include "chain.h"
 #include "cmd.h"
 #include "cmd_common.h"
+#include "heirs.h"
 #include "mem.h"
 #include "receive.h"
 #include "remote.h"
@@ -52,6 +63,7 @@ static int become_creator(const Repo_t *r, const SharedEntry_t *e,
     oid_to_hex(t, hex);
     str_addf(&ref, "%s:content", hex);
     auth.sovereigns.len = 0U; /* un creatore, mai incoronato */
+    auth.heirs.len = 0U;      /* e senza eredi */
     if (!git_batch_blob(b, str_cstr(&ref), &blob) ||
         (remote_url_blob(str_cstr(url), &auth.creator) != GS_OK) ||
         (chain_commit(&blob, t, NULL, &auth, str_cstr(&e->name), &v) != GS_OK)) {
@@ -89,6 +101,114 @@ static int become_creator(const Repo_t *r, const SharedEntry_t *e,
     printf(msg(MSG_PUSH_CREATOR_NEW), label, str_cstr(url));
     putchar('\n');
     rc = cmd_publish_entry(r, e, b, NULL, &v); /* avviso ai peer locali */
+
+exit:
+    str_free(&ref);
+    return rc;
+}
+
+/* shared.heir = false: il proprio remote non diventa mai erede (D-114).
+ * Un processo, letto una volta e solo se serve. */
+static int heir_allowed(void)
+{
+    static const char *const args[] = { "config", "--bool", "--get", "shared.heir",
+                                        NULL };
+    static int cached = -1;
+    Str_t out = STR_INIT;
+
+    if (cached < 0) {
+        cached = 1;
+        if (git_run(args, PROC_STDERR_NULL, &out) == GS_OK) {
+            str_trim_eol(&out);
+            cached = !str_eq(&out, "false");
+        }
+        str_free(&out);
+    }
+    return cached;
+}
+
+/*
+ * Iscrizione (D-114): se own puo' diventare erede dell'autorita' di T, la
+ * versione che lo dice in *v (genitore T, stesso contenuto, la riga nuova
+ * in heirs), le sue voci in *ab e la posizione in *pos. Non tocca nessuna
+ * ref. 0 se non c'e' nulla da fare.
+ */
+static int enroll_prepare(GitBatch_t *b, const SharedEntry_t *e, const Oid_t *t,
+                          const char *own, Oid_t *v, AuthBlobs_t *ab, unsigned *pos)
+{
+    char hex[OID_HEX_SIZE];
+    Auth_t a = AUTH_INIT;
+    Heirs_t h = HEIRS_INIT;
+    Str_t ref = STR_INIT;
+    Oid_t blob;
+    int ok = 0;
+
+    *pos = 0U;
+    if ((*own == '\0') || (heirs_of(b, t, &a, ab, &h) != GS_OK)) {
+        goto exit;
+    }
+    *pos = heirs_can_join(&a, &h, own);
+    if ((*pos == 0U) || !heir_allowed()) {
+        goto exit;
+    }
+    heirs_add(&h, auth_authority(&a), own);
+    oid_to_hex(t, hex);
+    str_addf(&ref, "%s:content", hex);
+    ok = git_batch_blob(b, str_cstr(&ref), &blob) &&
+         (heirs_write(&h, &ab->heirs) == GS_OK) &&
+         (chain_commit(&blob, t, NULL, ab, str_cstr(&e->name), v) == GS_OK);
+
+exit:
+    str_free(&ref);
+    heirs_free(&h);
+    auth_free(&a);
+    return ok;
+}
+
+/*
+ * Autorita' che non risponde (D-114): se il proprio remote e' un erede di
+ * T, la nota che dice come prenderne il posto. Un ls-remote, solo qui.
+ */
+static void heir_note(GitBatch_t *b, const SharedEntry_t *e, const Oid_t *t,
+                      const char *own, const char *url, int sov)
+{
+    Auth_t a = AUTH_INIT;
+    Heirs_t h = HEIRS_INIT;
+    Str_t order = STR_INIT;
+    unsigned pos;
+
+    if ((*own != '\0') && (heirs_of(b, t, &a, NULL, &h) == GS_OK) && (h.n > 0U)) {
+        heirs_order(&a, &h, &order);
+        pos = heirs_position(&order, own);
+        if ((pos > 0U) && !remote_reachable(url)) {
+            printf(msg(MSG_PUSH_HEIR_NOTE), str_cstr(&e->path), auth_role(sov), url,
+                   pos, str_cstr(&e->path));
+            putchar('\n');
+        }
+    }
+    str_free(&order);
+    heirs_free(&h);
+    auth_free(&a);
+}
+
+/* L'iscrizione accettata dall'autorita': la versione entra nella catena
+ * locale (condizionata a T) e ai peer locali. */
+static int enroll_done(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
+                       const Oid_t *t, Oid_t *v, const char *own, unsigned pos,
+                       const char *url)
+{
+    const char *label = str_cstr(&e->path);
+    Str_t ref = STR_INIT;
+    int rc = GS_EXIT_ERROR;
+
+    chain_ref(&ref, e->id);
+    if (git_update_ref(str_cstr(&ref), v, t, "git shared: push") != GS_OK) {
+        msg_error(MSG_ERR_CHAIN, str_cstr(&e->name)); /* P-03: il prossimo push */
+        goto exit;
+    }
+    printf(msg(MSG_PUSH_HEIR_NEW), label, own, pos, url);
+    putchar('\n');
+    rc = cmd_publish_entry(r, e, b, NULL, v);
 
 exit:
     str_free(&ref);
@@ -161,14 +281,25 @@ static int pending_on_authority(const Repo_t *r, const SharedEntry_t *e,
     return found;
 }
 
+/* Iscrizioni in corso (D-114), per voce: la versione d'iscrizione e' in
+ * tips[i], T in orig[i]. */
+typedef struct {
+    unsigned char *on;  /* 1 se la voce prova a iscriversi */
+    Oid_t *orig;        /* T */
+    AuthBlobs_t *ab;    /* voci della versione d'iscrizione */
+    unsigned *pos;      /* posizione che prenderebbe */
+    const char *own;    /* il proprio remote */
+} Enroll_t;
+
 /*
  * Versioni ufficiali: un push per autorita', con le catene il cui T non e'
  * gia' l'ultima versione vista. GS_EXIT_ERROR se l'autorita' ne rifiuta
- * qualcuna. sov[i]: l'autorita' e' un sovrano (per i messaggi).
+ * qualcuna. sov[i]: l'autorita' e' un sovrano (per i messaggi). Le
+ * iscrizioni (en) finiscono qui: tips[i] torna T se non sono passate.
  */
 static int push_creators(const Repo_t *r, GitBatch_t *b, const unsigned char *sel,
                          const Str_t *urls, const unsigned char *sov,
-                         const Oid_t *tips, const Oid_t *seen)
+                         Oid_t *tips, const Oid_t *seen, const Enroll_t *en)
 {
     size_t n = r->n;
     Oid_t *v = xmalloc(((n > 0U) ? n : 1U) * sizeof *v);
@@ -180,10 +311,12 @@ static int push_creators(const Repo_t *r, GitBatch_t *b, const unsigned char *se
     const SharedEntry_t *e;
     const char *url;
     const char *label;
+    Oid_t own_v;
     size_t i;
     size_t j;
     size_t k;
     size_t m;
+    size_t x;
     int rc = GS_EXIT_OK;
 
     memset(done, 0, (n > 0U) ? n : 1U);
@@ -214,28 +347,54 @@ static int push_creators(const Repo_t *r, GitBatch_t *b, const unsigned char *se
             remote_push_many(url, &ids, v, res);
         }
         for (k = 0U; k < m; k++) {
-            e = &r->v[idx[k]];
+            x = idx[k];
+            e = &r->v[x];
             label = str_cstr(&e->path);
+            /* P-03 (D-112): un'iscrizione riuscita a cui e' mancato
+             * l'update-ref ha lasciato la versione sull'autorita'. */
+            if ((en->on[x] != 0U) && (res[k] == (uint8_t)REMOTE_PUSH_NEWER) &&
+                remote_find_own(b, url, e->id, &en->orig[x], NULL, &en->ab[x], &own_v)) {
+                v[k] = own_v;
+                tips[x] = own_v;
+                res[k] = (uint8_t)REMOTE_PUSH_OK;
+            }
+            if ((en->on[x] != 0U) && (res[k] != (uint8_t)REMOTE_PUSH_OK)) {
+                tips[x] = en->orig[x]; /* l'iscrizione non e' passata */
+                if (oid_eq(&seen[x], &en->orig[x])) {
+                    /* non c'era altro da mandare: come prima */
+                    printf(msg(MSG_PUSH_ON_CREATOR), label, auth_role(sov[x]), url);
+                    putchar('\n');
+                    if (res[k] == (uint8_t)REMOTE_PUSH_REFUSED) {
+                        heir_note(b, e, &en->orig[x], en->own, url, sov[x]);
+                    }
+                    continue;
+                }
+            }
             switch ((eRemotePush_t)res[k]) {
             case REMOTE_PUSH_OK:
                 remote_seen_ref(&ref, e->id);
                 if (git_set_ref(str_cstr(&ref), &v[k], "git shared: push") == GS_OK) {
                     (void)remote_seen_write(e->id, url, NULL, NULL);
                 }
-                printf(msg(MSG_PUSH_TO_CREATOR), label, auth_role(sov[idx[k]]), url);
+                printf(msg(MSG_PUSH_TO_CREATOR), label, auth_role(sov[x]), url);
                 putchar('\n');
+                if ((en->on[x] != 0U) &&
+                    (enroll_done(r, e, b, &en->orig[x], &v[k], en->own, en->pos[x],
+                                 url) != GS_EXIT_OK)) {
+                    rc = GS_EXIT_ERROR;
+                }
                 break;
             case REMOTE_PUSH_NEWER:
                 if (pending_on_authority(r, e, b, &ref)) {
                     msg_error(MSG_ERR_AUTH_DECIDE_FIRST, label, url, str_cstr(&ref));
                 } else {
-                    msg_error(MSG_ERR_CREATOR_NEWER, label, auth_role(sov[idx[k]]), url);
+                    msg_error(MSG_ERR_CREATOR_NEWER, label, auth_role(sov[x]), url);
                 }
                 rc = GS_EXIT_ERROR;
                 break;
             default:
-                msg_error(MSG_ERR_CREATOR_REFUSED, label, auth_role(sov[idx[k]]),
-                          url);
+                msg_error(MSG_ERR_CREATOR_REFUSED, label, auth_role(sov[x]), url);
+                heir_note(b, e, &tips[x], en->own, url, sov[x]);
                 rc = GS_EXIT_ERROR;
                 break;
             }
@@ -261,12 +420,14 @@ int cmd_push(int argc, char **argv)
     unsigned char *sov = NULL; /* l'autorita' e' un sovrano */
     Oid_t *tips = NULL;    /* T di ogni voce */
     Oid_t *seen = NULL;    /* ultima versione vista del creatore */
+    Enroll_t en = { NULL, NULL, NULL, NULL, "" };
     Str_t ref = STR_INIT;
     const SharedEntry_t *e;
     const char *remote = NULL;
     const char *path = NULL;
     const char *label;
     char **pos;
+    Oid_t ref_v;
     size_t n = 0U;
     size_t i;
     int npos;
@@ -325,6 +486,12 @@ int cmd_push(int argc, char **argv)
     sov = xmalloc((n > 0U) ? n : 1U);
     tips = xmalloc(((n > 0U) ? n : 1U) * sizeof *tips);
     seen = xmalloc(((n > 0U) ? n : 1U) * sizeof *seen);
+    en.on = xmalloc((n > 0U) ? n : 1U);
+    en.orig = xmalloc(((n > 0U) ? n : 1U) * sizeof *en.orig);
+    en.ab = xmalloc(((n > 0U) ? n : 1U) * sizeof *en.ab);
+    en.pos = xmalloc(((n > 0U) ? n : 1U) * sizeof *en.pos);
+    en.own = str_cstr(&own);
+    memset(en.on, 0, (n > 0U) ? n : 1U);
     for (i = 0U; i < n; i++) {
         str_init(&urls[i]);
     }
@@ -365,6 +532,13 @@ int cmd_push(int argc, char **argv)
         }
         if (urls[i].len > 0U) {
             any = 1;
+            /* Il proprio remote tra gli eredi, se puo' (D-114). */
+            if (enroll_prepare(&batch, e, &tips[i], en.own, &ref_v, &en.ab[i],
+                               &en.pos[i])) {
+                en.on[i] = 1U;
+                en.orig[i] = tips[i];
+                tips[i] = ref_v;
+            }
             continue;
         }
         sel[i] = 0U;
@@ -384,10 +558,12 @@ int cmd_push(int argc, char **argv)
         rc = GS_EXIT_ERROR;
         goto exit;
     }
-    push_copies(&repo, sel, urls, tips, &own);
-    if (push_creators(&repo, &batch, sel, urls, sov, tips, seen) != GS_EXIT_OK) {
+    /* Prima l'autorita', poi la copia: con la versione che e' rimasta
+     * (un'iscrizione rifiutata non va nemmeno nella copia, D-114). */
+    if (push_creators(&repo, &batch, sel, urls, sov, tips, seen, &en) != GS_EXIT_OK) {
         rc = GS_EXIT_ERROR;
     }
+    push_copies(&repo, sel, urls, tips, &own);
 
 exit:
     if (urls != NULL) {
@@ -395,6 +571,10 @@ exit:
             str_free(&urls[i]);
         }
     }
+    free(en.pos);
+    free(en.ab);
+    free(en.orig);
+    free(en.on);
     free(seen);
     free(tips);
     free(sov);

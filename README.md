@@ -94,7 +94,7 @@ sequenceDiagram
 | `git shared update [--all] [<file>]` | Receives and applies the latest version; `--ours` / `--theirs` keeps one version, `--abort` gives up a merge |
 | `git shared push [<remote>] [<file>]` | Remote (beta): sends the published versions to the creator; the first time, `<remote>` becomes the creator |
 | `git shared pull [<file>]` | Remote (beta): receives the versions of the creator, then `update` |
-| `git shared crown <remote> <file>` | Remote (beta): moves the authority of the file to another remote, the creator stays; `--restore` goes back to the creator, `--accept` / `--reject` decide a change received |
+| `git shared crown [<remote>] <file>` | Remote (beta): moves the authority of the file to another remote (default: your own `origin`), the creator stays; `--restore` goes back to the creator, `--accept` / `--reject` decide a change received |
 | `git shared branch <file> [-a\|-rm <branch>]` | Chooses the branches where the file is shared; on the others it is a regular file |
 | `git shared prune [-n]` | Removes peers that were deleted or no longer share the file |
 | `git shared relocate [--copy]` | Tells the peers that the repository was moved or copied |
@@ -178,6 +178,10 @@ sequenceDiagram
     X->>S: git shared push
     S->>Y: git shared pull
 ```
+
+But how does Y learn the new address, if nobody tells it? With the **heirs**. The first two people who push the file to the creator from their own remote, and who can write there, become its heirs (Adam and Eve), and every sovereign gets its own heirs in the same way. Their addresses travel in the version chain, so every repository knows them before they are needed: `git shared status` lists them in order of succession. The two heirs of a sovereign belong to different houses (a house is an owner on a hosting: `github.com/you/A` and `github.com/you/B` are one house, and they usually disappear together).
+
+When the authority stops answering, nobody takes over by itself: `push` tells an heir it can do so with `git shared crown <file>` (without a remote, `crown` means your own `origin`). Once an heir has crowned itself, `git shared pull` on the other repositories tries the heirs in order, finds it and follows it without asking. A sovereign that is not an heir is only pointed out, with the command to follow it. And if the creator comes back, `git shared status --remote` says so: going back to it stays your choice. To keep your remote out of the heirs: `git config shared.heir false`.
 
 ## Limits of the first release
 

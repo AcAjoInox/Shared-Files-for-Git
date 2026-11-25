@@ -60,6 +60,12 @@ DESCRIZIONE
     arriva e il comando per accettarlo o rifiutarlo: fino ad allora
     l'ultima versione non va oltre.
 
+    Una riga "heirs" elenca gli eredi del file nell'ordine di
+    successione (git shared crown --help, EREDI). Con --remote, se
+    l'autorita' non risponde, una nota dice quale erede ne ha preso il
+    posto (pull lo segue), o che nessuno l'ha fatto; se l'autorita' e' un
+    sovrano e il creatore torna a rispondere, una nota lo dice.
+
     Se qui manca la catena delle versioni di un file, status la
     ricostruisce dall'ultima versione vista sul creatore, senza rete, o
     da un peer locale, e lo dice. Se nessuno ce l'ha, una nota dice di

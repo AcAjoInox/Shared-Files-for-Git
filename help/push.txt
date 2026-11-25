@@ -30,6 +30,13 @@ DESCRIPTION
     sovereign instead: it is the authority of the file. The creator
     never changes.
 
+    If the authority has fewer than two heirs, your remote becomes one
+    (git shared crown --help, HEIRS): push sends a version that records
+    it, and keeps it here only if the authority takes it. Without write
+    access nothing changes. git config shared.heir false keeps your
+    remote out. If the authority does not answer and your remote is an
+    heir, push says how to take over.
+
     Without <path>, all the files that have a creator, with one push for
     each creator; files without a creator are skipped. The first
     argument is a <remote> when this repository has a remote with that

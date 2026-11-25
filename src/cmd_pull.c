@@ -8,6 +8,11 @@
  * Un file il cui creatore non risponde, o non ha piu' il file, non si
  * aggiorna: la rete l'ha chiesta l'utente, quindi e' un errore. --abort,
  * --ours e --theirs non hanno bisogno di rete: si usano con update.
+ *
+ * Prima dell'errore, gli eredi (D-114): la linea di successione si visita
+ * (cmd_heirs_visit) e un erede che si e' incoronato si segue senza domande;
+ * poi update come per gli altri file. Un'autorita' che non e' un erede, o
+ * il creatore tornato, li dice l'errore, con il comando per seguirli.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -27,6 +32,7 @@ int cmd_pull(int argc, char **argv)
     unsigned char *res = NULL;
     unsigned char *sov = NULL;
     Str_t *urls = NULL;
+    HeirVisit_t visit = HEIRVISIT_INIT;
     const char *path;
     const char *label;
     size_t n = 0U;
@@ -68,6 +74,13 @@ int cmd_pull(int argc, char **argv)
 
     /* 1. fetch dalle autorita' (D-111: l'ultimo sovrano, o il creatore) */
     cmd_fetch_creators(&repo, &batch, sel, res, urls, sov);
+    git_batch_close(&batch);
+    if (git_batch_open(&batch) != GS_OK) {
+        msg_fatal(MSG_ERR_PROC, "git cat-file");
+        batch_ok = 0;
+        rc = GS_EXIT_FATAL;
+        goto exit;
+    }
     for (i = 0U; i < n; i++) {
         if (sel[i] == 0U) {
             continue;
@@ -79,14 +92,31 @@ int cmd_pull(int argc, char **argv)
                 rc = GS_EXIT_ERROR;
                 sel[i] = 0U;
             } /* senza path: update come per ogni file locale */
-        } else if (res[i] == (unsigned char)REMOTE_MISSING) {
-            msg_error(MSG_ERR_CREATOR_MISSING, label, auth_role(sov[i]),
-                      str_cstr(&urls[i]));
-            rc = GS_EXIT_ERROR;
-            sel[i] = 0U;
-        } else if (res[i] == (unsigned char)REMOTE_UNREACHABLE) {
-            msg_error(MSG_ERR_CREATOR_UNREACHABLE, label, auth_role(sov[i]),
-                      str_cstr(&urls[i]));
+        } else if ((res[i] == (unsigned char)REMOTE_MISSING) ||
+                   (res[i] == (unsigned char)REMOTE_UNREACHABLE)) {
+            /* Gli eredi, prima di arrendersi (D-114). */
+            if (!cmd_heirs_visit(&repo, &repo.v[i], &batch, 1, &visit)) {
+                batch_ok = 0;
+                rc = GS_EXIT_FATAL;
+                goto exit;
+            }
+            if (visit.kind == HEIR_VISIT_FOLLOWED) {
+                continue; /* T ha la nuova autorita': update come gli altri */
+            }
+            msg_error((res[i] == (unsigned char)REMOTE_MISSING)
+                          ? MSG_ERR_CREATOR_MISSING
+                          : MSG_ERR_CREATOR_UNREACHABLE,
+                      label, auth_role(sov[i]), str_cstr(&urls[i]));
+            if (visit.kind == HEIR_VISIT_OTHER) {
+                msg_error(MSG_ERR_HEIR_OTHER, label, str_cstr(&visit.where),
+                          str_cstr(&visit.to), str_cstr(&visit.to), label);
+            } else if (visit.kind == HEIR_VISIT_CREATOR) {
+                msg_error(MSG_ERR_CREATOR_BACK, label, str_cstr(&visit.where), label);
+            } else if (visit.kind == HEIR_VISIT_NONE) {
+                msg_error(MSG_ERR_HEIRS_NONE, label, label, label);
+            } else {
+                /* errore gia' detto */
+            }
             rc = GS_EXIT_ERROR;
             sel[i] = 0U;
         } else {
@@ -111,6 +141,7 @@ exit:
         }
     }
     free(urls);
+    heirvisit_free(&visit);
     free(sov);
     free(res);
     free(sel);

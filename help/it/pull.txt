@@ -21,8 +21,12 @@ DESCRIZIONE
     sovrano. Un cambio di autorita' ricevuto pull non lo applica mai:
     aspetta 'git shared crown --accept' o '--reject'.
 
-    Se il creatore non risponde, o non ha piu' il file, quel file non si
-    aggiorna e pull fallisce; gli altri file proseguono. I file senza
+    Se il creatore non risponde, o non ha piu' il file, pull prova i
+    suoi eredi nell'ordine di successione (git shared crown --help,
+    EREDI): un erede che si e' incoronato si segue senza chiedere, e il
+    file si aggiorna da li'. Altrimenti quel file non si aggiorna e pull
+    fallisce, dicendo chi potrebbe prenderne il posto; gli altri file
+    proseguono. I file senza
     creatore vengono solo aggiornati, come con update. pull non chiede
     mai la password: usa le credenziali che git ha gia'.
 

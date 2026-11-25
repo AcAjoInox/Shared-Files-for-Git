@@ -194,6 +194,49 @@ void cmd_auth_describe(const AuthChange_t *c, Str_t *from, Str_t *info);
  * se ce n'e' piu' d'uno. */
 void cmd_auth_how(const SharedEntry_t *e, const Received_t *rv, size_t k, Str_t *how);
 
+/*
+ * Visita della linea di successione (D-114, heirs.h, cmd_crown.c): per un
+ * file la cui autorita' non risponde, la catena di ogni erede nell'ordine
+ * di successione, fino al primo che dichiara un'autorita' nuova:
+ *   - HEIR_VISIT_FOUND: un erede di T (con apply: lo si segue senza
+ *     domande, HEIR_VISIT_FOLLOWED, e T avanza come con crown);
+ *   - HEIR_VISIT_OTHER: un'autorita' che non e' un erede: solo con crown;
+ *   - HEIR_VISIT_CREATOR: nessun erede, ma il creatore risponde (e
+ *     l'autorita' era un sovrano): crown --restore;
+ *   - HEIR_VISIT_NONE: nessuno.
+ * where: l'indirizzo che l'ha detto; to: l'autorita' nuova; pos: la sua
+ * posizione nell'ordine. Il cat-file viene riaperto: ritorna 0 se non ci
+ * riesce (errore fatale stampato).
+ */
+typedef enum {
+    HEIR_VISIT_NONE = 0,
+    HEIR_VISIT_FOUND,
+    HEIR_VISIT_FOLLOWED,
+    HEIR_VISIT_OTHER,
+    HEIR_VISIT_CREATOR,
+    HEIR_VISIT_ERROR
+} eHeirVisit_t;
+
+typedef struct {
+    eHeirVisit_t kind;
+    Str_t where;
+    Str_t to;
+    unsigned pos;
+} HeirVisit_t;
+
+#define HEIRVISIT_INIT { HEIR_VISIT_NONE, STR_INIT, STR_INIT, 0U }
+
+void heirvisit_free(HeirVisit_t *v);
+int cmd_heirs_visit(Repo_t *r, SharedEntry_t *e, GitBatch_t *b, int apply,
+                    HeirVisit_t *out);
+
+/*
+ * Ritorno del creatore (D-114): per un file la cui autorita' e' un sovrano,
+ * *back = 1 se il creatore risponde, ha il file e la sua linea non porta
+ * all'autorita' di T. Un fetch. Ritorna 0 se il cat-file non si riapre.
+ */
+int cmd_creator_back(Repo_t *r, SharedEntry_t *e, GitBatch_t *b, int *back);
+
 /* Avviso per publish/update lanciati a mano su un branch sospeso (atto
  * esplicito: si fa); se nessun branch attivo esiste, anche il rimedio. */
 void cmd_warn_suspended(const SharedEntry_t *e, BranchNames_t *bn);

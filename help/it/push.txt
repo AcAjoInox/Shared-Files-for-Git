@@ -29,6 +29,13 @@ DESCRIZIONE
     Se il file ha un sovrano (git shared crown), push invia al sovrano:
     e' lui l'autorita' del file. Il creatore non cambia mai.
 
+    Se l'autorita' ha meno di due eredi, il tuo remote diventa uno di
+    loro (git shared crown --help, EREDI): push invia una versione che
+    lo registra, e la tiene qui solo se l'autorita' la accetta. Senza
+    permessi di scrittura non cambia nulla. git config shared.heir
+    false tiene fuori il tuo remote. Se l'autorita' non risponde e il
+    tuo remote e' un erede, push dice come prenderne il posto.
+
     Senza <path>, tutti i file che hanno un creatore, con un push per
     creatore; i file senza creatore si saltano. Il primo argomento e' un
     <remote> se questo repository ha un remote con quel nome; dopo '--'

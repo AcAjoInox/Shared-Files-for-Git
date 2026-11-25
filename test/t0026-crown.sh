@@ -13,6 +13,10 @@
 
 . "$(dirname "$0")/lib.sh"
 
+# Gli eredi (D-114) li prova t0027: qui il proprio remote non si iscrive,
+# cosi' le versioni restano quelle che il test si aspetta.
+git config --global shared.heir false
+
 tip() {
 	git -C "$TRASH/$1" rev-parse -q --verify "refs/shared/${2:-$ID}"
 }
@@ -58,7 +62,9 @@ SRV_A=$(git remote get-url origin)
 run git shared crown
 expect_rc "uso: senza argomenti 129" 129
 run git shared crown origin
-expect_rc "uso: un solo argomento 129" 129
+expect_rc "un solo argomento: e' il path, l'URL vale origin (D-114)" 1
+expect_err "un solo argomento: origin non e' un file shared" "origin"
+
 run git shared crown --accept --reject p.h
 expect_rc "uso: --accept e --reject insieme 129" 129
 run git shared crown --restore origin p.h

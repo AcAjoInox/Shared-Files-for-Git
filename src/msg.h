@@ -202,6 +202,9 @@ typedef enum {
     MSG_PUB_NOT_ON_CREATOR,  /* file, ruolo */
     MSG_PUB_COPIED,          /* file, url */
     MSG_PUSH_CREATOR_NEW,    /* file, url */
+    MSG_PUSH_HEIR_NEW,       /* file, url, posizione, autorita' (D-114) */
+    MSG_PUSH_HEIR_NOTE,      /* file, ruolo, url, posizione, path */
+    MSG_PULL_HEIR_FOLLOWED,  /* file, posizione, url, autorita' di prima */
     MSG_PUSH_TO_CREATOR,     /* file, ruolo, url */
     MSG_PUSH_ON_CREATOR,     /* file, ruolo, url */
     MSG_SKIP_STATE,          /* file, stato */
@@ -228,6 +231,7 @@ typedef enum {
     MSG_STATUS_FIELD_PEERS,
     MSG_STATUS_FIELD_CREATOR,
     MSG_STATUS_FIELD_AUTHORITY,
+    MSG_STATUS_FIELD_HEIRS,  /* D-114 */
     MSG_ROLE_CREATOR,        /* ruolo dell'autorita' nei messaggi (D-111) */
     MSG_ROLE_SOVEREIGN,
     MSG_PEER_SAME,
@@ -244,7 +248,10 @@ typedef enum {
     MSG_STATUS_TO_MERGE,     /* repo che ha annunciato */
     MSG_STATUS_RENAMED,      /* path di prima */
     MSG_STATUS_CREATOR_UNREACHABLE, /* ruolo, url */
-    MSG_STATUS_AUTH_RESTORE, /* url del creatore, path (D-111) */
+    MSG_STATUS_HEIR_FOUND,   /* url, posizione, autorita', path (D-114) */
+    MSG_STATUS_HEIR_OTHER,   /* url, autorita', autorita', path */
+    MSG_STATUS_CREATOR_BACK, /* url del creatore, path */
+    MSG_STATUS_HEIRS_NONE,   /* path, path */
     MSG_LINK_COPY,           /* url, autorita' (D-111) */
     MSG_STATUS_CHAIN_MISSING, /* path (D-112, B-51) */
     MSG_CREATOR_SEEN,        /* data (D-112, B-53) */
@@ -263,6 +270,9 @@ typedef enum {
 
     /* crown (D-111) */
     MSG_ERR_CROWN_ARGS,
+    MSG_ERR_HEIRS_NONE,      /* file, path, path (D-114) */
+    MSG_ERR_HEIR_OTHER,      /* file, url, autorita', autorita', path */
+    MSG_ERR_CREATOR_BACK,    /* file, url del creatore, path */
     MSG_ERR_CROWN_NO_CREATOR,     /* file */
     MSG_ERR_CROWN_MERGING,        /* file */
     MSG_ERR_CROWN_BAD_URL,        /* argomento */

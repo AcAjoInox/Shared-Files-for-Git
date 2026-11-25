@@ -11,6 +11,10 @@
 
 . "$(dirname "$0")/lib.sh"
 
+# Gli eredi (D-114) li prova t0027: qui il proprio remote non si iscrive,
+# cosi' le versioni restano quelle che il test si aspetta.
+git config --global shared.heir false
+
 # tip <repo>: refs/shared/<id> della repo
 tip() {
 	git -C "$TRASH/$1" rev-parse -q --verify "refs/shared/${2:-$ID}"

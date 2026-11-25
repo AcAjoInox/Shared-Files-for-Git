@@ -4,7 +4,7 @@ NOME
     git shared crown - sposta l'autorita' di un file su un altro remoto
 
 SINTASSI
-    git shared crown [--yes] <remote> <path>
+    git shared crown [--yes] [<remote>] <path>
     git shared crown [--yes] --restore <path>
     git shared crown [--yes] --accept [<url>] <path>
     git shared crown --reject [<url>] <path>
@@ -20,6 +20,7 @@ DESCRIZIONE
     crown gliela da' senza toccare il creatore.
 
     <remote> e' il nome di un remote di questo repository, o un URL.
+    Senza, origin: il file lo prende il tuo remote.
 
     Se <remote> governa gia' il file (lo dice la sua ultima versione),
     crown lo segue: li' non servono permessi di scrittura, come per
@@ -45,7 +46,29 @@ DESCRIZIONE
     dall'autorita' stessa, e' automatico: l'ultima versione resta
     all'ultima con l'autorita' di prima finche' il cambio non viene
     accettato o rifiutato. 'git shared status' lo mostra nella riga
-    'authority -> <url>'.
+    'authority -> <url>'. L'unica eccezione e' un erede (sotto).
+
+EREDI
+    I primi due editori che fanno push del file sul creatore, o su un
+    sovrano, dal proprio remote diventano i suoi eredi: dicono dove
+    guardare se l'autorita' non risponde piu'. 'git shared status' li
+    mostra nella riga "heirs", nell'ordine di successione: prima gli
+    eredi dell'autorita', poi i suoi fratelli, fino al creatore. I due
+    eredi di un'autorita' sono di casate diverse (proprietario e
+    hosting: github.com/luca/A e github.com/luca/B sono una casata).
+
+    Nessuno diventa autorita' da solo. Quando l'autorita' non risponde,
+    push dice a un erede come prenderne il posto, con
+    'git shared crown <path>'. Quando un erede si e' incoronato,
+    'git shared pull' lo trova provando gli eredi in ordine e lo segue
+    senza chiedere, perche' l'autorita' non rispondeva e l'erede e'
+    nella catena. Un sovrano che non e' un erede viene solo mostrato:
+    lo si segue con crown. Quando il creatore torna a rispondere nessuno
+    lo segue da solo: 'git shared status --remote' lo dice, e
+    'crown --restore' torna da lui.
+
+    Per tenere il tuo remote fuori dagli eredi (il suo URL finisce nella
+    storia del file): git config shared.heir false.
 
 OPZIONI
     --restore
@@ -66,6 +89,7 @@ OPZIONI
         Non chiede conferma.
 
 ESEMPI
+    git shared crown inc/common.h              # il tuo remote
     git shared crown origin inc/common.h
     git shared crown https://github.com/anna/A inc/common.h
     git shared crown --restore inc/common.h

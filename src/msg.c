@@ -155,15 +155,15 @@ static const char *const msg_en[] = {
         "copy to <remote> (default: origin). The first time, with <remote>\n"
         "and <path>: <remote> becomes the creator of the file.\n",
     [MSG_USAGE_CROWN] =
-        "usage: git shared crown [--yes] <remote> <path>\n"
+        "usage: git shared crown [--yes] [<remote>] <path>\n"
         "   or: git shared crown [--yes] --restore <path>\n"
         "   or: git shared crown [--yes] --accept [<url>] <path>\n"
         "   or: git shared crown --reject [<url>] <path>\n"
         "\n"
         "Move the authority of a file, the remote its official versions\n"
-        "come from, to <remote> (a remote name or a URL): follow it if it\n"
-        "already governs the file, otherwise make it the sovereign. The\n"
-        "creator never changes.\n"
+        "come from, to <remote> (a remote name or a URL; default: origin):\n"
+        "follow it if it already governs the file, otherwise make it the\n"
+        "sovereign. The creator never changes.\n"
         "\n"
         "    --restore    follow the line of the creator again\n"
         "    --accept     accept an authority change received\n"
@@ -472,6 +472,12 @@ static const char *const msg_en[] = {
     [MSG_PUB_COPIED] = "%s: versions copied to %s",
     [MSG_PUSH_CREATOR_NEW] =
         "%s: pushed to %s, which is now the creator of the file",
+    [MSG_PUSH_HEIR_NEW] = "%s: %s is now heir %u of %s",
+    [MSG_PUSH_HEIR_NOTE] =
+        "%s: the %s %s is unreachable; you are heir %u: "
+        "'git shared crown %s' to take over",
+    [MSG_PULL_HEIR_FOLLOWED] =
+        "%s: the authority moved to heir %u %s (%s was unreachable)",
     [MSG_PUSH_TO_CREATOR] = "%s: pushed to the %s %s",
     [MSG_PUSH_ON_CREATOR] = "%s: already on the %s %s",
     [MSG_SKIP_STATE] = "%s: %s, nothing to do",
@@ -505,6 +511,7 @@ static const char *const msg_en[] = {
     [MSG_STATUS_FIELD_PEERS] = "peers",
     [MSG_STATUS_FIELD_CREATOR] = "creator",
     [MSG_STATUS_FIELD_AUTHORITY] = "authority",
+    [MSG_STATUS_FIELD_HEIRS] = "heirs",
     [MSG_ROLE_CREATOR] = "creator",
     [MSG_ROLE_SOVEREIGN] = "sovereign",
     [MSG_PEER_SAME] = "same version",
@@ -526,9 +533,17 @@ static const char *const msg_en[] = {
     [MSG_STATUS_CREATOR_UNREACHABLE] =
         "%s %s not reachable: state from the last version seen",
     [MSG_LINK_COPY] = "%s is a copy: the authority of the file is %s",
-    [MSG_STATUS_AUTH_RESTORE] =
-        "if it is gone: the creator is %s, 'git shared crown --restore %s' "
-        "follows its line, or crown another remote",
+    [MSG_STATUS_HEIR_FOUND] =
+        "%s says the authority is now heir %u %s: "
+        "'git shared pull %s' follows it",
+    [MSG_STATUS_HEIR_OTHER] =
+        "%s says the authority is now %s, which is not an heir: to follow "
+        "it, 'git shared crown %s %s'",
+    [MSG_STATUS_CREATOR_BACK] =
+        "the creator %s is reachable again: 'git shared crown --restore %s'",
+    [MSG_STATUS_HEIRS_NONE] =
+        "no heir answers: choose a sovereign with 'git shared crown <url> %s', "
+        "or your own remote with 'git shared crown %s'",
     [MSG_CREATOR_SAME] = "same version",
     [MSG_CREATOR_AHEAD] = "ahead: run 'git shared push'",
     [MSG_CREATOR_BEHIND] = "newer version on the %s: run 'git shared update'",
@@ -553,8 +568,19 @@ static const char *const msg_en[] = {
         "none of its active branches exists (%s): "
         "git shared branch %s -a <branch>",
 
-    [MSG_ERR_CROWN_ARGS] = "crown needs a remote or URL and a path, or "
-                           "--restore, --accept or --reject with a path",
+    [MSG_ERR_CROWN_ARGS] = "crown needs a path, with a remote or URL "
+                           "(default: origin), or --restore, --accept or "
+                           "--reject",
+    [MSG_ERR_HEIRS_NONE] =
+        "%s: the authority and its heirs are unreachable.\n"
+        "  choose a sovereign: 'git shared crown <url> %s',\n"
+        "  or your own remote:  'git shared crown %s'",
+    [MSG_ERR_HEIR_OTHER] =
+        "%s: the authority is unreachable; %s says it is now %s, which is "
+        "not an heir: to follow it, 'git shared crown %s %s'",
+    [MSG_ERR_CREATOR_BACK] =
+        "%s: the authority is unreachable, the creator %s is reachable "
+        "again: 'git shared crown --restore %s'",
     [MSG_ERR_CROWN_NO_CREATOR] =
         "%s: never published to a remote: there is no authority to move",
     [MSG_ERR_CROWN_MERGING] =

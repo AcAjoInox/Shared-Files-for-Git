@@ -21,8 +21,11 @@ DESCRIPTION
     applied by pull: it waits for 'git shared crown --accept' or
     '--reject'.
 
-    If the creator cannot be reached, or no longer has the file, that
-    file is not updated and pull fails; the other files go on. Files
+    If the creator cannot be reached, or no longer has the file, pull
+    tries its heirs in order of succession (git shared crown --help,
+    HEIRS): an heir that crowned itself is followed without asking, and
+    the file is updated from there. Otherwise that file is not updated
+    and pull fails, saying who could take over; the other files go on. Files
     without a creator are only updated, as with update. pull never asks
     for a password: it uses the credentials git already has.
 
