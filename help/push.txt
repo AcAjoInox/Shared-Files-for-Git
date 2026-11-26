@@ -49,6 +49,15 @@ DESCRIPTION
     chain as an absolute one. The same remote written in another form
     (https:// or git@, with or without .git) counts as the same.
 
+    The chain records the URL of the remote as it is configured
+    (remote.<name>.url), not as url.<base>.insteadOf rewrites it on
+    your machine: readers see https://... even if you push over ssh.
+    Credentials in the URL (a token, user:password) are never recorded
+    nor shown: push warns and leaves them out. To reach a URL that is
+    one of your remotes, push and pull go through that remote, as 'git
+    push <remote>' does: its pushurl, insteadOf rules and credentials
+    apply.
+
 EXAMPLES
     git shared push origin common.h   # origin becomes the creator
     git commit -am "Fix the timeout in common.h"

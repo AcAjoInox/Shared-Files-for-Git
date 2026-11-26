@@ -19,6 +19,9 @@
  *
  * Il trasporto e' quello di git (push, fetch, credenziali, permessi):
  * nessun server nostro. Nessun dato locale va in remoto: solo la catena.
+ * Verso un URL che e' quello di un remote configurato (in forma normale)
+ * git riceve il nome del remote, non l'URL (AB-03): valgono pushurl,
+ * insteadOf, pushInsteadOf e le credenziali del remote.
  */
 #ifndef GS_REMOTE_H
 #define GS_REMOTE_H
@@ -55,11 +58,19 @@ typedef enum {
 int remote_url_ok(const char *url);
 
 /*
- * URL del remote `name` della repo corrente (git remote get-url).
- * GS_ERR_GIT se la repo non ha quel remote. Un path locale relativo
- * (git remote add origin ../srv.git) diventa assoluto rispetto a `top`,
- * la radice della repo: scritto nella catena, varrebbe per le altre repo
- * da un'altra cartella (D-112, P-08).
+ * URL del remote `name` della repo corrente, nella forma che puo' andare
+ * nella catena e nei messaggi. GS_ERR_GIT se la repo non ha quel remote.
+ * - L'URL come e' configurato (remote.<name>.url), non quello espanso da
+ *   url.<base>.insteadOf, che e' una preferenza locale (AB-02); espanso
+ *   solo se il configurato non e' completo (un'abbreviazione: gh:luca/A).
+ * - Senza credenziali (S-01): lo userinfo di http(s) e la password di ssh
+ *   si tolgono, con un avviso che non ripete l'URL.
+ * - Un path locale relativo (git remote add origin ../srv.git) diventa
+ *   assoluto rispetto a `top`, la radice della repo: scritto nella catena,
+ *   varrebbe per le altre repo da un'altra cartella (D-112, P-08).
+ * Il trasporto non perde nulla: push e fetch verso un URL che e' quello di
+ * un remote configurato passano dal nome del remote (AB-03), quindi con le
+ * sue credenziali, pushurl e insteadOf.
  */
 eGsErr_t remote_url(const char *top, const char *name, Str_t *url);
 
@@ -68,8 +79,9 @@ eGsErr_t remote_url(const char *top, const char *name, Str_t *url);
  * (come remote_url), altrimenti l'URL stesso; un path locale relativo
  * diventa assoluto rispetto a `cwd`, la cartella da cui e' stato lanciato
  * il comando. Una parola senza separatori e' un remote che non c'e', non
- * un path (per una cartella: "./x"). GS_ERR_FORMAT se l'URL non si puo'
- * usare (remote_url_ok).
+ * un path (per una cartella: "./x"). Un URL con credenziali le perde, con
+ * un avviso (S-01). GS_ERR_FORMAT se l'URL non si puo' usare
+ * (remote_url_ok).
  */
 eGsErr_t remote_arg_url(const char *top, const char *cwd, const char *arg,
                         Str_t *url);

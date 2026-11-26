@@ -48,6 +48,15 @@ DESCRIZIONE
     come path assoluto. Lo stesso remote scritto in un'altra forma
     (https:// o git@, con o senza .git) vale come lo stesso.
 
+    Nella catena va l'URL del remote come e' configurato
+    (remote.<name>.url), non come lo riscrive url.<base>.insteadOf
+    sulla tua macchina: i lettori vedono https://... anche se tu fai
+    push via ssh. Le credenziali nell'URL (un token, utente:password)
+    non si scrivono mai e non si stampano: push avvisa e le toglie. Per
+    raggiungere un URL che e' uno dei tuoi remote, push e pull passano
+    da quel remote, come 'git push <remote>': valgono il suo pushurl,
+    le regole insteadOf e le credenziali.
+
 ESEMPI
     git shared push origin common.h   # origin diventa il creatore
     git commit -am "Corretto il timeout in common.h"

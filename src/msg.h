@@ -146,6 +146,8 @@ typedef enum {
     MSG_WARN_RELOCATE_NOT_MEMBER, /* file, path */
     MSG_WARN_AUTH_PENDING,   /* file, url, [url] path (D-111) */
     MSG_WARN_COPY_FAILED,    /* file, url */
+    MSG_WARN_URL_CREDENTIALS, /* remote (S-01) */
+    MSG_WARN_URL_ARG_CREDENTIALS, /* (S-01) */
     MSG_WARN_CHAIN_RESTORED, /* file, da dove (D-112, B-51) */
     MSG_HOOK_NOT_ALIGNED,    /* file, stato, comando */
     MSG_HOOK_ANNOUNCED,      /* file */

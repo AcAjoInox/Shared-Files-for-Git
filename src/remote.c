@@ -13,6 +13,7 @@
 #include "bounds.h"
 #include "chain.h"
 #include "mem.h"
+#include "msg.h"
 #include "path.h"
 #include "sys.h"
 
@@ -114,14 +115,116 @@ static int join_abs(const char *base, const char *rel, Str_t *out)
     return ok;
 }
 
+/*
+ * URL senza credenziali (S-01): in "schema://utente:password@host/..." si
+ * toglie tutto lo userinfo, che per http(s) e' spesso un token; per ssh si
+ * tiene l'utente (git@), che serve e non e' un segreto, e si toglie solo
+ * ":password". La forma scp (utente@host:path) e i path restano come sono.
+ * 1 se ha tolto qualcosa.
+ */
+static int url_public(const char *u, Str_t *out)
+{
+    static const char *const ssh[] = { "ssh", "git+ssh", "ssh+git" };
+    const char *sep = strstr(u, "://");
+    const char *auth;
+    const char *end;
+    const char *at = NULL;
+    const char *colon;
+    const char *p;
+    size_t slen;
+    size_t k;
+    int is_ssh = 0;
+
+    str_reset(out);
+    if (sep == NULL) {
+        str_add(out, u);
+        return 0;
+    }
+    auth = sep + 3;
+    end = auth + strcspn(auth, "/?#");
+    for (p = auth; p < end; p++) {
+        if (*p == '@') {
+            at = p; /* l'ultima: una password puo' contenere '@' */
+        }
+    }
+    if (at == NULL) {
+        str_add(out, u);
+        return 0;
+    }
+    slen = (size_t)(sep - u);
+    for (k = 0U; k < (sizeof ssh / sizeof ssh[0]); k++) {
+        if ((strlen(ssh[k]) == slen) && (strncmp(u, ssh[k], slen) == 0)) {
+            is_ssh = 1;
+        }
+    }
+    str_addn(out, u, (size_t)(auth - u));
+    if (is_ssh != 0) {
+        colon = memchr(auth, ':', (size_t)(at - auth));
+        str_addn(out, auth, (size_t)(((colon != NULL) ? colon : at) - auth));
+        str_add(out, at);
+        return colon != NULL;
+    }
+    str_add(out, at + 1);
+    return 1;
+}
+
+/* Credenziali tolte dall'URL di un remote: un avviso per remote e per
+ * processo, senza l'URL (lo stamperebbe). */
+static void warn_credentials(const char *name)
+{
+    static Str_t warned = STR_INIT;
+
+    if (!str_zhas(&warned, name)) {
+        str_addz(&warned, name);
+        msg_warning(MSG_WARN_URL_CREDENTIALS, name);
+    }
+}
+
+/* Primo valore di remote.<name>.url, come e' scritto nella configurazione
+ * (il primo e' quello che git usa per il fetch). 1 se c'e'. */
+static int config_url(const char *name, Str_t *url)
+{
+    const char *args[] = { "config", "--get-all", NULL, NULL };
+    Str_t key = STR_INIT;
+    const char *nl;
+    int ok;
+
+    str_reset(url);
+    str_addf(&key, "remote.%s.url", name);
+    args[2] = str_cstr(&key);
+    ok = (git_run(args, PROC_STDERR_NULL, url) == GS_OK) && (url->len > 0U);
+    nl = ok ? strchr(str_cstr(url), '\n') : NULL;
+    if (nl != NULL) {
+        str_setlen(url, (size_t)(nl - url->buf));
+    }
+    str_free(&key);
+    return ok && (url->len > 0U);
+}
+
 eGsErr_t remote_url(const char *top, const char *name, Str_t *url)
 {
     const char *args[] = { "remote", "get-url", "--", name, NULL };
     Str_t abs = STR_INIT;
+    Str_t raw = STR_INIT;
     eGsErr_t err;
 
     str_reset(url);
     err = git_run(args, PROC_STDERR_NULL, url);
+    /* AB-02: get-url espande url.<base>.insteadOf, una preferenza locale
+     * (ssh al posto di https, un mirror interno) che nella catena varrebbe
+     * per tutti. Si tiene l'URL configurato se e' completo (schema://, o un
+     * path); un'abbreviazione (gh:luca/A) resta espansa. */
+    if ((err == GS_OK) && config_url(name, &raw) &&
+        ((strstr(str_cstr(&raw), "://") != NULL) || url_is_path(str_cstr(&raw)))) {
+        str_reset(url);
+        str_add(url, str_cstr(&raw));
+    }
+    if ((err == GS_OK) && url_public(str_cstr(url), &raw)) {
+        warn_credentials(name);
+        str_reset(url);
+        str_add(url, str_cstr(&raw));
+    }
+    str_free(&raw);
     if ((err == GS_OK) && url_is_path(str_cstr(url)) &&
         !path_is_absolute(str_cstr(url))) {
         /* P-08: git risolve un path relativo dalla radice della repo */
@@ -161,6 +264,10 @@ eGsErr_t remote_arg_url(const char *top, const char *cwd, const char *arg,
         } else {
             err = GS_ERR_FORMAT;
         }
+    } else if (url_public(arg, &abs)) {
+        /* scritto dall'utente con le credenziali: nella catena no (S-01) */
+        msg_warning(MSG_WARN_URL_ARG_CREDENTIALS);
+        str_add(url, str_cstr(&abs));
     } else {
         str_add(url, arg);
     }
@@ -287,6 +394,117 @@ int remote_same_house(const char *a, const char *b)
     return same;
 }
 
+/* 1 se l'elenco di coppie nome, URL ha gia' il nome. */
+static int remote_pair_name(const Str_t *pairs, const char *name)
+{
+    const char *p;
+
+    for (p = str_znext(pairs, NULL); p != NULL; p = str_znext(pairs, p)) {
+        if (strcmp(p, name) == 0) {
+            return 1;
+        }
+        p = str_znext(pairs, p); /* l'URL */
+        if (p == NULL) {
+            break;
+        }
+    }
+    return 0;
+}
+
+/*
+ * Remote configurati della repo: elenco compatto di coppie nome, URL (il
+ * primo remote.<name>.url, un path relativo reso assoluto come in
+ * remote_url). Letti una volta per processo, con un solo git config.
+ */
+static const Str_t *configured_remotes(void)
+{
+    static const char *const args[] = { "config", "--get-regexp",
+                                        "^remote\\..*\\.url$", NULL };
+    static const char *const top_args[] = { "rev-parse", "--show-toplevel", NULL };
+    static Str_t pairs = STR_INIT;
+    static int loaded = 0;
+    static const char key_frame[] = "remote..url"; /* "remote." + nome + ".url" */
+    Str_t out = STR_INIT;
+    Str_t top = STR_INIT;
+    Str_t name = STR_INIT;
+    Str_t value = STR_INIT;
+    Str_t joined = STR_INIT;
+    const char *line;
+    const char *nl;
+    const char *sp;
+    size_t klen;
+    int have_top = 0;
+
+    if (loaded != 0) {
+        return &pairs;
+    }
+    loaded = 1;
+    if (git_run(args, PROC_STDERR_NULL, &out) != GS_OK) {
+        str_reset(&out);
+    }
+    /* Righe "remote.<nome>.url <valore>": il nome puo' contenere punti. */
+    for (line = str_cstr(&out); *line != '\0'; line = (*nl == '\n') ? (nl + 1) : nl) {
+        nl = strchr(line, '\n');
+        nl = (nl != NULL) ? nl : (line + strlen(line));
+        sp = memchr(line, ' ', (size_t)(nl - line));
+        klen = (sp != NULL) ? (size_t)(sp - line) : 0U;
+        if ((klen <= (sizeof key_frame - 1U)) || ((sp + 1) >= nl)) {
+            continue;
+        }
+        str_reset(&name);
+        str_addn(&name, line + 7, klen - (sizeof key_frame - 1U));
+        str_reset(&value);
+        str_addn(&value, sp + 1, (size_t)(nl - (sp + 1)));
+        if (remote_pair_name(&pairs, str_cstr(&name))) {
+            continue; /* un URL in piu' dello stesso remote: vale il primo */
+        }
+        if (url_is_path(str_cstr(&value)) && !path_is_absolute(str_cstr(&value))) {
+            if (have_top == 0) {
+                have_top = (git_run(top_args, PROC_STDERR_NULL, &top) == GS_OK) ? 1 : -1;
+            }
+            if ((have_top < 0) || !join_abs(str_cstr(&top), str_cstr(&value), &joined)) {
+                continue;
+            }
+            str_reset(&value);
+            str_add(&value, str_cstr(&joined));
+        }
+        str_addz(&pairs, str_cstr(&name));
+        str_addz(&pairs, str_cstr(&value));
+    }
+    str_free(&joined);
+    str_free(&value);
+    str_free(&name);
+    str_free(&top);
+    str_free(&out);
+    return &pairs;
+}
+
+/*
+ * Come si raggiunge url (AB-03): se e' l'URL di un remote configurato (in
+ * forma normale, quindi anche senza le credenziali che remote_url toglie),
+ * il nome di quel remote. Cosi' git usa il suo pushurl, insteadOf,
+ * pushInsteadOf e le credenziali scritte nell'URL configurato, come in un
+ * "git push <remote>". Altrimenti url stesso. Un nome che comincia con '-'
+ * diventerebbe un'opzione: si usa l'URL.
+ */
+static const char *transport(const char *url)
+{
+    const Str_t *pairs = configured_remotes();
+    const char *name;
+    const char *value;
+
+    for (name = str_znext(pairs, NULL); name != NULL; name = str_znext(pairs, value)) {
+        value = str_znext(pairs, name);
+        if (value == NULL) {
+            break;
+        }
+        if ((name[0] != '-') && remote_same(value, url)) {
+            return name;
+        }
+    }
+    return url;
+}
+
 eGsErr_t remote_creator_url(GitBatch_t *b, const Oid_t *version, Str_t *url)
 {
     Auth_t a = AUTH_INIT;
@@ -345,7 +563,7 @@ exit:
 static int fetch_specs(const char *url, const Str_t *ids, const uint8_t *sel)
 {
     const char *args[] = { "fetch", "-q", "--no-tags", "--no-write-fetch-head",
-                           "--no-auto-gc", "--stdin", url, NULL };
+                           "--no-auto-gc", "--stdin", transport(url), NULL };
     Str_t out = STR_INIT;
     Proc_t p;
     const char *id;
@@ -379,7 +597,7 @@ exit:
 static int remote_has(const char *url, const Str_t *ids, uint8_t *has)
 {
     static const char prefix[] = "refs/shared/";
-    const char *args[] = { "ls-remote", url, "refs/shared/*", NULL };
+    const char *args[] = { "ls-remote", transport(url), "refs/shared/*", NULL };
     Str_t out = STR_INIT;
     const char *line;
     const char *tab;
@@ -500,7 +718,7 @@ static void push_chunk(const char *url, const char *const *idv, const Oid_t *v,
     args[na++] = "push";
     args[na++] = "--porcelain";
     args[na++] = "--no-verify";
-    args[na++] = url;
+    args[na++] = transport(url); /* AB-03 */
     for (k = 0U; k < n; k++) {
         oid_to_hex(&v[k], hex);
         str_reset(&one);
@@ -703,7 +921,7 @@ exit:
 eGsErr_t remote_fetch(const char *url, const char *id, const char *ref)
 {
     const char *args[] = { "fetch", "-q", "--no-tags", "--no-write-fetch-head",
-                           "--no-auto-gc", url, NULL, NULL };
+                           "--no-auto-gc", transport(url), NULL, NULL };
     Str_t spec = STR_INIT;
     eGsErr_t err = GS_ERR_GIT;
 

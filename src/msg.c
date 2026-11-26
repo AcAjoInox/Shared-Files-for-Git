@@ -408,6 +408,12 @@ static const char *const msg_en[] = {
         "%s: authority change pending (-> %s): decide first with "
         "'git shared crown --accept %s' or '--reject'",
     [MSG_WARN_COPY_FAILED] = "%s: cannot copy the versions to %s",
+    [MSG_WARN_URL_CREDENTIALS] =
+        "the URL of remote '%s' contains credentials (a user name or a token):\n"
+        "  git shared does not write them in the file history nor show them",
+    [MSG_WARN_URL_ARG_CREDENTIALS] =
+        "the URL given contains credentials (a user name or a token):\n"
+        "  git shared does not write them in the file history nor show them",
     [MSG_WARN_CHAIN_RESTORED] =
         "%s: the version chain was missing: restored from %s",
     [MSG_HOOK_NOT_ALIGNED] = "%s: %s (run 'git shared %s')",
