@@ -249,7 +249,7 @@ int cmd_creator_back(Repo_t *r, SharedEntry_t *e, GitBatch_t *b, int *back);
 void cmd_warn_suspended(const SharedEntry_t *e, BranchNames_t *bn);
 
 /*
- * Riga "<tipo> <chiave>[ <campi>]" di --porcelain (D-119): eol '\n',
+ * Riga "<tipo> <chiave>[ <campi>]" di --porcelain (D-119, D-120): eol '\n',
  * o NUL con -z; fmt NULL = nessun campo; chiave NULL o vuota = "-". Al piu'
  * un campo libero (nome, path, URL), sempre l'ultimo.
  */

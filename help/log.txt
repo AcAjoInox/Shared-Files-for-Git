@@ -1,0 +1,71 @@
+GIT-SHARED-LOG(1)
+
+NAME
+    git shared log - show the versions of a shared file
+
+SYNOPSIS
+    git shared log [-n <number>] [--porcelain] [-z] [<path>]
+
+DESCRIPTION
+    Shows the versions of a shared file, the latest first, with the
+    graph drawn by git: where two peers published without seeing each
+    other, and where their versions were merged. Without <path>, the
+    only shared file of this repository; <path> can also be the ID.
+
+    Each version is a line: the short name, the date and the author,
+    then in brackets:
+
+    latest                the latest version here (status compares
+                          with this one)
+    authority             the last version seen on the authority of
+                          the file (remote)
+    this branch           the version the file on this branch starts
+                          from; "changed" if the file here is different
+
+    and after a colon what the version changed besides the content:
+    first version; merge; same content (only the authority or the heirs
+    changed); creator <url>; authority -> <url> (git shared crown, or
+    crown --restore); heirs changed.
+
+    The author is the one written in user.name by whoever published:
+    versions are not signed, so it is declared, not checked.
+
+    First log receives the versions the peers announced, as status
+    does: it shows the versions status uses. It never uses the network.
+
+OPTIONS
+    -n <number>
+        Shows only the latest <number> versions.
+
+    --porcelain, --porcelain=1
+        Writes the same information for a program, in a format that does
+        not change and is never translated, as git shared status
+        --porcelain does (PORCELAIN below). No graph.
+
+    -z
+        Like --porcelain, but each line ends with NUL.
+
+PORCELAIN
+    One line per fact: the first word is its type, the second the
+    version (a complete commit name), then the fields, separated by one
+    space; only the last field can contain spaces. Dates are seconds
+    since 1970.
+
+    # porcelain 1                       format version
+    # id <id>                           the file
+    # path <path>                       its path here (can be empty)
+    version <commit> <blob> <time> <author>
+                                        first for each version
+    parent <commit> <parent>            one per parent
+    latest <commit>
+    authority-tip <commit>
+    base <commit> <same|changed>        this branch
+    creator <commit> <url>              the creator changed (or appeared)
+    authority <commit> <url>            the authority changed
+    heirs <commit>                      the heirs changed
+
+    The versions come in the order of 'git log --topo-order'. A program
+    must ignore the lines it does not know.
+
+SEE ALSO
+    git shared status --help, git shared crown --help

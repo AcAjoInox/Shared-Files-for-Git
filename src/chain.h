@@ -48,4 +48,10 @@ eGsErr_t chain_blobs(GitBatch_t *b, const char *id, OidList_t *out);
  * del fetch di link, D-062). */
 eGsErr_t chain_blobs_ref(GitBatch_t *b, const char *ref, OidList_t *out);
 
+/* Come chain_blobs_ref, e in commits (se non NULL) il commit di ogni
+ * versione, nello stesso ordine: commits->v[i] ha il blob out->v[i]
+ * (git shared log, D-120). */
+eGsErr_t chain_versions_ref(GitBatch_t *b, const char *ref, OidList_t *out,
+                            OidList_t *commits);
+
 #endif /* GS_CHAIN_H */

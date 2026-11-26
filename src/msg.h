@@ -339,6 +339,22 @@ typedef enum {
     MSG_STATE_INCONSISTENT,
     MSG_STATE_ABSENT,
 
+    /* git shared log (D-120) */
+    MSG_USAGE_LOG,
+    MSG_ERR_LOG_NONE,
+    MSG_ERR_LOG_WHICH,
+    MSG_ERR_LOG_NO_CHAIN,    /* path o id */
+    MSG_LOG_LATEST,
+    MSG_LOG_AUTHORITY,
+    MSG_LOG_HERE,
+    MSG_LOG_HERE_CHANGED,
+    MSG_LOG_FIRST,
+    MSG_LOG_MERGE,
+    MSG_LOG_SAME,
+    MSG_LOG_CREATOR,         /* url */
+    MSG_LOG_AUTH,            /* url */
+    MSG_LOG_HEIRS,
+
     MSG_COUNT
 } eMsgId_t;
 

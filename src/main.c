@@ -27,6 +27,7 @@ static const CmdDef_t commands[] = {
     { "hook", cmd_hook, MSG_USAGE_HOOK }, /* interno: lo chiamano gli hook */
     { "lang", cmd_lang, MSG_USAGE_LANG },
     { "link", cmd_link, MSG_USAGE_LINK },
+    { "log", cmd_log, MSG_USAGE_LOG },
     { "mv", cmd_mv, MSG_USAGE_MV },
     { "prune", cmd_prune, MSG_USAGE_PRUNE },
     { "publish", cmd_publish, MSG_USAGE_PUBLISH },

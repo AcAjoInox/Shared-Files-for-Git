@@ -32,6 +32,7 @@ COMANDI
     unlink     smette di condividere un file
     mv         rinomina un file condiviso
     status     mostra lo stato di ogni file shared e dei suoi peer
+    log        mostra le versioni di un file shared
     publish    invia la versione nuova ai peer
     update     riceve le versioni nuove e le applica, unendo se serve
     push       invia al creatore le versioni pubblicate (remoto)

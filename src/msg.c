@@ -15,6 +15,7 @@ static const char *const msg_en[] = {
         "    unlink    stop sharing a file\n"
         "    mv        rename a shared file\n"
         "    status    show the shared files of this repository\n"
+        "    log       show the versions of a shared file\n"
         "    publish   send new versions to the peers\n"
         "    update    get the new versions and apply them\n"
         "    push      send the published versions to the creator (remote)\n"
@@ -702,6 +703,31 @@ static const char *const msg_en[] = {
     [MSG_STATE_UNLINKED] = "unlinked",
     [MSG_STATE_INCONSISTENT] = "inconsistent",
     [MSG_STATE_ABSENT] = "not declared here",
+
+    [MSG_USAGE_LOG] =
+        "usage: git shared log [-n <number>] [--porcelain] [-z] [<path>]\n"
+        "\n"
+        "Show the versions of a shared file, the latest first.\n"
+        "\n"
+        "    -n <number>  show only the latest <number> versions\n"
+        "    --porcelain  stable output for scripts, one line per fact\n"
+        "    -z           like --porcelain, each line ending with NUL\n",
+    [MSG_ERR_LOG_NONE] = "no shared file here",
+    [MSG_ERR_LOG_WHICH] =
+        "more than one shared file: say which one, "
+        "for example 'git shared log <path>'",
+    [MSG_ERR_LOG_NO_CHAIN] =
+        "%s: the version chain is missing: run 'git shared status'",
+    [MSG_LOG_LATEST] = "latest",
+    [MSG_LOG_AUTHORITY] = "authority",
+    [MSG_LOG_HERE] = "this branch",
+    [MSG_LOG_HERE_CHANGED] = "this branch, changed",
+    [MSG_LOG_FIRST] = "first version",
+    [MSG_LOG_MERGE] = "merge",
+    [MSG_LOG_SAME] = "same content",
+    [MSG_LOG_CREATOR] = "creator %s",
+    [MSG_LOG_AUTH] = "authority -> %s",
+    [MSG_LOG_HEIRS] = "heirs changed",
 };
 
 _Static_assert(sizeof msg_en / sizeof msg_en[0] == MSG_COUNT,

@@ -32,6 +32,7 @@ COMMANDS
     unlink     stop sharing a file
     mv         rename a shared file
     status     show the state of each shared file, and of its peers
+    log        show the versions of a shared file
     publish    send the new version to the peers
     update     get the new versions and apply them, merging if needed
     push       send the published versions to the creator (remote)

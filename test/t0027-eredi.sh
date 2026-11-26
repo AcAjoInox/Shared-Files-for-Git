@@ -93,6 +93,12 @@ expect_eq "B push: la voce sul creatore" "$(srv_heirs luca/A)" "$(printf '%s\t%s
 expect_eq "B push: stessa versione qui e sul creatore" "$(tip B)" "$(srv_tip luca/A)"
 expect_eq "B push: e nella copia" "$(srv_tip luca/B)" "$(tip B)"
 expect_eq "B push: genitore T" "$(git rev-parse "$(tip B)^1")" "$T0"
+run git shared log
+expect_out "B log: gli eredi cambiati, stesso contenuto" "same content; heirs changed"
+expect_out "B log: il creatore comparso" "creator $A"
+run git shared log --porcelain
+expect_out "B log, porcelain: heirs" "heirs $(tip B)"
+expect_out "B log, porcelain: authority-tip" "authority-tip $(tip B)"
 expect_eq "B push: stesso contenuto" "$(git rev-parse "$(tip B):content")" \
 	"$(git rev-parse "$T0:content")"
 run git shared push

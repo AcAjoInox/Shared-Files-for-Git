@@ -128,6 +128,11 @@ run git shared status
 expect_out "status: riga creator" "creator $SRV_A"
 expect_no_out "status: la riga creator senza confronto" "creator $SRV_A ("
 expect_out "status: riga authority con il confronto" "authority $SRV_C (same version, seen 20"
+run git shared log -n 1
+expect_out "log: il cambio di autorita'" "same content; authority -> $SRV_C"
+expect_out "log: latest e authority" "(latest, authority, this branch)"
+run git shared log --porcelain
+expect_out "log, porcelain: authority" "authority $T_M $SRV_C"
 run git shared status --porcelain
 expect_out "porcelain: riga creator" "creator $ID $SRV_A"
 expect_out "porcelain: authority = sovrano, uguale, vista" "authority $ID same 1"

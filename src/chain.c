@@ -183,10 +183,17 @@ eGsErr_t chain_blobs(GitBatch_t *b, const char *id, OidList_t *out)
 
 eGsErr_t chain_blobs_ref(GitBatch_t *b, const char *ref, OidList_t *out)
 {
+    return chain_versions_ref(b, ref, out, NULL);
+}
+
+eGsErr_t chain_versions_ref(GitBatch_t *b, const char *ref, OidList_t *out,
+                            OidList_t *commits)
+{
     char hex[OID_HEX_SIZE];
     ChainStack_t stack = { NULL, 0U, 0U };
     OidList_t seen = OIDLIST_INIT; /* versioni gia' espanse */
     OidList_t post = OIDLIST_INIT; /* blob in post-ordine: dalla piu' vecchia */
+    OidList_t postc = OIDLIST_INIT; /* i loro commit, nello stesso ordine */
     ChainFrame_t f;
     Str_t name = STR_INIT;
     Oid_t commit;
@@ -196,6 +203,9 @@ eGsErr_t chain_blobs_ref(GitBatch_t *b, const char *ref, OidList_t *out)
     eGsErr_t err = GS_OK;
 
     out->n = 0U;
+    if (commits != NULL) {
+        commits->n = 0U;
+    }
     type = git_batch_query(b, ref, &commit);
     if (type == GIT_OBJ_COMMIT) {
         stack_push(&stack, &commit, NULL, 0);
@@ -210,6 +220,7 @@ eGsErr_t chain_blobs_ref(GitBatch_t *b, const char *ref, OidList_t *out)
         f = stack.v[stack.n];
         if (f.done != 0) {
             oidlist_add(&post, &f.blob);
+            oidlist_add(&postc, &f.commit);
         } else if (!oidlist_has(&seen, &f.commit)) {
             oidlist_add(&seen, &f.commit);
             oid_to_hex(&f.commit, hex);
@@ -232,11 +243,15 @@ eGsErr_t chain_blobs_ref(GitBatch_t *b, const char *ref, OidList_t *out)
     if (err == GS_OK) {
         for (j = post.n; j > 0U; j--) {
             oidlist_add(out, &post.v[j - 1U]);
+            if (commits != NULL) {
+                oidlist_add(commits, &postc.v[j - 1U]);
+            }
         }
     }
     free(stack.v);
     oidlist_free(&seen);
     oidlist_free(&post);
+    oidlist_free(&postc);
     str_free(&name);
     return err;
 }

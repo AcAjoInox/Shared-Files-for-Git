@@ -1,0 +1,74 @@
+GIT-SHARED-LOG(1)
+
+NOME
+    git shared log - mostra le versioni di un file shared
+
+SINTASSI
+    git shared log [-n <numero>] [--porcelain] [-z] [<path>]
+
+DESCRIZIONE
+    Mostra le versioni di un file shared, dalla piu' recente, con il
+    grafo disegnato da git: dove due peer hanno pubblicato senza
+    vedersi, e dove le loro versioni sono state unite. Senza <path>,
+    l'unico file shared di questa repository; <path> puo' essere anche
+    l'ID.
+
+    Ogni versione e' una riga: il nome breve, la data e l'autore, poi
+    tra parentesi (in inglese, come li stampa il comando):
+
+    latest                l'ultima versione qui (status confronta con
+                          questa)
+    authority             l'ultima versione vista sull'autorita' del
+                          file (remoto)
+    this branch           la versione da cui parte il file su questo
+                          branch; "changed" se qui il file e' diverso
+
+    e dopo i due punti cosa ha cambiato la versione oltre al contenuto:
+    first version (la prima); merge (un'unione); same content (cambiano
+    solo l'autorita' o gli eredi); creator <url>; authority -> <url>
+    (git shared crown, o crown --restore); heirs changed (eredi
+    cambiati).
+
+    L'autore e' quello scritto in user.name da chi ha pubblicato: le
+    versioni non sono firmate, quindi e' dichiarato, non verificato.
+
+    Prima log riceve le versioni annunciate dai peer, come status:
+    mostra le versioni che status usa. Non usa mai la rete.
+
+OPZIONI
+    -n <numero>
+        Mostra solo le ultime <numero> versioni.
+
+    --porcelain, --porcelain=1
+        Scrive le stesse informazioni per un programma, in un formato che
+        non cambia e non si traduce mai, come git shared status
+        --porcelain (PORCELAIN, sotto). Senza grafo.
+
+    -z
+        Come --porcelain, ma ogni riga finisce con NUL.
+
+PORCELAIN
+    Una riga per informazione: la prima parola e' il tipo, la seconda
+    la versione (il nome completo del commit), poi i campi, separati da
+    uno spazio; solo l'ultimo campo puo' contenere spazi. Le date sono
+    in secondi dal 1970.
+
+    # porcelain 1                       versione del formato
+    # id <id>                           il file
+    # path <path>                       il suo path qui (puo' mancare)
+    version <commit> <blob> <data> <autore>
+                                        la prima di ogni versione
+    parent <commit> <genitore>          una per genitore
+    latest <commit>
+    authority-tip <commit>
+    base <commit> <same|changed>        questo branch
+    creator <commit> <url>              il creatore e' cambiato (o
+                                        comparso)
+    authority <commit> <url>            l'autorita' e' cambiata
+    heirs <commit>                      gli eredi sono cambiati
+
+    Le versioni vengono nell'ordine di 'git log --topo-order'. Un
+    programma deve ignorare le righe che non conosce.
+
+VEDI ANCHE
+    git shared status --help, git shared crown --help
