@@ -13,7 +13,7 @@ The file stays a regular file: anyone using the repository without the extension
 
 ## Installation
 
-**Windows, without compiling.** Download [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (built from the latest tag, v0.10.0) and put it in a folder of your `PATH`, for example `%USERPROFILE%\bin`. It needs only git 2.34 or later. Check with `git shared -h`; the manual is in `git shared help`. The file is not signed, so Windows may warn you the first time you run it.
+**Windows, without compiling.** Download [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (built from the latest tag, v0.11.0) and put it in a folder of your `PATH`, for example `%USERPROFILE%\bin`. It needs only git 2.34 or later. Check with `git shared -h`; the manual is in `git shared help`. The file is not signed, so Windows may warn you the first time you run it.
 
 **From the sources.** You need git 2.34 or later, `make` and `gcc` (MinGW-w64 on Windows).
 
@@ -138,7 +138,7 @@ Each command has its own page: `git shared <command> --help`. The same pages are
 
 ## Remote repositories (beta)
 
-On GitHub the main flow is tested: `push`, `pull` and `status --remote`. Sovereigns and heirs, described below, are tested only between repositories on the same machine; permissions, credentials and GitLab are not tested yet. It is in the Windows executable of `dist/windows/` (v0.10.0) and in the sources.
+On GitHub the main flow is tested: `push`, `pull` and `status --remote`. Sovereigns and heirs, described below, are tested only between repositories on the same machine; permissions, credentials and GitLab are not tested yet. It is in the Windows executable of `dist/windows/` (v0.11.0) and in the sources.
 
 There is no server of its own: git shared uses the transport of git and the permissions of the hosting. Only the version history of the file travels, never the project.
 
