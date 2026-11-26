@@ -35,7 +35,7 @@ expect_rc "opzione sconosciuta: codice 129" 129
 run git shared status x
 expect_rc "argomento: codice 129" 129
 run git shared status -h
-expect_out "uso: --peers" "--peers    also show whether each peer has the same version"
+expect_out "uso: --peers" "--peers      also show whether each peer has the same version"
 run git shared status --help
 expect_out "manuale: --peers" "Also shows, for each peer"
 run git shared status

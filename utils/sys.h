@@ -21,6 +21,13 @@
  */
 void sys_init(int *argc, char ***argv);
 
+/*
+ * Standard output in modo binario: '\n' resta LF. Windows: senza, il modo
+ * testo scrive CR LF (status --porcelain, D-119: come git, solo LF). POSIX:
+ * niente. Da chiamare prima di scrivere su stdout.
+ */
+void sys_stdout_binary(void);
+
 /* n byte dal generatore casuale del sistema operativo. */
 eGsErr_t sys_random(uint8_t *buf, size_t n);
 

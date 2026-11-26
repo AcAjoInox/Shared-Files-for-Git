@@ -108,7 +108,7 @@ The peers work in parallel. In each one, only a new version on a file with no lo
 | `git shared link <file-in-other-repo> [<dest>]` | Links a file shared by another repository; a copy that already exists is kept and `update` aligns it |
 | `git shared unlink <file>` | Stops sharing the file, which stays as a regular file |
 | `git shared mv <file> <dest>` | Renames a shared file, only in this repository |
-| `git shared status [--peers] [--remote]` | State of each shared file; with `--peers`, also that of the peers; with `--remote`, first asks the creators |
+| `git shared status [--peers] [--remote] [--porcelain] [-z]` | State of each shared file; with `--peers`, also that of the peers; with `--remote`, first asks the creators; with `--porcelain`, a stable format for scripts |
 | `git shared publish [<file>]` | Creates a new version and notifies the peers |
 | `git shared update [<repo>] [<file>]` | Receives and applies the latest version, also in another repository (`<repo>`); `--peers` also updates and commits every peer; `--ours` / `--theirs` keeps one version, `--abort` gives up a merge |
 | `git shared push [<remote>] [<file>]` | Remote (beta): sends the published versions to the creator; the first time, `<remote>` becomes the creator |

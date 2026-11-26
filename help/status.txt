@@ -4,7 +4,7 @@ NAME
     git shared status - show the state of each shared file
 
 SYNOPSIS
-    git shared status [--peers] [--remote]
+    git shared status [--peers] [--remote] [--porcelain] [-z]
 
 DESCRIPTION
     Shows each shared file with its path, ID and state, and what to do.
@@ -85,6 +85,68 @@ OPTIONS
         does, but without applying anything. If a creator cannot be
         reached a note says so, and the state uses the last version
         seen.
+
+    --porcelain, --porcelain=1
+        Writes the same information for a program, in a format that does
+        not change from one version to the next and is never translated
+        (PORCELAIN below).
+
+    -z
+        Like --porcelain, but each line ends with NUL instead of a
+        newline: for paths with unusual characters.
+
+PORCELAIN
+    One line per fact: the first word is its type, the second the ID of
+    the file, then the fields, separated by one space. Only the last
+    field can contain spaces (a name, path or URL), and it can be empty.
+    Object names are complete, dates are seconds since 1970 (0 = never).
+    No colors, no advice. Errors and warnings go to stderr as usual, and
+    the exit code is the same as without --porcelain.
+
+    # porcelain 1                       format version
+    # repo <folder>                     this repository
+    # branch <branch>                   or "# detached"
+    file <id> <state> <active|suspended> <path>
+                                        always first for a file; state:
+                                        aligned, to-apply, to-publish,
+                                        diverged, to-commit, merging,
+                                        pending, unlinked, inconsistent,
+                                        absent
+    name <id> <name>                    the name in .gitshared
+    branch <id> <branch>                one per active branch
+    pending-on <id> <branch>            pending commit on another branch
+    head <id> <blob>                    the file in HEAD
+    tip <id> <commit> <blob>            the latest version and its content
+    base <id> <blob>                    diverged only; none = no base
+    creator <id> <url>
+    authority <id> <rel> <seen> <url>   rel: same, ahead, behind,
+                                        diverged, unseen, missing
+    heir <id> <n> <url>                 in order of succession
+    unreachable <id> <url>              --remote: the authority
+    succession <id> <kind> <n> <url>    --remote: found, other, creator,
+                                        none
+    succession-via <id> <url>           who said so (found, other)
+    creator-back <id> <url>
+    auth-change <id> <version> <from> <url>
+                                        from: authority, peer, unknown
+    auth-change-from <id> <version> <repo>
+    auth-change-creator <id> <version> <url>
+    chain-missing <id>
+    elsewhere <id> <branch>             absent: the branch declaring it
+    renamed <id> <old path>
+    branches-gone <id>
+    announced <id> <repo>               announced, not received
+    stranger <id> <repo>                announced by a non-peer
+    to-merge <id> <repo>
+    peer <id> <state> <repo>            --peers: same, behind, newer,
+                                        none, announced, left, gone,
+                                        unreachable
+    invalid <id> <name>                 invalid entry in .gitshared
+
+    The order of the lines after "file" may change. A program must
+    ignore the lines it does not know: new ones can be added. The
+    version in "# porcelain" changes only if the meaning of an existing
+    line changes.
 
 SEE ALSO
     git shared update --help, git shared publish --help

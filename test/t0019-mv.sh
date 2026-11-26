@@ -71,6 +71,9 @@ expect_eq "mv: nessuna attesa in .git/config" "$(git config "shared.$ID.pending"
 run git shared status
 expect_out "mv: stato in attesa di commit" "pending commit"
 expect_out "mv: nota con il path di prima" "renamed from 'inc/common.h': commit it with .gitshared to confirm"
+run git shared status --porcelain
+expect_out "mv, porcelain: in attesa, path nuovo" "file $ID pending active inc/shared.h"
+expect_out "mv, porcelain: renamed" "renamed $ID inc/common.h"
 run git shared publish
 expect_out "mv: publish salta il file" "inc/shared.h: pending commit, nothing to do"
 run git shared update

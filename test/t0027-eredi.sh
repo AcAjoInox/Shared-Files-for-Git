@@ -150,6 +150,10 @@ expect_err "nessun erede incoronato: lo dice" "the authority and its heirs are u
 expect_err "nessun erede incoronato: crown <url>" "git shared crown <url> p.h"
 expect_err "nessun erede incoronato: crown della propria repo" "or your own remote:  'git shared crown p.h'"
 expect_eq "nessun erede incoronato: T non cambia" "$(tip R)" "$TR"
+run git shared status --remote --porcelain
+expect_out "creatore morto, porcelain: unreachable" "unreachable $ID $A"
+expect_out "creatore morto, porcelain: nessuno al suo posto" "succession $ID none 0 "
+expect_out "creatore morto, porcelain: heir 1" "heir $ID 1 $B"
 run git shared crown --yes p.h
 expect_rc "crown senza URL e senza origin: codice 1" 1
 expect_err "crown senza URL e senza origin: lo dice" "no remote named 'origin'"
@@ -189,6 +193,10 @@ git shared pull >/dev/null 2>&1
 run git shared status
 expect_out "R status: prima i figli di D" "    heirs  1 $G"
 expect_out "R status: poi il fratello" "           2 $B"
+run git shared status --porcelain
+expect_eq "R status, porcelain: eredi in ordine" "$(printf '%s\n' "$OUT" | grep '^heir ')" \
+	"heir $ID 1 $G
+heir $ID 2 $B"
 
 # --- cartello stradale: B segue Anna, S lo trova da B --------------------------------
 cd "$TRASH/B" || exit 1
@@ -202,6 +210,9 @@ run git shared status --remote
 expect_out "S status --remote: B dice dov'e' l'autorita'" \
 	"$B says the authority is now heir 2 $D: 'git shared pull p.h' follows it"
 expect_eq "S status --remote: non segue" "$(tip S)" "$TS"
+run git shared status --remote --porcelain
+expect_out "S, porcelain: succession found" "succession $ID found 2 $D"
+expect_out "S, porcelain: succession-via" "succession-via $ID $B"
 
 # --- il ritorno del creatore ---------------------------------------------------------
 revive_srv luca/A
@@ -210,6 +221,9 @@ run git shared status --remote
 expect_out "Aslan: il creatore e' tornato" \
 	"the creator $A is reachable again: 'git shared crown --restore p.h'"
 expect_out "Aslan: l'autorita' resta D" "authority $D (same version"
+run git shared status --remote --porcelain
+expect_out "Aslan, porcelain: creator-back" "creator-back $ID $A"
+expect_out "Aslan, porcelain: authority D" "authority $ID same "
 
 # --- un'autorita' che non e' un erede ------------------------------------------------
 kill_srv anna/D
@@ -224,6 +238,9 @@ expect_rc "autorita' non erede: codice 1" 1
 expect_err "autorita' non erede: lo dice" \
 	"$G says it is now $N, which is not an heir: to follow it, 'git shared crown $N p.h'"
 expect_eq "autorita' non erede: T non cambia" "$(tip R)" "$TR"
+run git shared status --remote --porcelain
+expect_out "autorita' non erede, porcelain: succession other" "succession $ID other 0 $N"
+expect_out "autorita' non erede, porcelain: succession-via" "succession-via $ID $G"
 run git shared crown --yes "$N" p.h
 expect_rc "seguirla con crown: codice 0" 0
 expect_out "seguirla con crown" "p.h: now follows $N"

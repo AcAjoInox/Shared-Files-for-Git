@@ -111,6 +111,12 @@ void sys_sleep_ms(unsigned ms)
     Sleep((DWORD)ms);
 }
 
+void sys_stdout_binary(void)
+{
+    (void)fflush(stdout);
+    (void)_setmode(_fileno(stdout), _O_BINARY);
+}
+
 int sys_stdin_is_tty(void)
 {
     HANDLE h = GetStdHandle(STD_INPUT_HANDLE);

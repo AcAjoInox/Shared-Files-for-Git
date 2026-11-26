@@ -4,7 +4,7 @@ NOME
     git shared status - mostra lo stato di ogni file shared
 
 SINTASSI
-    git shared status [--peers] [--remote]
+    git shared status [--peers] [--remote] [--porcelain] [-z]
 
 DESCRIZIONE
     Mostra ogni file shared con path, ID, stato e cosa fare. Gli stati
@@ -88,6 +88,69 @@ OPZIONI
         condiviso attraverso un remoto, un fetch per creatore, come pull,
         ma senza applicare nulla. Se un creatore non risponde lo dice una
         nota, e lo stato si ricava dall'ultima versione vista.
+
+    --porcelain, --porcelain=1
+        Scrive le stesse informazioni per un programma, in un formato che
+        non cambia da una versione all'altra e non si traduce mai
+        (PORCELAIN, sotto).
+
+    -z
+        Come --porcelain, ma ogni riga finisce con NUL invece che con un
+        a capo: per i path con caratteri insoliti.
+
+PORCELAIN
+    Una riga per informazione: la prima parola e' il tipo, la seconda
+    l'ID del file, poi i campi, separati da uno spazio. Solo l'ultimo
+    campo puo' contenere spazi (un nome, un path o un URL), e puo' essere
+    vuoto. Gli oid sono completi, le date in secondi dal 1970 (0 = mai).
+    Niente colori, niente consigli. Errori e avvisi vanno su stderr come
+    sempre, e il codice di uscita e' lo stesso che senza --porcelain.
+
+    # porcelain 1                       versione del formato
+    # repo <cartella>                   questa repository
+    # branch <branch>                   oppure "# detached"
+    file <id> <stato> <active|suspended> <path>
+                                        sempre la prima di un file; stato:
+                                        aligned, to-apply, to-publish,
+                                        diverged, to-commit, merging,
+                                        pending, unlinked, inconsistent,
+                                        absent
+    name <id> <nome>                    il nome in .gitshared
+    branch <id> <branch>                una per branch attivo
+    pending-on <id> <branch>            commit atteso su un altro branch
+    head <id> <blob>                    il file in HEAD
+    tip <id> <commit> <blob>            l'ultima versione e il contenuto
+    base <id> <blob>                    solo diverged; assente = nessuna
+                                        base
+    creator <id> <url>
+    authority <id> <rel> <vista> <url>  rel: same, ahead, behind,
+                                        diverged, unseen, missing
+    heir <id> <n> <url>                 in ordine di successione
+    unreachable <id> <url>              --remote: l'autorita'
+    succession <id> <esito> <n> <url>   --remote: found, other, creator,
+                                        none
+    succession-via <id> <url>           chi l'ha detto (found, other)
+    creator-back <id> <url>
+    auth-change <id> <versione> <fonte> <url>
+                                        fonte: authority, peer, unknown
+    auth-change-from <id> <versione> <repo>
+    auth-change-creator <id> <versione> <url>
+    chain-missing <id>
+    elsewhere <id> <branch>             absent: il branch che lo dichiara
+    renamed <id> <path di prima>
+    branches-gone <id>
+    announced <id> <repo>               annunciata, non ricevuta
+    stranger <id> <repo>                annunciata da chi non e' un peer
+    to-merge <id> <repo>
+    peer <id> <stato> <repo>            --peers: same, behind, newer,
+                                        none, announced, left, gone,
+                                        unreachable
+    invalid <id> <nome>                 voce non valida in .gitshared
+
+    L'ordine delle righe dopo "file" puo' cambiare. Un programma deve
+    ignorare le righe che non conosce: se ne possono aggiungere di nuove.
+    La versione in "# porcelain" cambia solo se cambia il significato di
+    una riga esistente.
 
 VEDI ANCHE
     git shared update --help, git shared publish --help

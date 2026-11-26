@@ -106,6 +106,11 @@ void sys_sleep_ms(unsigned ms)
     (void)nanosleep(&ts, NULL);
 }
 
+void sys_stdout_binary(void)
+{
+    /* POSIX: nessun modo testo */
+}
+
 int sys_remove(const char *path)
 {
     return remove(path);

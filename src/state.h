@@ -31,6 +31,10 @@ int state_is_derived(eState_t st);
 /* Nome dello stato per l'utente. */
 const char *state_name(eState_t st);
 
+/* Parola chiave fissa dello stato per status --porcelain (D-119): non si
+ * traduce e non cambia. */
+const char *state_keyword(eState_t st);
+
 /* Cio' che lo stato ha usato: chi agisce dopo (publish, update) parte da
  * questi valori invece di rileggerli (reportIdea B-31). Un oid con
  * len = 0 non e' stato ricavato. */

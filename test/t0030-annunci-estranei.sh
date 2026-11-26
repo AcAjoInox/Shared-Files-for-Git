@@ -65,6 +65,9 @@ expect_rc "status: codice 0" 0
 expect_out "status: chi lo ha annunciato e come riceverla" \
 	"note   new version announced by $TOP_A, which is not a peer. There, 'git shared update --peers' brings it here; 'git shared prune --one-way' stops the notices"
 expect_no_out "status: non manda a update" "not received: run 'git shared update'"
+run git shared status --porcelain
+expect_out "status, porcelain: stranger" "stranger $ID $TOP_A"
+expect_no_out "status, porcelain: non announced" "announced $ID"
 
 run git shared update
 expect_rc "update: codice 0" 0

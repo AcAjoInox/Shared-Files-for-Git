@@ -272,6 +272,10 @@ git update-ref -d "refs/shared-authority/$ID"
 run git shared status
 expect_out "nessuna copia: nota" \
 	"the version chain is missing and no copy was found: run 'git shared unlink p.h'"
+run git shared status --porcelain
+expect_out "nessuna copia, porcelain: chain-missing" "chain-missing $ID"
+expect_out "nessuna copia, porcelain: incoerente" "file $ID inconsistent active p.h"
+expect_no_out "nessuna copia, porcelain: nessuna T" "tip $ID"
 expect_fail "nessuna copia: la catena resta assente" \
 	git rev-parse -q --verify "refs/shared/$ID"
 

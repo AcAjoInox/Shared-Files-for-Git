@@ -146,12 +146,14 @@ static const char *const msg_en[] = {
         "    --theirs          finish the merge taking the other version\n"
         "    --abort           give up the merge in progress\n",
     [MSG_USAGE_STATUS] =
-        "usage: git shared status [--peers] [--remote]\n"
+        "usage: git shared status [--peers] [--remote] [--porcelain] [-z]\n"
         "\n"
         "Show the state of each shared file.\n"
         "\n"
-        "    --peers    also show whether each peer has the same version\n"
-        "    --remote   first get the latest versions from the creators\n",
+        "    --peers      also show whether each peer has the same version\n"
+        "    --remote     first get the latest versions from the creators\n"
+        "    --porcelain  stable output for scripts, one line per fact\n"
+        "    -z           like --porcelain, each line ending with NUL\n",
     [MSG_USAGE_PUSH] =
         "usage: git shared push [<remote>] [--] [<path>]\n"
         "\n"

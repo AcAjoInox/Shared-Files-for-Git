@@ -17,11 +17,16 @@
  * senza rete. Con --remote, se l'autorita' non risponde, la visita degli
  * eredi dice chi ha preso il suo posto (pull lo segue); se l'autorita' e'
  * un sovrano, anche se il creatore e' tornato.
+ *
+ * --porcelain (D-119): le stesse informazioni per un programma, una riga
+ * "<tipo> <id> <campi>" ciascuna, con parole chiave fisse in inglese, oid
+ * completi e date in secondi dal 1970; al piu' un campo libero (nome, path,
+ * URL), sempre l'ultimo. Con -z ogni riga finisce con NUL. Il calcolo e'
+ * lo stesso: cambia solo la stampa.
  */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #include "cmd.h"
 #include "cmd_common.h"
@@ -38,28 +43,28 @@
 #include "remote.h"
 #include "shared.h"
 #include "state.h"
+#include "sys.h"
 
-/* Una nota per ogni repo dell'elenco (compatto). */
-static void print_notes(const Str_t *from, eMsgId_t what)
+/* --porcelain (D-119): 1 se attivo, e il carattere di fine riga ('\n', NUL
+ * con -z). Valgono per un solo comando, impostati da cmd_status. */
+static int s_porc = 0;
+static int s_eol = '\n';
+
+/* Una nota per ogni repo dell'elenco (compatto); kw: tipo della riga di
+ * --porcelain. Un avviso di una repo che non e' un peer (stranger): la
+ * versione arriva solo se la porta 'update --peers' lanciato da lei. */
+static void print_notes(const SharedEntry_t *e, const Str_t *from, eMsgId_t what,
+                        const char *kw)
 {
     const char *p;
 
     for (p = str_znext(from, NULL); p != NULL; p = str_znext(from, p)) {
+        if (s_porc != 0) {
+            cmd_porc(s_eol, kw, e->id, "%s", p);
+            continue;
+        }
         printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
-        printf(msg(what), (*p != '\0') ? p : "?");
-        putchar('\n');
-    }
-}
-
-/* Avvisi di repo che non sono peer: la versione arriva solo se la porta
- * 'update --peers' lanciato da loro. Entrare tra i peer e' una scelta. */
-static void print_strangers(const Str_t *from)
-{
-    const char *p;
-
-    for (p = str_znext(from, NULL); p != NULL; p = str_znext(from, p)) {
-        printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
-        printf(msg(MSG_STATUS_STRANGER), p);
+        printf(msg(what), ((*p != '\0') || (what == MSG_STATUS_STRANGER)) ? p : "?");
         putchar('\n');
     }
 }
@@ -98,16 +103,114 @@ static void print_entry(const Repo_t *r, const SharedEntry_t *e, eState_t st,
     putchar('\n');
 }
 
-/* Data e ora locali "AAAA-MM-GG hh:mm" di un istante in secondi dal 1970. */
-static const char *seen_date(unsigned long at, char *buf, size_t size)
+/* --porcelain: righe file, name, branch, pending-on, head, tip, base
+ * (D-119). Il path come in print_entry; vuoto se non c'e'. T si legge qui
+ * se state_derive si e' fermato prima (file assente, voce non dichiarata):
+ * la catena c'e' lo stesso. */
+static void porc_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *bt,
+                       eState_t st, int suspended, const char *alt_path,
+                       const StateInfo_t *si)
 {
-    time_t tt = (time_t)at;
-    const struct tm *tm = localtime(&tt);
+    const char *path = "";
+    const char *b;
+    Str_t name = STR_INIT;
+    Oid_t tip = si->tip;
+    Oid_t t = si->t;
+    char hex[OID_HEX_SIZE];
+    char hex2[OID_HEX_SIZE];
 
-    if ((tm == NULL) || (strftime(buf, size, "%Y-%m-%d %H:%M", tm) == 0U)) {
-        (void)snprintf(buf, size, "%lu", at);
+    if ((tip.len == 0U) && e->in_config && (e->id[0] != '\0')) {
+        chain_ref(&name, e->id);
+        if (git_batch_query(bt, str_cstr(&name), &tip) == GIT_OBJ_COMMIT) {
+            oid_to_hex(&tip, hex);
+            str_reset(&name);
+            str_addf(&name, "%s:content", hex);
+            if (git_batch_blob(bt, str_cstr(&name), &t) == 0) {
+                t.len = 0U;
+            }
+        } else {
+            tip.len = 0U;
+        }
     }
-    return buf;
+
+    if (e->in_gitshared) {
+        path = str_cstr(&e->path);
+    } else if ((st == STATE_PENDING) && (e->pending_path.len > 0U)) {
+        path = str_cstr(&e->pending_path);
+    } else if (alt_path != NULL) {
+        path = alt_path;
+    } else {
+        /* nessun path */
+    }
+    cmd_porc(s_eol, "file", e->id, "%s %s %s", state_keyword(st),
+         (suspended != 0) ? "suspended" : "active", path);
+    if (e->in_gitshared) {
+        cmd_porc(s_eol, "name", e->id, "%s", str_cstr(&e->name));
+    }
+    for (b = str_znext(&e->branches, NULL); b != NULL; b = str_znext(&e->branches, b)) {
+        cmd_porc(s_eol, "branch", e->id, "%s", b);
+    }
+    if ((st == STATE_PENDING) && (e->pending_branch.len > 0U) &&
+        !str_eq(&r->branch, str_cstr(&e->pending_branch))) {
+        cmd_porc(s_eol, "pending-on", e->id, "%s", str_cstr(&e->pending_branch));
+    }
+    if (si->h.len > 0U) {
+        oid_to_hex(&si->h, hex);
+        cmd_porc(s_eol, "head", e->id, "%s", hex);
+    }
+    if ((tip.len > 0U) && (t.len > 0U)) {
+        oid_to_hex(&tip, hex);
+        oid_to_hex(&t, hex2);
+        cmd_porc(s_eol, "tip", e->id, "%s %s", hex, hex2);
+    }
+    if ((st == STATE_DIVERGED) && (si->base.len > 0U)) {
+        oid_to_hex(&si->base, hex);
+        cmd_porc(s_eol, "base", e->id, "%s", hex);
+    }
+    str_free(&name);
+}
+
+/*
+ * --porcelain (D-119): creator, authority con il confronto e quando e'
+ * stata vista (0 = mai), unreachable, succession (e succession-via),
+ * creator-back. rel: il confronto calcolato da print_creator.
+ */
+static void porc_creator(const SharedEntry_t *e, const Received_t *rv, eMsgId_t rel,
+                         unsigned char fetched, const HeirVisit_t *visit, int back)
+{
+    const char *kw = (rel == MSG_CREATOR_SAME)      ? "same"
+                     : (rel == MSG_CREATOR_AHEAD)    ? "ahead"
+                     : (rel == MSG_CREATOR_BEHIND)   ? "behind"
+                     : (rel == MSG_CREATOR_DIVERGED) ? "diverged"
+                     : (rel == MSG_CREATOR_MISSING)  ? "missing"
+                                                     : "unseen";
+    unsigned long seen = ((rv->auth_tip.len > 0U) && (rel != MSG_CREATOR_MISSING))
+                             ? e->seen_at
+                             : 0UL;
+
+    cmd_porc(s_eol, "creator", e->id, "%s", str_cstr(&rv->creator));
+    cmd_porc(s_eol, "authority", e->id, "%s %lu %s", kw, seen, str_cstr(&rv->authority));
+    if (fetched == (unsigned char)REMOTE_UNREACHABLE) {
+        cmd_porc(s_eol, "unreachable", e->id, "%s", str_cstr(&rv->authority));
+    }
+    if ((fetched == (unsigned char)REMOTE_UNREACHABLE) ||
+        (fetched == (unsigned char)REMOTE_MISSING)) {
+        if (visit->kind == HEIR_VISIT_FOUND) {
+            cmd_porc(s_eol, "succession", e->id, "found %u %s", visit->pos, str_cstr(&visit->to));
+        } else if (visit->kind == HEIR_VISIT_OTHER) {
+            cmd_porc(s_eol, "succession", e->id, "other 0 %s", str_cstr(&visit->to));
+        } else if (visit->kind == HEIR_VISIT_CREATOR) {
+            cmd_porc(s_eol, "succession", e->id, "creator 0 %s", str_cstr(&visit->where));
+        } else {
+            cmd_porc(s_eol, "succession", e->id, "none 0 ");
+        }
+        if ((visit->kind == HEIR_VISIT_FOUND) || (visit->kind == HEIR_VISIT_OTHER)) {
+            cmd_porc(s_eol, "succession-via", e->id, "%s", str_cstr(&visit->where));
+        }
+    }
+    if (back != 0) {
+        cmd_porc(s_eol, "creator-back", e->id, "%s", str_cstr(&rv->creator));
+    }
 }
 
 /*
@@ -145,6 +248,11 @@ static void print_creator(const SharedEntry_t *e, GitBatch_t *b,
     } else {
         rel = MSG_CREATOR_DIVERGED;
     }
+    if (s_porc != 0) {
+        porc_creator(e, rv, rel, fetched, visit, back);
+        str_free(&ref);
+        return;
+    }
     if (rv->sovereign != 0) {
         printf("    %-6s %s\n", msg(MSG_STATUS_FIELD_CREATOR), str_cstr(&rv->creator));
     }
@@ -156,7 +264,7 @@ static void print_creator(const SharedEntry_t *e, GitBatch_t *b,
      * giorni senza rete sembrerebbe un controllo appena fatto. */
     if ((seen->len > 0U) && (rel != MSG_CREATOR_MISSING) && (e->seen_at > 0UL)) {
         fputs(", ", stdout);
-        printf(msg(MSG_CREATOR_SEEN), seen_date(e->seen_at, date, sizeof date));
+        printf(msg(MSG_CREATOR_SEEN), cmd_local_date(e->seen_at, date, sizeof date));
     }
     fputs(")\n", stdout);
     if (fetched == (unsigned char)REMOTE_UNREACHABLE) {
@@ -209,12 +317,29 @@ static void print_heirs(const SharedEntry_t *e, GitBatch_t *b)
         heirs_order(&a, &h, &order);
     }
     for (p = str_znext(&order, NULL); p != NULL; p = str_znext(&order, p), k++) {
-        printf("    %-6s %u %s\n", (k == 1U) ? msg(MSG_STATUS_FIELD_HEIRS) : "", k, p);
+        if (s_porc != 0) {
+            cmd_porc(s_eol, "heir", e->id, "%u %s", k, p);
+        } else {
+            printf("    %-6s %u %s\n", (k == 1U) ? msg(MSG_STATUS_FIELD_HEIRS) : "", k, p);
+        }
     }
     str_free(&ref);
     str_free(&order);
     heirs_free(&h);
     auth_free(&a);
+}
+
+/* Parola chiave di --porcelain per lo stato di un peer (D-119). */
+static const char *peer_keyword(eMsgId_t what)
+{
+    return (what == MSG_PEER_SAME)        ? "same"
+           : (what == MSG_PEER_BEHIND)    ? "behind"
+           : (what == MSG_PEER_NEWER)     ? "newer"
+           : (what == MSG_PEER_NO_VERSION) ? "none"
+           : (what == MSG_PEER_ANNOUNCED) ? "announced"
+           : (what == MSG_PEER_LEFT)      ? "left"
+           : (what == MSG_PEER_GONE)      ? "gone"
+                                          : "unreachable";
 }
 
 /*
@@ -236,9 +361,13 @@ static void print_peers(const SharedEntry_t *e, GitBatch_t *b)
     eMsgId_t what;
     size_t k;
 
-    printf("    %-6s ", msg(MSG_STATUS_FIELD_PEERS));
+    if (s_porc == 0) {
+        printf("    %-6s ", msg(MSG_STATUS_FIELD_PEERS));
+    }
     if (n == 0U) {
-        puts(msg(MSG_BRANCH_NONE));
+        if (s_porc == 0) {
+            puts(msg(MSG_BRANCH_NONE));
+        }
         goto exit;
     }
     peers_check(e->id, &e->peers, state);
@@ -275,6 +404,10 @@ static void print_peers(const SharedEntry_t *e, GitBatch_t *b)
             (t.len > 0U) && inbox_has(p, e->id, &t)) {
             what = MSG_PEER_ANNOUNCED;
         }
+        if (s_porc != 0) {
+            cmd_porc(s_eol, "peer", e->id, "%s %s", peer_keyword(what), p);
+            continue;
+        }
         if (k > 0U) {
             printf("    %-6s ", "");
         }
@@ -285,6 +418,51 @@ exit:
     str_free(&ref);
     free(tips);
     free(state);
+}
+
+/*
+ * --porcelain: cambi di autorita' da decidere (D-111, D-119), con la
+ * versione che li porta. Niente autore e data (un git log a testa: chi
+ * legge li chiede a git con l'oid) e niente comando per decidere.
+ */
+static void porc_auth_changes(const SharedEntry_t *e, const Received_t *rv)
+{
+    const AuthChange_t *c;
+    const char *tab;
+    char hex[OID_HEX_SIZE];
+    size_t k;
+
+    for (k = 0U; k < rv->nchanges; k++) {
+        c = &rv->changes[k];
+        if (c->rejected != 0U) {
+            continue; /* gia' deciso */
+        }
+        oid_to_hex(&c->version, hex);
+        cmd_porc(s_eol, "auth-change", e->id, "%s %s %s", hex,
+             (c->by_authority != 0U) ? "authority"
+             : (c->from.len > 0U)    ? "peer"
+                                     : "unknown",
+             str_cstr(&c->authority));
+        if ((c->by_authority == 0U) && (c->from.len > 0U)) {
+            cmd_porc(s_eol, "auth-change-from", e->id, "%s %s", hex, str_cstr(&c->from));
+        }
+        tab = strchr(str_cstr(&c->key), '\t');
+        if ((c->creator != 0U) && (tab != NULL)) {
+            cmd_porc(s_eol, "auth-change-creator", e->id, "%s %s", hex, tab + 1);
+        }
+    }
+}
+
+/* --porcelain: intestazione (D-119). */
+static void porc_header(const Repo_t *r)
+{
+    printf("# porcelain 1%c", s_eol);
+    printf("# repo %s%c", str_cstr(&r->top), s_eol);
+    if (r->branch.len > 0U) {
+        printf("# branch %s%c", str_cstr(&r->branch), s_eol);
+    } else {
+        printf("# detached%c", s_eol);
+    }
 }
 
 int cmd_status(int argc, char **argv)
@@ -313,14 +491,23 @@ int cmd_status(int argc, char **argv)
     int with_remote = 0;
     int received;
     Received_t rv = RECEIVED_INIT;
+    StateInfo_t si;
     int rc = GS_EXIT_FATAL;
     eGsErr_t err;
 
+    s_porc = 0;
+    s_eol = '\n';
     for (i = 1U; i < (size_t)argc; i++) {
         if (strcmp(argv[i], "--peers") == 0) {
             with_peers = 1;
         } else if (strcmp(argv[i], "--remote") == 0) {
             with_remote = 1;
+        } else if ((strcmp(argv[i], "--porcelain") == 0) ||
+                   (strcmp(argv[i], "--porcelain=1") == 0)) {
+            s_porc = 1;
+        } else if (strcmp(argv[i], "-z") == 0) {
+            s_porc = 1; /* come git status -z */
+            s_eol = '\0';
         } else {
             if (argv[i][0] == '-') {
                 msg_error(MSG_ERR_UNKNOWN_OPT, argv[i]);
@@ -351,6 +538,10 @@ int cmd_status(int argc, char **argv)
         rc = GS_EXIT_ERROR; /* si mostra comunque lo stato */
     }
     repo_check_self(&repo);
+    if (s_porc != 0) {
+        sys_stdout_binary(); /* solo LF, anche su Windows */
+        porc_header(&repo);
+    }
 
     /* --remote (D-110): un fetch per creatore, poi un cat-file che veda le
      * ref e gli oggetti nuovi. Un creatore che non risponde e' una nota. */
@@ -408,6 +599,9 @@ int cmd_status(int argc, char **argv)
         e = &repo.v[i];
         if (e->in_gitshared && !e->valid) {
             msg_warning(MSG_WARN_BAD_ENTRY, str_cstr(&e->name));
+            if (s_porc != 0) {
+                cmd_porc(s_eol, "invalid", e->id, "%s", str_cstr(&e->name));
+            }
         } else if (e->in_gitshared || e->in_config) {
             /* Prima si riceve (D-099): lo stato e' quello giusto, non
              * "allineato" con una nota. Senza avvisi resta tutto locale.
@@ -415,7 +609,7 @@ int cmd_status(int argc, char **argv)
             received = e->in_config && (e->pending == SHARED_PENDING_NONE) &&
                        (e->id[0] != '\0') &&
                        (receive_entry(&repo, e, &batch, 0, &rv) == GS_OK);
-            if (state_derive(&repo, e, &batch, &st, NULL) != GS_OK) {
+            if (state_derive(&repo, e, &batch, &st, &si) != GS_OK) {
                 msg_fatal(MSG_ERR_PROC, "git");
                 rc = GS_EXIT_FATAL;
                 goto exit;
@@ -429,11 +623,16 @@ int cmd_status(int argc, char **argv)
                                        &found) != GS_OK)) {
                 found = 0; /* solo per i messaggi: senza, niente nota */
             }
-            if (shown > 0U) {
-                putchar('\n');
+            if (s_porc != 0) {
+                porc_entry(&repo, e, &batch, st, suspended,
+                           (found != 0) ? str_cstr(&alt_path) : NULL, &si);
+            } else {
+                if (shown > 0U) {
+                    putchar('\n');
+                }
+                print_entry(&repo, e, st, suspended,
+                            (found != 0) ? str_cstr(&alt_path) : NULL);
             }
-            print_entry(&repo, e, st, suspended,
-                        (found != 0) ? str_cstr(&alt_path) : NULL);
             /* In remoto: da dove arrivano le versioni e com'e' T
              * rispetto al creatore (D-110). */
             if (received && (rv.creator.len > 0U)) {
@@ -442,8 +641,12 @@ int cmd_status(int argc, char **argv)
             }
             /* Cambi di autorita' da decidere (D-111): una riga, non uno
              * stato. */
-            if (received) {
+            if (received && (s_porc != 0)) {
+                porc_auth_changes(e, &rv);
+            } else if (received) {
                 cmd_print_auth_changes(e, &rv, 0);
+            } else {
+                /* niente ricevuto: nessun cambio */
             }
             /* Catena assente e non ricostruita (D-112, B-51): l'unica
              * uscita e' unlink, poi di nuovo link. */
@@ -451,39 +654,55 @@ int cmd_status(int argc, char **argv)
                 (e->pending == SHARED_PENDING_NONE) && (st == STATE_INCONSISTENT)) {
                 chain_ref(&chain, e->id);
                 if (git_batch_query(&batch, str_cstr(&chain), &tip) != GIT_OBJ_COMMIT) {
-                    printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
-                    printf(msg(MSG_STATUS_CHAIN_MISSING), str_cstr(&e->path));
-                    putchar('\n');
+                    if (s_porc != 0) {
+                        cmd_porc(s_eol, "chain-missing", e->id, NULL);
+                    } else {
+                        printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+                        printf(msg(MSG_STATUS_CHAIN_MISSING), str_cstr(&e->path));
+                        putchar('\n');
+                    }
                 }
             }
             /* Non dichiarato qui: dove lo e' (B-16, D-095). */
-            if (found != 0) {
+            if ((found != 0) && (s_porc != 0)) {
+                cmd_porc(s_eol, "elsewhere", e->id, "%s", str_cstr(&elsewhere));
+            } else if (found != 0) {
                 printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
                 printf(msg(MSG_STATUS_ELSEWHERE), str_cstr(&elsewhere));
                 putchar('\n');
+            } else {
+                /* dichiarato qui */
             }
             /* Rinomina di git shared mv non committata (D-101). */
             if ((st == STATE_PENDING) && (e->pending == SHARED_PENDING_NONE) &&
                 (state_renamed(&batch, e, &alt_path, &found) == GS_OK) &&
                 (found != 0)) {
-                printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
-                printf(msg(MSG_STATUS_RENAMED), str_cstr(&alt_path));
-                putchar('\n');
+                if (s_porc != 0) {
+                    cmd_porc(s_eol, "renamed", e->id, "%s", str_cstr(&alt_path));
+                } else {
+                    printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+                    printf(msg(MSG_STATUS_RENAMED), str_cstr(&alt_path));
+                    putchar('\n');
+                }
             }
             /* Sospeso perche' nessun suo branch esiste piu' (B-21). */
             if (suspended && shared_branches_gone(&names, e, &list)) {
-                printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
-                printf(msg(MSG_STATUS_BRANCHES_GONE), str_cstr(&list),
-                       e->in_gitshared ? str_cstr(&e->path) : e->id);
-                putchar('\n');
+                if (s_porc != 0) {
+                    cmd_porc(s_eol, "branches-gone", e->id, NULL);
+                } else {
+                    printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+                    printf(msg(MSG_STATUS_BRANCHES_GONE), str_cstr(&list),
+                           e->in_gitshared ? str_cstr(&e->path) : e->id);
+                    putchar('\n');
+                }
             }
             /* Avvisi rimasti: versione non arrivata (fetch fallito) o da
              * unire. Durante un'unione lo dice gia' lo stato. */
             if (received) {
-                print_notes(&rv.missing, MSG_STATUS_ANNOUNCED);
-                print_strangers(&rv.strangers);
+                print_notes(e, &rv.missing, MSG_STATUS_ANNOUNCED, "announced");
+                print_notes(e, &rv.strangers, MSG_STATUS_STRANGER, "stranger");
                 if (st != STATE_MERGING) {
-                    print_notes(&rv.to_merge, MSG_STATUS_TO_MERGE);
+                    print_notes(e, &rv.to_merge, MSG_STATUS_TO_MERGE, "to-merge");
                 }
             }
             /* Peer: per i file collegati e non in attesa di set o link. */
@@ -496,7 +715,7 @@ int cmd_status(int argc, char **argv)
             /* attesa appena scartata: niente da mostrare */
         }
     }
-    if (shown == 0U) {
+    if ((shown == 0U) && (s_porc == 0)) {
         puts(msg(MSG_STATUS_NONE));
     }
 

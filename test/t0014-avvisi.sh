@@ -27,6 +27,10 @@ run git shared status
 expect_out "rinomina: sospeso" "suspended on this branch (aligned)"
 expect_out "rinomina: nota con il rimedio" \
 	"note   none of its active branches exists (main): git shared branch c.h -a <branch>"
+run git shared status --porcelain
+expect_out "rinomina, porcelain: sospeso" " aligned suspended c.h"
+expect_out "rinomina, porcelain: branches-gone" "branches-gone "
+expect_out "rinomina, porcelain: il branch che manca" " main"
 
 # Gli hook avvisano (prima i file sospesi non avevano nessun avviso).
 git switch -q dev 2>"$TRASH/hook.err"
@@ -108,6 +112,10 @@ expect_no_out "B-16: non incoerente" "inconsistent"
 expect_out "B-16: path dal branch che lo dichiara" "    path   c.h"
 expect_out "B-16: nota con il branch" \
 	"note   shared on branch 'main', not on this one: nothing to do here"
+ID16=$(git config --blob main:.gitshared shared.c.h.id)
+run git shared status --porcelain
+expect_out "B-16, porcelain: absent, path dal branch che lo dichiara" "file $ID16 absent suspended c.h"
+expect_out "B-16, porcelain: elsewhere" "elsewhere $ID16 main"
 run git shared update
 expect_rc "B-16: update codice 0" 0
 expect_eq "B-16: update non scrive nulla" "$ERR" ""

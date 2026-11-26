@@ -248,4 +248,15 @@ int cmd_creator_back(Repo_t *r, SharedEntry_t *e, GitBatch_t *b, int *back);
  * esplicito: si fa); se nessun branch attivo esiste, anche il rimedio. */
 void cmd_warn_suspended(const SharedEntry_t *e, BranchNames_t *bn);
 
+/*
+ * Riga "<tipo> <chiave>[ <campi>]" di --porcelain (D-119): eol '\n',
+ * o NUL con -z; fmt NULL = nessun campo; chiave NULL o vuota = "-". Al piu'
+ * un campo libero (nome, path, URL), sempre l'ultimo.
+ */
+void cmd_porc(int eol, const char *type, const char *key, const char *fmt, ...);
+
+/* Data e ora locali "AAAA-MM-GG hh:mm" di un istante in secondi dal 1970,
+ * in buf; i secondi se non si converte. Ritorna buf. */
+const char *cmd_local_date(unsigned long at, char *buf, size_t size);
+
 #endif /* GS_CMD_COMMON_H */

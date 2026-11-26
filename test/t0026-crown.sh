@@ -128,6 +128,10 @@ run git shared status
 expect_out "status: riga creator" "creator $SRV_A"
 expect_no_out "status: la riga creator senza confronto" "creator $SRV_A ("
 expect_out "status: riga authority con il confronto" "authority $SRV_C (same version, seen 20"
+run git shared status --porcelain
+expect_out "porcelain: riga creator" "creator $ID $SRV_A"
+expect_out "porcelain: authority = sovrano, uguale, vista" "authority $ID same 1"
+expect_out "porcelain: authority, URL del sovrano" " $SRV_C"
 run git shared crown --yes origin p.h
 expect_rc "di nuovo lo stesso: codice 0" 0
 expect_out "di nuovo lo stesso: niente da fare" "is already the authority: nothing to do"
@@ -137,6 +141,10 @@ cd "$TRASH/E" || exit 1
 run git shared status
 expect_out "peer: riga authority ->" "authority -> $SRV_C, crowned by the local peer"
 expect_out "peer: come decidere" "git shared crown --accept p.h"
+run git shared status --porcelain
+expect_out "peer, porcelain: auth-change da un peer" "auth-change $ID $T_M peer $SRV_C"
+expect_out "peer, porcelain: auth-change-from" "auth-change-from $ID $T_M "
+expect_no_out "peer, porcelain: nessun consiglio" "crown"
 expect_eq "peer: T non avanza senza accettare" "$(tip E)" "$T0"
 run git shared update
 expect_err "peer: update avvisa" "authority change pending (-> $SRV_C)"
@@ -302,6 +310,9 @@ run git shared pull
 expect_err "consegne viste da M: pull avvisa" "authority change pending (-> $SRV_N)"
 run git shared status
 expect_out "consegne viste da M: dall'autorita' stessa" "authority -> $SRV_N, moved by the authority itself"
+run git shared status --porcelain
+expect_out "consegne, porcelain: dall'autorita'" " authority $SRV_N"
+expect_no_out "consegne, porcelain: nessun from" "auth-change-from"
 run git shared push
 expect_rc "consegne viste da M: push codice 1" 1
 expect_err "consegne viste da M: decide first" "authority change pending on $SRV_A: decide first"

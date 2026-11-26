@@ -171,6 +171,8 @@ expect_out "fetch fallito: stato da T" "aligned"
 expect_out "fetch fallito: nota" "note   new version announced by $TOP_A, not received: run 'git shared update'"
 expect_err "fetch fallito: avviso del peer" "peer $TOP_A not reachable"
 expect_eq "fetch fallito: l'avviso resta" "$(notices B)" 1
+run git shared status --porcelain
+expect_out "fetch fallito, porcelain: announced" "announced $ID $TOP_A"
 mv "$TRASH/A.off" "$TRASH/A"
 run git shared status
 expect_out "fetch riuscito: da applicare" "new version to apply"
@@ -194,6 +196,8 @@ run git shared status
 expect_out "divergente: C allineata alla sua T" "aligned"
 expect_out "divergente: nota da unire" "note   the version of $TOP_B must be merged: run 'git shared update'"
 expect_eq "divergente: l'avviso resta" "$(notices C)" 1
+run git shared status --porcelain
+expect_out "divergente, porcelain: to-merge" "to-merge $ID $TOP_B"
 mv "$TRASH/B" "$TRASH/B.off"
 run git shared status
 expect_out "divergente, B spostata: nota ancora" "the version of $TOP_B must be merged"

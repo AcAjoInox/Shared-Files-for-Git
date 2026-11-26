@@ -53,6 +53,24 @@ const char *state_name(eState_t st)
     return msg(names[st]);
 }
 
+const char *state_keyword(eState_t st)
+{
+    static const char *const words[] = {
+        [STATE_ALIGNED] = "aligned",
+        [STATE_TO_APPLY] = "to-apply",
+        [STATE_TO_PUBLISH] = "to-publish",
+        [STATE_DIVERGED] = "diverged",
+        [STATE_TO_COMMIT] = "to-commit",
+        [STATE_MERGING] = "merging",
+        [STATE_PENDING] = "pending",
+        [STATE_UNLINKED] = "unlinked",
+        [STATE_INCONSISTENT] = "inconsistent",
+        [STATE_ABSENT] = "absent",
+    };
+
+    return words[st];
+}
+
 /* Nuovo blob di una riga di `git log --raw`:
  * ":<modo> <modo> <oid vecchio> <oid nuovo> <stato>\t<path>". */
 static int raw_new_blob(const char *line, Oid_t *oid)

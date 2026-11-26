@@ -3,9 +3,11 @@
  */
 #include "cmd_common.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "chain.h"
 #include "remote.h"
@@ -827,4 +829,29 @@ void cmd_fetch_creators(Repo_t *r, GitBatch_t *b, const unsigned char *sel,
     str_free(&ref);
     free(idx);
     free(got);
+}
+
+void cmd_porc(int eol, const char *type, const char *key, const char *fmt, ...)
+{
+    va_list ap;
+
+    printf("%s %s", type, ((key != NULL) && (key[0] != '\0')) ? key : "-");
+    if (fmt != NULL) {
+        putchar(' ');
+        va_start(ap, fmt);
+        (void)vprintf(fmt, ap);
+        va_end(ap);
+    }
+    putchar(eol);
+}
+
+const char *cmd_local_date(unsigned long at, char *buf, size_t size)
+{
+    time_t tt = (time_t)at;
+    const struct tm *tm = localtime(&tt);
+
+    if ((tm == NULL) || (strftime(buf, size, "%Y-%m-%d %H:%M", tm) == 0U)) {
+        (void)snprintf(buf, size, "%lu", at);
+    }
+    return buf;
 }
