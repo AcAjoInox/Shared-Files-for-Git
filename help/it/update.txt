@@ -15,8 +15,9 @@ DESCRIZIONE
     nell'index. Scarica solo dai peer che hanno annunciato qualcosa.
     Non committa nulla, salvo -c o -m. Da una repo che ha annunciato una
     versione ma non e' un peer di questa non scarica: update dice di
-    lanciare 'git shared update --peers' in quella repo. Entrare tra i
-    peer resta una tua scelta.
+    lanciare, in quella repo, 'git shared update --peers' per portarla
+    qui, oppure 'git shared prune --one-way' per fermare i suoi avvisi.
+    Entrare tra i peer resta una tua scelta.
 
     Le modifiche non committate, anche quelle in staging, non vengono mai
     sovrascritte: update si ferma, salvo -f. Una versione applicata da un

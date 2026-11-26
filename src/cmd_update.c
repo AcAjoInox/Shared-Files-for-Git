@@ -397,7 +397,7 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
      * scaricano, si dice come riceverle. */
     for (p = str_znext(&rv.strangers, NULL); p != NULL;
          p = str_znext(&rv.strangers, p)) {
-        printf(msg(MSG_UPD_STRANGER), label, p, p);
+        printf(msg(MSG_UPD_STRANGER), label, p);
         putchar('\n');
     }
     /* Un cambio di autorita' ricevuto si decide prima (D-111): T si e'

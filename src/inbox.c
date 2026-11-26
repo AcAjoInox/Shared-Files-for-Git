@@ -125,6 +125,30 @@ void inbox_remove(const char *top, const char *id)
     str_free(&dir);
 }
 
+void inbox_withdraw(const char *top, const char *id, const Str_t *from)
+{
+    Str_t dir = STR_INIT;
+    Str_t names = STR_INIT;
+    Str_t file = STR_INIT;
+    Str_t who = STR_INIT;
+    const char *n;
+
+    if (id_dir(top, id, &dir) && (sys_list_dir(str_cstr(&dir), &names) == GS_OK)) {
+        for (n = str_znext(&names, NULL); n != NULL; n = str_znext(&names, n)) {
+            str_reset(&file);
+            str_addf(&file, "%s/%s", str_cstr(&dir), n);
+            read_line(str_cstr(&file), &who);
+            if ((who.len > 0U) && str_zhas(from, str_cstr(&who))) {
+                (void)sys_remove(str_cstr(&file));
+            }
+        }
+    }
+    str_free(&who);
+    str_free(&file);
+    str_free(&names);
+    str_free(&dir);
+}
+
 void inbox_ids(const char *top, Str_t *ids)
 {
     Str_t dir = STR_INIT;

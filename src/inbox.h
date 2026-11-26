@@ -50,6 +50,10 @@ void inbox_drop(const Repo_t *r, const char *id, const Oid_t *oid);
 /* Cancella la cartella degli avvisi di un ID, con il contenuto. */
 void inbox_remove(const char *top, const char *id);
 
+/* Nella repo con radice top, cancella gli avvisi dell'ID scritti a nome di
+ * una delle repo di `from` (prune --one-way, D-118). */
+void inbox_withdraw(const char *top, const char *id, const Str_t *from);
+
 /* Nomi delle cartelle per ID (prune). Nessuna cartella: elenco vuoto. */
 void inbox_ids(const char *top, Str_t *ids);
 

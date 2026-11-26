@@ -81,11 +81,12 @@ static const char *const msg_en[] = {
         "    -c, --commit      commit .gitshared right away\n"
         "    -m <message>      commit .gitshared right away with <message>\n",
     [MSG_USAGE_PRUNE] =
-        "usage: git shared prune [-n] [<path>]\n"
+        "usage: git shared prune [-n] [--one-way] [<path>]\n"
         "\n"
         "Forget the peers that no longer exist or no longer share the file.\n"
         "\n"
-        "    -n, --dry-run     only show what would be removed\n",
+        "    -n, --dry-run     only show what would be removed\n"
+        "    --one-way         also the peers that do not list this repository\n",
     [MSG_USAGE_BRANCH] =
         "usage: git shared branch [<path>]\n"
         "   or: git shared branch <path> (-a | -rm) <branch>\n"
@@ -444,6 +445,16 @@ static const char *const msg_en[] = {
     [MSG_PRUNE_WOULD_LEFT] =
         "%s: would remove peer %s (it no longer shares the file)",
     [MSG_PRUNE_WOULD_REF] = "would remove leftover %s",
+    [MSG_PRUNE_ONE_WAY] =
+        "%s: removed peer %s (it does not list this repository)",
+    [MSG_PRUNE_WOULD_ONE_WAY] =
+        "%s: would remove peer %s (it does not list this repository)",
+    [MSG_PRUNE_NOTICES] =
+        "%s: removed the notices of %s (not a peer, and it does not list "
+        "this repository)",
+    [MSG_PRUNE_WOULD_NOTICES] =
+        "%s: would remove the notices of %s (not a peer, and it does not "
+        "list this repository)",
     [MSG_PRUNE_NOTHING] = "Nothing to prune.",
     [MSG_BRANCH_FIELD_ACTIVE] = "active",
     [MSG_BRANCH_FIELD_DEFAULT] = "default",
@@ -501,7 +512,8 @@ static const char *const msg_en[] = {
     [MSG_UPD_UP_TO_DATE] = "%s: up to date",
     [MSG_UPD_STRANGER] =
         "%s: new version announced by %s, which is not a peer of this "
-        "repository: to receive it, run 'git shared update --peers' in %s",
+        "repository. There, 'git shared update --peers' brings it here; "
+        "'git shared prune --one-way' stops the notices",
     [MSG_UPD_TO_PUBLISH] =
         "%s: local change not published yet: run 'git shared publish'",
     [MSG_UPD_MERGED] =
@@ -566,8 +578,9 @@ static const char *const msg_en[] = {
         "new version announced by %s, not received: "
         "run 'git shared update'",
     [MSG_STATUS_STRANGER] =
-        "new version announced by %s, which is not a peer: to receive it, "
-        "run 'git shared update --peers' in %s",
+        "new version announced by %s, which is not a peer. There, "
+        "'git shared update --peers' brings it here; "
+        "'git shared prune --one-way' stops the notices",
     [MSG_STATUS_TO_MERGE] =
         "the version of %s must be merged: run 'git shared update'",
     [MSG_STATUS_CREATOR_UNREACHABLE] =

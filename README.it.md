@@ -112,7 +112,7 @@ I peer lavorano in parallelo. In ognuno si applica solo una versione nuova su un
 | `git shared pull [<file>]` | Remoto (beta): riceve le versioni del creatore, poi `update` |
 | `git shared crown [<remote>] <file>` | Remoto (beta): sposta l'autorità del file su un altro remoto (di default il tuo `origin`), il creatore resta; `--restore` torna al creatore, `--accept` / `--reject` decidono un cambio ricevuto |
 | `git shared branch <file> [-a\|-rm <branch>]` | Sceglie i branch su cui il file è shared; sugli altri è un file normale |
-| `git shared prune [-n]` | Toglie i peer cancellati o che non condividono più il file |
+| `git shared prune [-n] [--one-way]` | Toglie i peer cancellati o che non condividono più il file; con `--one-way`, anche quelli che non elencano questo repository |
 | `git shared relocate [--copy]` | Avvisa i peer che la repo è stata spostata o copiata |
 | `git shared lang [en\|it]` | Lingua del manuale |
 

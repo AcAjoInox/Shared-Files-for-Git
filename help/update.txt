@@ -15,8 +15,10 @@ DESCRIPTION
     into the file and the index. Nothing is committed unless -c or -m is
     given. Only the peers that announced something are fetched from.
     A repository that announced a version but is not a peer of this one
-    is not fetched from: update says to run 'git shared update --peers'
-    in that repository. Joining the peers stays your choice.
+    is not fetched from: update says to run, in that repository,
+    'git shared update --peers' to bring it here, or
+    'git shared prune --one-way' to stop its notices. Joining the peers
+    stays your choice.
 
     Changes that are not committed, even staged ones, are never
     overwritten: update stops, unless -f is given. A version applied by

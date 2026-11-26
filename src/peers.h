@@ -23,7 +23,9 @@ typedef enum {
     PEER_MEMBER = 0,  /* repo con la sezione [shared "<id>"] */
     PEER_LEFT,        /* repo che non condivide piu' il file */
     PEER_GONE,        /* nessuna repo a quel path */
-    PEER_UNREACHABLE  /* la repo c'e' ma git non la legge (lock, permessi) */
+    PEER_UNREACHABLE, /* la repo c'e' ma git non la legge (lock, permessi) */
+    PEER_ONE_WAY      /* membro che non elenca questa repo tra i suoi peer
+                       * (prune --one-way, D-118): non lo da' peers_check */
 } ePeerState_t;
 
 typedef struct {

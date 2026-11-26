@@ -136,7 +136,7 @@ static void hook_warn(void)
                 }
                 for (who = str_znext(&strangers, NULL); who != NULL;
                      who = str_znext(&strangers, who)) {
-                    msg_warning(MSG_UPD_STRANGER, str_cstr(&e->path), who, who);
+                    msg_warning(MSG_UPD_STRANGER, str_cstr(&e->path), who);
                 }
             }
             /* Cambio di autorita' da decidere (D-111): una nota, senza

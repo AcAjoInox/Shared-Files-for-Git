@@ -4,7 +4,7 @@ NOME
     git shared prune - dimentica i peer che non esistono piu'
 
 SINTASSI
-    git shared prune [-n] [<path>]
+    git shared prune [-n] [--one-way] [<path>]
 
 DESCRIZIONE
     Toglie dai peer di ogni file shared (o di <path>) i repository che
@@ -17,9 +17,26 @@ DESCRIZIONE
     Senza <path>, prune toglie anche i riferimenti e gli avvisi di
     versioni nuove rimasti di file non piu' condivisi qui.
 
+    Toglie anche gli avvisi di un repository che qui non e' un peer e
+    che non elenca questo tra i suoi peer (o non esiste piu'): quelle
+    versioni non le porterebbe nessuno.
+
+    Peer elencati da una parte sola. Un peer puo' non elencare questo
+    repository tra i suoi, per esempio un repository collegato solo
+    attraverso un remoto, per scelta. Riceve comunque gli avvisi di ogni
+    publish, e il suo status lo dice. Con --one-way prune lo toglie qui,
+    e dagli altri peer che neanche lui elenca, e ritira gli avvisi che
+    gli avevano mandato. Non e' il default: anche un peer che non si
+    raggiungeva quando e' stato collegato un altro repository non ha
+    quel repository nel suo elenco. Prova prima con -n.
+
 OPZIONI
     -n, --dry-run
         Mostra soltanto cosa toglierebbe.
+
+    --one-way
+        Toglie anche i peer che non elencano questo repository tra i
+        loro (vedi sopra).
 
 VEDI ANCHE
     git shared status --help (con --peers), git shared relocate --help

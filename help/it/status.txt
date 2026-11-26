@@ -43,8 +43,9 @@ DESCRIZIONE
     nota dice quando una versione annunciata non si e' potuta ricevere,
     o quando la versione di un peer va unita: in entrambi i casi,
     update. Una versione annunciata da una repo che non e' un peer di
-    questa non si scarica da li': la nota dice di lanciare
-    'git shared update --peers' in quella repo, che la porta qui.
+    questa non si scarica da li': la nota dice di lanciare, in quella
+    repo, 'git shared update --peers', che la porta qui, oppure
+    'git shared prune --one-way', che ferma i suoi avvisi.
 
     Per un file condiviso attraverso un remoto (beta) una riga
     "creator" mostra il repository da cui arrivano le versioni e, tra

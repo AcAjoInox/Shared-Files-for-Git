@@ -115,7 +115,7 @@ The peers work in parallel. In each one, only a new version on a file with no lo
 | `git shared pull [<file>]` | Remote (beta): receives the versions of the creator, then `update` |
 | `git shared crown [<remote>] <file>` | Remote (beta): moves the authority of the file to another remote (default: your own `origin`), the creator stays; `--restore` goes back to the creator, `--accept` / `--reject` decide a change received |
 | `git shared branch <file> [-a\|-rm <branch>]` | Chooses the branches where the file is shared; on the others it is a regular file |
-| `git shared prune [-n]` | Removes peers that were deleted or no longer share the file |
+| `git shared prune [-n] [--one-way]` | Removes peers that were deleted or no longer share the file; with `--one-way`, also those that do not list this repository |
 | `git shared relocate [--copy]` | Tells the peers that the repository was moved or copied |
 | `git shared lang [en\|it]` | Language of the manual |
 

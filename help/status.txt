@@ -14,8 +14,9 @@ DESCRIPTION
     touched. A note says when an announced version could not be
     received, or when the version of a peer must be merged: in both
     cases, update. A version announced by a repository that is not a
-    peer of this one is not fetched from it: the note says to run
-    'git shared update --peers' in that repository, which brings it here.
+    peer of this one is not fetched from it: the note says to run, in
+    that repository, 'git shared update --peers', which brings it here,
+    or 'git shared prune --one-way', which stops its notices.
 
     For a file shared through a remote (beta) a "creator" line
     shows the repository the versions come from and, in brackets, how

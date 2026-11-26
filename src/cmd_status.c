@@ -59,7 +59,7 @@ static void print_strangers(const Str_t *from)
 
     for (p = str_znext(from, NULL); p != NULL; p = str_znext(from, p)) {
         printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
-        printf(msg(MSG_STATUS_STRANGER), p, p);
+        printf(msg(MSG_STATUS_STRANGER), p);
         putchar('\n');
     }
 }

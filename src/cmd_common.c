@@ -42,6 +42,7 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
     o->adopt = 0U;
     o->ours = 0U;
     o->theirs = 0U;
+    o->one_way = 0U;
     o->dashdash = 0U;
     while ((i < argc) && (end_opts == 0) && (argv[i][0] == '-') &&
            (argv[i][1] != '\0')) {
@@ -69,6 +70,9 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
                    ((strcmp(argv[i], "-n") == 0) ||
                     (strcmp(argv[i], "--dry-run") == 0))) {
             o->dry_run = 1U;
+        } else if (((allowed & CMD_OPT_ONE_WAY) != 0U) &&
+                   (strcmp(argv[i], "--one-way") == 0)) {
+            o->one_way = 1U;
         } else if (((allowed & CMD_OPT_ABORT) != 0U) &&
                    (strcmp(argv[i], "--abort") == 0)) {
             o->abort = 1U;

@@ -24,6 +24,7 @@
 #define CMD_OPT_CHOOSE 0x100U /* --ours, --theirs (update, D-108) */
 /* --peers e l'interna --as-peer <id>[,<id>...] (update, D-115) */
 #define CMD_OPT_PEERS  0x200U
+#define CMD_OPT_ONE_WAY 0x400U /* --one-way (prune, D-118) */
 
 typedef struct {
     const char *message; /* -m; NULL = messaggio standard */
@@ -39,6 +40,7 @@ typedef struct {
     unsigned adopt : 1U;
     unsigned ours : 1U;
     unsigned theirs : 1U;
+    unsigned one_way : 1U;
     unsigned dashdash : 1U; /* le opzioni sono finite con "--" */
 } CmdOpts_t;
 
