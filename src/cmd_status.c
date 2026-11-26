@@ -51,6 +51,19 @@ static void print_notes(const Str_t *from, eMsgId_t what)
     }
 }
 
+/* Avvisi di repo che non sono peer: la versione arriva solo se la porta
+ * 'update --peers' lanciato da loro. Entrare tra i peer e' una scelta. */
+static void print_strangers(const Str_t *from)
+{
+    const char *p;
+
+    for (p = str_znext(from, NULL); p != NULL; p = str_znext(from, p)) {
+        printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+        printf(msg(MSG_STATUS_STRANGER), p, p);
+        putchar('\n');
+    }
+}
+
 /* alt_path: path del file sul branch che lo dichiara, per un file non
  * dichiarato su questo (STATE_ABSENT); NULL altrimenti. */
 static void print_entry(const Repo_t *r, const SharedEntry_t *e, eState_t st,
@@ -468,6 +481,7 @@ int cmd_status(int argc, char **argv)
              * unire. Durante un'unione lo dice gia' lo stato. */
             if (received) {
                 print_notes(&rv.missing, MSG_STATUS_ANNOUNCED);
+                print_strangers(&rv.strangers);
                 if (st != STATE_MERGING) {
                     print_notes(&rv.to_merge, MSG_STATUS_TO_MERGE);
                 }

@@ -42,7 +42,9 @@ DESCRIZIONE
     nulla se non c'e' niente di nuovo, e non tocca il working tree. Una
     nota dice quando una versione annunciata non si e' potuta ricevere,
     o quando la versione di un peer va unita: in entrambi i casi,
-    update.
+    update. Una versione annunciata da una repo che non e' un peer di
+    questa non si scarica da li': la nota dice di lanciare
+    'git shared update --peers' in quella repo, che la porta qui.
 
     Per un file condiviso attraverso un remoto (beta) una riga
     "creator" mostra il repository da cui arrivano le versioni e, tra

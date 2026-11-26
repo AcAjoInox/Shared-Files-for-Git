@@ -499,6 +499,9 @@ static const char *const msg_en[] = {
     [MSG_UPD_APPLIED] = "%s: new version applied. Commit it to confirm.",
     [MSG_UPD_COMMITTED] = "%s: new version applied and committed.",
     [MSG_UPD_UP_TO_DATE] = "%s: up to date",
+    [MSG_UPD_STRANGER] =
+        "%s: new version announced by %s, which is not a peer of this "
+        "repository: to receive it, run 'git shared update --peers' in %s",
     [MSG_UPD_TO_PUBLISH] =
         "%s: local change not published yet: run 'git shared publish'",
     [MSG_UPD_MERGED] =
@@ -562,6 +565,9 @@ static const char *const msg_en[] = {
     [MSG_STATUS_ANNOUNCED] =
         "new version announced by %s, not received: "
         "run 'git shared update'",
+    [MSG_STATUS_STRANGER] =
+        "new version announced by %s, which is not a peer: to receive it, "
+        "run 'git shared update --peers' in %s",
     [MSG_STATUS_TO_MERGE] =
         "the version of %s must be merged: run 'git shared update'",
     [MSG_STATUS_CREATOR_UNREACHABLE] =

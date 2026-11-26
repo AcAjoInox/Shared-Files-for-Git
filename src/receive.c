@@ -35,6 +35,7 @@ void received_free(Received_t *rv)
 {
     oidlist_free(&rv->heads);
     str_free(&rv->missing);
+    str_free(&rv->strangers);
     str_free(&rv->to_merge);
     str_free(&rv->creator);
     str_free(&rv->authority);
@@ -693,6 +694,7 @@ static void received_reset(Received_t *rv)
     rv->auth_tip.len = 0U;
     rv->sovereign = 0;
     str_reset(&rv->missing);
+    str_reset(&rv->strangers);
     str_reset(&rv->to_merge);
     str_reset(&rv->creator);
     str_reset(&rv->authority);
@@ -798,7 +800,14 @@ eGsErr_t receive_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         if (done[k] != 0U) {
             /* gia' cancellato */
         } else if (!have_commit(b, &in.oids.v[k])) {
-            add_once(&rv->missing, who); /* fetch fallito: si riprova */
+            if (str_zhas(&e->peers, who) ||
+                ((rv->authority.len > 0U) && str_eq(&rv->authority, who))) {
+                add_once(&rv->missing, who); /* fetch fallito: si riprova */
+            } else {
+                /* non e' un peer: entrare tra i peer e' una scelta
+                 * dell'utente, l'avviso resta e status lo dice */
+                add_once(&rv->strangers, who);
+            }
         } else if (oidlist_has(&dropped, &in.oids.v[k])) {
             inbox_drop(r, e->id, &in.oids.v[k]); /* mai candidata */
         } else if (oidlist_has(&held, &in.oids.v[k])) {

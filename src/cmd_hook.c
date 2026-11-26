@@ -44,23 +44,40 @@ static int is_live(const Repo_t *r, const SharedEntry_t *e)
 }
 
 /* 1 se un peer ha annunciato una versione diversa da T (D-099). Niente
- * fetch negli hook: girano dentro le operazioni di git. */
-static int announced(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b)
+ * fetch negli hook: girano dentro le operazioni di git. In strangers le
+ * repo non peer che hanno annunciato una versione assente qui: update non
+ * la scarica, la porta 'update --peers' lanciato da loro. */
+static int announced(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
+                     Str_t *strangers)
 {
     Inbox_t in = INBOX_INIT;
     Str_t ref = STR_INIT;
+    char hex[OID_HEX_SIZE];
+    const char *who;
     Oid_t t;
+    Oid_t got;
     size_t k;
     int found = 0;
 
+    str_reset(strangers);
     inbox_read(r, e->id, &in);
     if (in.oids.n > 0U) {
         chain_ref(&ref, e->id);
         if (git_batch_query(b, str_cstr(&ref), &t) != GIT_OBJ_COMMIT) {
             t.len = 0U;
         }
-        for (k = 0U; (k < in.oids.n) && (found == 0); k++) {
-            found = !oid_eq(&in.oids.v[k], &t);
+        for (k = 0U, who = str_znext(&in.from, NULL); k < in.oids.n;
+             k++, who = str_znext(&in.from, who)) {
+            if (oid_eq(&in.oids.v[k], &t)) {
+                continue;
+            }
+            oid_to_hex(&in.oids.v[k], hex);
+            if (str_zhas(&e->peers, who) ||
+                (git_batch_query(b, hex, &got) == GIT_OBJ_COMMIT)) {
+                found = 1; /* update la riceve */
+            } else if (!str_zhas(strangers, who)) {
+                str_addz(strangers, who); /* da qui non si scarica */
+            }
         }
     }
     inbox_free(&in);
@@ -77,8 +94,10 @@ static void hook_warn(void)
     BranchNames_t names = BRANCHNAMES_INIT;
     Received_t rv = RECEIVED_INIT;
     Str_t list = STR_INIT;
+    Str_t strangers = STR_INIT;
     const SharedEntry_t *e;
     const char *command;
+    const char *who;
     eState_t st;
     size_t i;
 
@@ -111,8 +130,14 @@ static void hook_warn(void)
                                 state_name(st), command);
                 }
             }
-            if (is_live(&repo, e) && announced(&repo, e, &batch)) {
-                msg_warning(MSG_HOOK_ANNOUNCED, str_cstr(&e->path));
+            if (is_live(&repo, e)) {
+                if (announced(&repo, e, &batch, &strangers)) {
+                    msg_warning(MSG_HOOK_ANNOUNCED, str_cstr(&e->path));
+                }
+                for (who = str_znext(&strangers, NULL); who != NULL;
+                     who = str_znext(&strangers, who)) {
+                    msg_warning(MSG_UPD_STRANGER, str_cstr(&e->path), who, who);
+                }
             }
             /* Cambio di autorita' da decidere (D-111): una nota, senza
              * rete ne' domande. */
@@ -129,6 +154,7 @@ exit:
     branchnames_free(&names);
     received_free(&rv);
     str_free(&list);
+    str_free(&strangers);
 }
 
 /*

@@ -363,6 +363,7 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
                         int *batch_ok, BranchNames_t *bn)
 {
     const char *label = str_cstr(&e->path);
+    const char *p;
     Received_t rv = RECEIVED_INIT; /* versioni dei peer da unire: rv.heads */
     StateInfo_t si;
     eState_t st;
@@ -390,6 +391,13 @@ static int update_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
     if ((rv.advanced != 0) && (o->as_peer == 0U)) {
         /* nel peer lo dice gia' la riga che segue (D-115) */
         printf(msg(MSG_UPD_RECEIVED), label);
+        putchar('\n');
+    }
+    /* Versioni annunciate da repo che non sono peer: da qui non si
+     * scaricano, si dice come riceverle. */
+    for (p = str_znext(&rv.strangers, NULL); p != NULL;
+         p = str_znext(&rv.strangers, p)) {
+        printf(msg(MSG_UPD_STRANGER), label, p, p);
         putchar('\n');
     }
     /* Un cambio di autorita' ricevuto si decide prima (D-111): T si e'

@@ -64,6 +64,9 @@ typedef struct {
                       * discende: da unire (REQ-F-011) */
     Str_t missing;   /* repo che hanno annunciato una versione non arrivata
                       * (elenco compatto, senza doppioni) */
+    Str_t strangers; /* repo non peer (ne' autorita') che hanno annunciato
+                      * una versione non arrivata: da qui non si scarica,
+                      * la porta 'update --peers' lanciato da loro */
     Str_t to_merge;  /* repo che hanno annunciato una versione da unire */
     Str_t creator;   /* URL del creatore di T ("" = solo locale, D-103) */
     Str_t authority; /* URL dell'autorita' di T: l'ultimo sovrano, o il
@@ -79,7 +82,7 @@ typedef struct {
 } Received_t;
 
 #define RECEIVED_INIT { OIDLIST_INIT, STR_INIT, STR_INIT, STR_INIT, STR_INIT, \
-                        0, { 0U, { 0U } }, NULL, 0U, 0 }
+                        STR_INIT, 0, { 0U, { 0U } }, NULL, 0U, 0 }
 
 void received_free(Received_t *rv);
 

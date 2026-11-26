@@ -215,6 +215,7 @@ typedef enum {
     MSG_UPD_APPLIED,         /* file */
     MSG_UPD_COMMITTED,       /* file */
     MSG_UPD_UP_TO_DATE,      /* file */
+    MSG_UPD_STRANGER,        /* file, repo non peer, la stessa repo */
     MSG_UPD_TO_PUBLISH,      /* file */
     MSG_UPD_MERGED,          /* file */
     MSG_UPD_MERGED_COMMITTED, /* file */
@@ -261,6 +262,7 @@ typedef enum {
     MSG_STATUS_BRANCHES_GONE, /* branch attivi, path */
     MSG_STATUS_ELSEWHERE,    /* branch */
     MSG_STATUS_ANNOUNCED,    /* repo che ha annunciato */
+    MSG_STATUS_STRANGER,     /* repo non peer, la stessa repo */
     MSG_STATUS_TO_MERGE,     /* repo che ha annunciato */
     MSG_STATUS_RENAMED,      /* path di prima */
     MSG_STATUS_CREATOR_UNREACHABLE, /* ruolo, url */
