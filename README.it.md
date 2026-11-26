@@ -13,7 +13,7 @@ Il file resta un file normale: chi usa la repo senza l'estensione lo vede, lo co
 
 ## Installazione
 
-**Windows, senza compilare.** Scarica [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (compilato dall'ultimo tag, v0.11.0) e mettilo in una cartella del `PATH`, per esempio `%USERPROFILE%\bin`. Serve solo git 2.34 o più recente. Verifica con `git shared -h`; il manuale è in `git shared help`. Il file non è firmato: la prima volta Windows potrebbe chiedere conferma.
+**Windows, senza compilare.** Scarica [`dist/windows/git-shared.exe`](dist/windows/git-shared.exe) (compilato dall'ultimo tag, v0.11.1) e mettilo in una cartella del `PATH`, per esempio `%USERPROFILE%\bin`. Serve solo git 2.34 o più recente. Verifica con `git shared -h`; il manuale è in `git shared help`. Il file non è firmato: la prima volta Windows potrebbe chiedere conferma.
 
 **Dai sorgenti.** Servono git 2.34 o più recente, `make` e `gcc` (su Windows MinGW-w64).
 
@@ -135,7 +135,7 @@ Ogni comando ha la sua pagina: `git shared <comando> --help`. Le stesse pagine s
 
 ## Repository remote (beta)
 
-Su GitHub il flusso principale è provato: `push`, `pull` e `status --remote`. Sovrani ed eredi, descritti sotto, sono provati solo tra repository sulla stessa macchina; permessi, credenziali e GitLab non sono ancora provati. C'è nell'eseguibile Windows di `dist/windows/` (v0.11.0) e nei sorgenti.
+Su GitHub il flusso principale è provato: `push`, `pull` e `status --remote`. Sovrani ed eredi, descritti sotto, sono provati solo tra repository sulla stessa macchina; permessi, credenziali e GitLab non sono ancora provati. C'è nell'eseguibile Windows di `dist/windows/` (v0.11.1) e nei sorgenti.
 
 Non c'è un server apposta: git shared usa il trasporto di git e i permessi dell'hosting. Viaggia solo la storia delle versioni del file, mai il progetto.
 
