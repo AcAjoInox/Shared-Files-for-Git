@@ -55,7 +55,7 @@ void inbox_ids(const char *top, Str_t *ids);
 
 /*
  * Scrive l'avviso di oid, a nome di from, nella repo con radice top (anche
- * la repo stessa: una versione da unire trovata con update --all, che non
+ * la repo stessa: una versione da unire trovata con update --scan, che non
  * va dimenticata). Uno che c'e' gia' non si riscrive. 0 = c'e'.
  */
 int inbox_add(const char *top, const char *id, const Oid_t *oid,

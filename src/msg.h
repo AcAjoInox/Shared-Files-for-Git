@@ -110,6 +110,8 @@ typedef enum {
     MSG_ERR_NO_MERGE_ANY,
     MSG_ERR_ABORT_OPTS,
     MSG_ERR_CHOOSE_OPTS,
+    MSG_ERR_PEERS_OPTS,
+    MSG_ERR_CHDIR,           /* cartella */
     MSG_ERR_NO_REMOTE,       /* remote */
     MSG_ERR_REMOTE_FETCH,    /* id, url */
     MSG_ERR_NO_CREATOR,      /* id, url */
@@ -131,6 +133,7 @@ typedef enum {
     MSG_WARN_PENDING_NO_BRANCH, /* path (o id), branch, id */
     MSG_WARN_PEER_UNREACHABLE, /* file, peer */
     MSG_WARN_SUSPENDED,      /* file */
+    MSG_WARN_PEERS_UNPUBLISHED, /* file */
     MSG_WARN_HOOK,           /* path dell'hook */
     MSG_WARN_HOOK_NOT_SHELL, /* path dell'hook */
     MSG_WARN_HOOK_REPAIRED,  /* path dell'hook */
@@ -219,6 +222,19 @@ typedef enum {
     MSG_UPD_TO_COMMIT,       /* file */
     MSG_UPD_COMMIT_MSG,      /* path o "shared files" */
     MSG_UPD_ABORTED,         /* file */
+    MSG_UPD_PEER_OFF,        /* update --peers, nel peer (D-115) */
+    MSG_UPD_PEER_BUSY,
+    MSG_UPD_PEER_DETACHED,
+    MSG_UPD_PEER_NOTHING,
+    MSG_UPD_PEER_LOCAL,      /* file */
+    MSG_UPD_PEER_DIVERGED,   /* file */
+    MSG_UPD_PEER_TO_MERGE,   /* file */
+    MSG_UPD_PEER_MERGING,    /* file */
+    MSG_UPD_PEER_SUSPENDED,  /* file */
+    MSG_UPD_PEER_FAILED,     /* update --peers, nel padre */
+    MSG_UPD_PEER_WRITE_FAILED,  /* file (D-116) */
+    MSG_UPD_PEER_COMMIT_FAILED, /* file (D-116) */
+    MSG_UPD_PEERS_NONE,
 
     MSG_STATUS_NONE,
     MSG_STATUS_FIELD_PATH,

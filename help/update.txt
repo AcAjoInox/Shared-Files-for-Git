@@ -4,9 +4,11 @@ NAME
     git shared update - get the new versions and apply them
 
 SYNOPSIS
-    git shared update [-f] [--all] [-c | -m <message>] [<path>]
-    git shared update (--ours | --theirs) [-c | -m <message>] [<path>]
-    git shared update --abort [<path>]
+    git shared update [-f] [--scan] [-c | -m <message>] [<repo>] [<path>]
+    git shared update --peers [--scan] [-m <message>] [<path>]
+    git shared update (--ours | --theirs) [-c | -m <message>] [<repo>]
+                      [<path>]
+    git shared update --abort [<repo>] [<path>]
 
 DESCRIPTION
     Receives the versions the peers announced and writes the latest one
@@ -46,11 +48,41 @@ DESCRIPTION
 
     Without <path>, all the shared files; with it, only that one.
 
+    Another repository. If the first argument is a folder, update works
+    on that repository, without moving there; <path> is then relative to
+    that folder. A shared file is never a folder, so there is no doubt:
+        git shared update ../app             (every shared file of app)
+        git shared update ../app inc/conf.h  (only that one)
+    It is the same as 'git -C ../app shared update [<path>]'.
+
+    Every peer at once. With --peers, update brings this repository and
+    every local peer of its shared files (only the peers of <path>, if
+    given) to the latest version, and commits in each one: you do not
+    need to visit the other repositories. The peers work in parallel, so
+    it takes about as long as the slowest one. In a peer, update only
+    does what is safe without someone looking at it: it applies a new
+    version to a file with no local changes. It skips, and says why:
+        - a file with local changes, diverged, or with versions to merge;
+        - a file suspended on the branch the peer is on;
+        - a peer in the middle of a git merge, rebase, cherry-pick or
+          revert, or with a detached HEAD;
+        - a peer that opted out with 'git config shared.peerUpdate false'.
+    Each line of a peer starts with its path. The exit code is 1 if a
+    peer was left with something to do by hand.
+
+    A file committed here but not published: the peers get the last
+    published version, not your change. Run 'git shared publish' first.
+
 OPTIONS
     -f, --force
         Overwrite changes that are not committed.
 
-    --all
+    --peers
+        Also update and commit every local peer, in parallel (see
+        above). Not with -f, --abort, --ours, --theirs or <repo>; -m
+        sets the message of every commit.
+
+    --scan
         Fetch from every peer, not only from the ones that announced a
         new version: for a notice that got lost, for example while this
         repository was moved or could not be reached.

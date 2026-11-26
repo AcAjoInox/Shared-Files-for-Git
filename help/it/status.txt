@@ -76,7 +76,7 @@ OPZIONI
         Mostra anche, per ogni peer: stessa versione; versione piu'
         vecchia (publish); annunciata, non ancora ricevuta (niente da
         fare: la ricevera' da se'); versione piu' nuova o diversa
-        (update --all); nessuna versione (publish); non condivide piu' il
+        (update --scan); nessuna versione (publish); non condivide piu' il
         file, o non trovato (prune); non leggibile adesso. Dai peer non
         scarica e non cambia nulla.
 

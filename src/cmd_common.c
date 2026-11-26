@@ -30,11 +30,14 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
     int rc = -1;
 
     o->message = NULL;
+    o->peer_ids = NULL;
     o->commit = 0U;
     o->force = 0U;
     o->dry_run = 0U;
     o->abort = 0U;
-    o->all = 0U;
+    o->scan = 0U;
+    o->peers = 0U;
+    o->as_peer = 0U;
     o->merge = 0U;
     o->adopt = 0U;
     o->ours = 0U;
@@ -69,9 +72,22 @@ int cmd_parse(int argc, char **argv, unsigned allowed, eMsgId_t usage,
         } else if (((allowed & CMD_OPT_ABORT) != 0U) &&
                    (strcmp(argv[i], "--abort") == 0)) {
             o->abort = 1U;
-        } else if (((allowed & CMD_OPT_ALL) != 0U) &&
-                   (strcmp(argv[i], "--all") == 0)) {
-            o->all = 1U;
+        } else if (((allowed & CMD_OPT_SCAN) != 0U) &&
+                   (strcmp(argv[i], "--scan") == 0)) {
+            o->scan = 1U;
+        } else if (((allowed & CMD_OPT_PEERS) != 0U) &&
+                   (strcmp(argv[i], "--peers") == 0)) {
+            o->peers = 1U;
+        } else if (((allowed & CMD_OPT_PEERS) != 0U) &&
+                   (strcmp(argv[i], "--as-peer") == 0)) {
+            /* interna: la passa update --peers al figlio in ogni peer */
+            if ((i + 1) >= argc) {
+                msg_error(MSG_ERR_OPT_VALUE, argv[i]);
+                goto exit;
+            }
+            i++;
+            o->peer_ids = argv[i];
+            o->as_peer = 1U;
         } else if (((allowed & CMD_OPT_MERGE) != 0U) &&
                    (strcmp(argv[i], "--merge") == 0)) {
             o->merge = 1U;

@@ -4,9 +4,11 @@ NOME
     git shared update - riceve le versioni nuove e le applica
 
 SINTASSI
-    git shared update [-f] [--all] [-c | -m <messaggio>] [<path>]
-    git shared update (--ours | --theirs) [-c | -m <messaggio>] [<path>]
-    git shared update --abort [<path>]
+    git shared update [-f] [--scan] [-c | -m <messaggio>] [<repo>] [<path>]
+    git shared update --peers [--scan] [-m <messaggio>] [<path>]
+    git shared update (--ours | --theirs) [-c | -m <messaggio>] [<repo>]
+                      [<path>]
+    git shared update --abort [<repo>] [<path>]
 
 DESCRIZIONE
     Riceve le versioni annunciate dai peer e scrive l'ultima nel file e
@@ -48,11 +50,42 @@ DESCRIZIONE
 
     Senza <path>, tutti i file shared; con <path>, solo quello.
 
+    Un'altra repo. Se il primo argomento e' una cartella, update lavora
+    su quella repo, senza spostarsi; <path> e' allora relativo a quella
+    cartella. Un file shared non e' mai una cartella, quindi non c'e'
+    ambiguita':
+        git shared update ../app             (tutti i file shared di app)
+        git shared update ../app inc/conf.h  (solo quello)
+    Equivale a 'git -C ../app shared update [<path>]'.
+
+    Tutti i peer insieme. Con --peers update porta all'ultima versione
+    questa repo e ogni peer locale dei suoi file shared (con <path>, solo
+    i peer di quel file), e committa in ognuno: non serve passare dalle
+    altre repo. I peer lavorano in parallelo, quindi ci vuole piu' o meno
+    quanto il piu' lento. In un peer update fa solo cio' che e' sicuro
+    senza qualcuno che guarda: applica una versione nuova a un file senza
+    modifiche locali. Salta, e dice perche':
+        - un file con modifiche locali, divergente o con versioni da unire;
+        - un file sospeso sul branch su cui si trova il peer;
+        - un peer in mezzo a un merge, rebase, cherry-pick o revert di
+          git, o con HEAD staccata;
+        - un peer che si e' escluso con 'git config shared.peerUpdate false'.
+    Ogni riga di un peer comincia con il suo path. Il codice di uscita e'
+    1 se in un peer e' rimasto qualcosa da fare a mano.
+
+    Un file committato qui ma non pubblicato: i peer ricevono l'ultima
+    versione pubblicata, non la tua modifica. Prima 'git shared publish'.
+
 OPZIONI
     -f, --force
         Sovrascrive le modifiche non committate.
 
-    --all
+    --peers
+        Aggiorna e committa anche ogni peer locale, in parallelo (vedi
+        sopra). Non con -f, --abort, --ours, --theirs o <repo>; -m da'
+        il messaggio di ogni commit.
+
+    --scan
         Scarica da tutti i peer, non solo da quelli che hanno annunciato
         una versione nuova: per un avviso andato perso, per esempio
         mentre questa repo era spostata o non si raggiungeva.

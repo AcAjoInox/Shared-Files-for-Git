@@ -124,17 +124,20 @@ static const char *const msg_en[] = {
         "Create the new version and announce it to the local peers. For a\n"
         "file shared through a remote, then run 'git shared push'.\n",
     [MSG_USAGE_UPDATE] =
-        "usage: git shared update [-f] [--all] [-c | -m <message>] [<path>]\n"
-        "   or: git shared update (--ours | --theirs) [-c | -m <message>] [<path>]\n"
-        "   or: git shared update --abort [<path>]\n"
+        "usage: git shared update [-f] [--scan] [-c | -m <message>] [<repo>] [<path>]\n"
+        "   or: git shared update --peers [--scan] [-m <message>] [<path>]\n"
+        "   or: git shared update (--ours | --theirs) [-c | -m <message>] [<repo>] [<path>]\n"
+        "   or: git shared update --abort [<repo>] [<path>]\n"
         "\n"
         "Diverged versions are merged. After a conflict: fix the file,\n"
         "'git add' it and run 'git shared update' again, or keep one\n"
         "version with --ours or --theirs (the only way for a binary\n"
         "file). To give up: 'git shared update --abort'.\n"
+        "<repo>, a folder: update that repository without entering it.\n"
         "\n"
         "    -f, --force       overwrite local changes\n"
-        "    --all             fetch from every peer, not only from the\n"
+        "    --peers           also update and commit every local peer\n"
+        "    --scan            fetch from every peer, not only from the\n"
         "                      ones that announced a new version\n"
         "    -c, --commit      commit the applied files right away\n"
         "    -m <message>      commit right away with <message>\n"
@@ -170,13 +173,13 @@ static const char *const msg_en[] = {
         "    --reject     reject it: its versions are ignored\n"
         "    --yes        do not ask for confirmation\n",
     [MSG_USAGE_PULL] =
-        "usage: git shared pull [-f] [--all] [-c | -m <message>] [<path>]\n"
+        "usage: git shared pull [-f] [--scan] [-c | -m <message>] [<path>]\n"
         "\n"
         "Get the latest versions from the creators, then run\n"
         "'git shared update'.\n"
         "\n"
         "    -f, --force       overwrite local changes\n"
-        "    --all             fetch from every local peer too\n"
+        "    --scan            fetch from every local peer too\n"
         "    -c, --commit      commit the applied files right away\n"
         "    -m <message>      commit right away with <message>\n",
     [MSG_USAGE_HOOK] =
@@ -319,9 +322,15 @@ static const char *const msg_en[] = {
         "'git shared update --abort %s'",
     [MSG_ERR_NO_MERGE] = "%s: no merge in progress",
     [MSG_ERR_NO_MERGE_ANY] = "no merge in progress",
-    [MSG_ERR_ABORT_OPTS] = "--abort cannot be used with -c, -m, -f or --all",
+    [MSG_ERR_ABORT_OPTS] =
+        "--abort cannot be used with -c, -m, -f, --scan or --peers",
     [MSG_ERR_CHOOSE_OPTS] =
-        "use only one of --ours and --theirs, without --abort, -f or --all",
+        "use only one of --ours and --theirs, without --abort, -f, --scan "
+        "or --peers",
+    [MSG_ERR_PEERS_OPTS] =
+        "--peers cannot be used with -f or with a repository: it starts "
+        "from this one",
+    [MSG_ERR_CHDIR] = "cannot enter '%s'",
     [MSG_ERR_NO_REMOTE] = "no remote named '%s' in this repository",
     [MSG_ERR_REMOTE_FETCH] =
         "cannot get '%s' from %s: is the file shared there, and can the "
@@ -366,6 +375,9 @@ static const char *const msg_en[] = {
         "exists (to drop it: git config --remove-section shared.%s)",
     [MSG_WARN_PEER_UNREACHABLE] = "%s: peer %s not reachable",
     [MSG_WARN_SUSPENDED] = "%s: suspended on this branch",
+    [MSG_WARN_PEERS_UNPUBLISHED] =
+        "%s: the peers get the last published version, not your local "
+        "change: run 'git shared publish' first",
     [MSG_WARN_HOOK] = "cannot install the hook '%s'",
     [MSG_WARN_HOOK_NOT_SHELL] =
         "%s is not a shell script: left as it is (no git shared warnings "
@@ -499,6 +511,28 @@ static const char *const msg_en[] = {
         "%s: the latest version is applied but not committed: commit it "
         "to confirm",
     [MSG_UPD_COMMIT_MSG] = "Update %s",
+    [MSG_UPD_PEER_OFF] = "skipped: shared.peerUpdate is false here",
+    [MSG_UPD_PEER_BUSY] =
+        "skipped: a merge, rebase, cherry-pick or revert is in progress",
+    [MSG_UPD_PEER_DETACHED] = "skipped: HEAD is detached",
+    [MSG_UPD_PEER_NOTHING] =
+        "no longer shares these files: run 'git shared prune'",
+    [MSG_UPD_PEER_LOCAL] =
+        "%s: skipped, it has local changes: commit or discard them, then "
+        "run 'git shared update' there",
+    [MSG_UPD_PEER_DIVERGED] =
+        "%s: skipped, diverged: run 'git shared update' there to merge",
+    [MSG_UPD_PEER_TO_MERGE] =
+        "%s: versions still to merge: run 'git shared update' there",
+    [MSG_UPD_PEER_MERGING] =
+        "%s: skipped, merge in progress: finish it there",
+    [MSG_UPD_PEER_SUSPENDED] = "%s: skipped, suspended on this branch",
+    [MSG_UPD_PEER_FAILED] = "cannot run 'git shared update' there",
+    [MSG_UPD_PEER_WRITE_FAILED] =
+        "%s: cannot apply the new version: run 'git shared update' there",
+    [MSG_UPD_PEER_COMMIT_FAILED] =
+        "%s: new version applied, the commit failed: commit it there",
+    [MSG_UPD_PEERS_NONE] = "No local peers to update.",
 
     [MSG_STATUS_NONE] = "No shared files in this repository.",
     [MSG_STATUS_FIELD_PATH] = "path",
@@ -517,7 +551,7 @@ static const char *const msg_en[] = {
     [MSG_PEER_SAME] = "same version",
     [MSG_PEER_BEHIND] = "older version: run 'git shared publish'",
     [MSG_PEER_NEWER] =
-        "newer or different version: run 'git shared update --all'",
+        "newer or different version: run 'git shared update --scan'",
     [MSG_PEER_NO_VERSION] = "no version yet: run 'git shared publish'",
     [MSG_PEER_ANNOUNCED] = "announced, not received yet: nothing to do",
     [MSG_PEER_LEFT] = "no longer shares the file: run 'git shared prune'",

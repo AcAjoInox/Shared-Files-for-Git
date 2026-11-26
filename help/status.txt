@@ -71,7 +71,7 @@ OPTIONS
     --peers
         Also shows, for each peer: same version; older version (publish);
         announced, not received yet (nothing to do: it will get it by
-        itself); newer or different version (update --all); no version
+        itself); newer or different version (update --scan); no version
         yet (publish); no longer shares the file, or not found (prune);
         cannot be read now. Nothing is fetched from the peers or changed
         in them.

@@ -21,7 +21,7 @@ cd "$TRASH/P" || exit 1
 change P1 b c d e
 git shared publish >/dev/null 2>&1 # notifica O
 T_P=$(tip)
-run git shared update --all # l'avviso di O e' andato perso
+run git shared update --scan # l'avviso di O e' andato perso
 expect_rc "B-48: conflitto" 1
 expect_ok "B-48: unione registrata" has_marker
 git restore -s HEAD -SW -- f.h
@@ -86,7 +86,7 @@ expect_rc "abort <file> senza unione: codice 1" 1
 expect_err "abort <file> senza unione: messaggio" "f.h: no merge in progress"
 run git shared update --abort -c
 expect_rc "abort con -c: uso" 129
-expect_err "abort con -c: messaggio" "--abort cannot be used with -c, -m, -f or --all"
+expect_err "abort con -c: messaggio" "--abort cannot be used with -c, -m, -f, --scan or --peers"
 run git shared update -f --abort
 expect_rc "abort con -f: uso" 129
 

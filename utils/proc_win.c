@@ -207,6 +207,8 @@ eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags)
     p->in = NULL;
     p->out = NULL;
     p->handle = 0;
+    p->reaped = 0;
+    p->status = 0;
 
     if (strpbrk(argv[0], "/\\") != NULL) {
         wapp = win_utf8_to_wide(argv[0]);
@@ -226,7 +228,7 @@ eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags)
 
     /* Le estremita' del padre non sono ereditabili: un figlio avviato dopo
      * non le riceve, e chiudere le nostre basta a dare la fine dei dati. */
-    if (!CreatePipe(&out_rd, &out_wr, &sa, 0)) {
+    if (!CreatePipe(&out_rd, &out_wr, &sa, 65536U)) { /* vedi proc_exited */
         goto exit;
     }
     (void)SetHandleInformation(out_rd, HANDLE_FLAG_INHERIT, 0);
@@ -238,16 +240,20 @@ eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags)
     } else {
         in_rd = open_null();
     }
-    errh = ((flags & PROC_STDERR_NULL) != 0U)
-               ? open_null()
-               : inheritable(GetStdHandle(STD_ERROR_HANDLE));
+    if ((flags & PROC_STDERR_OUT) != 0U) {
+        errh = NULL; /* hStdError = out_wr, chiusa sotto */
+    } else if ((flags & PROC_STDERR_NULL) != 0U) {
+        errh = open_null();
+    } else {
+        errh = inheritable(GetStdHandle(STD_ERROR_HANDLE));
+    }
 
     memset(&si, 0, sizeof si);
     si.cb = sizeof si;
     si.dwFlags = STARTF_USESTDHANDLES;
     si.hStdInput = in_rd;
     si.hStdOutput = out_wr;
-    si.hStdError = errh;
+    si.hStdError = ((flags & PROC_STDERR_OUT) != 0U) ? out_wr : errh;
     if ((flags & PROC_CLEAN_ENV) != 0U) {
         wenv = clean_env_block();
     }
@@ -293,6 +299,11 @@ exit:
     free(wapp);
     str_free(&cmd);
     return err;
+}
+
+int proc_exited(Proc_t *p)
+{
+    return WaitForSingleObject((HANDLE)p->handle, 0U) == WAIT_OBJECT_0;
 }
 
 eGsErr_t proc_finish(Proc_t *p, int *exit_code)

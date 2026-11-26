@@ -4,7 +4,7 @@ NAME
     git shared pull - get the versions of the creator and apply them
 
 SYNOPSIS
-    git shared pull [-f] [--all] [-c | -m <message>] [<path>]
+    git shared pull [-f] [--scan] [-c | -m <message>] [<path>]
 
 DESCRIPTION
     Like 'git pull' = fetch + merge: for each file shared through a
@@ -36,8 +36,8 @@ OPTIONS
     -f, --force
         Overwrite local changes of the file.
 
-    --all
-        Also fetch from every local peer, as 'update --all'.
+    --scan
+        Also fetch from every local peer, as 'update --scan'.
 
     -c, --commit
         Commit the applied files right away.

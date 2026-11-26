@@ -27,6 +27,8 @@ typedef struct {
     FILE *in;        /* stdin del figlio (solo con PROC_STDIN_PIPE) */
     FILE *out;       /* stdout del figlio */
     intptr_t handle; /* HANDLE del processo (Windows) o pid (POSIX) */
+    int reaped;      /* POSIX: proc_exited ha gia' raccolto lo stato */
+    int status;      /* POSIX: lo stato raccolto */
 } Proc_t;
 
 #define PROC_STDERR_NULL 0x1U /* scarta lo stderr del figlio */
@@ -35,6 +37,9 @@ typedef struct {
  * (proc_repo_env). Negli hook git le esporta per la repo corrente: un
  * comando diretto a un'altra repo non deve vederle (A-27, D-071). */
 #define PROC_CLEAN_ENV   0x4U
+/* Lo stderr del figlio va nella stessa pipe dello stdout: il padre
+ * raccoglie tutto il testo di un figlio insieme (update --peers, D-115). */
+#define PROC_STDERR_OUT  0x8U
 
 /* Variabili tolte da PROC_CLEAN_ENV; l'elenco termina con NULL. */
 extern const char *const proc_repo_env[];
@@ -55,6 +60,14 @@ eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags);
  * fine. Ritorna 1 se ha letto un record, 0 a fine output.
  */
 int proc_read(Proc_t *p, int delim, Str_t *rec);
+
+/*
+ * 1 se il figlio e' terminato, senza attendere (D-116: i figli si stampano
+ * appena finiscono). Poi proc_collect o proc_finish come sempre. La pipe
+ * dello stdout tiene 64 KiB: un figlio che scrive di piu' resta fermo
+ * finche' il padre non legge.
+ */
+int proc_exited(Proc_t *p);
 
 /* Chiude lo stdin del figlio, che riceve la fine dell'input. */
 void proc_close_in(Proc_t *p);

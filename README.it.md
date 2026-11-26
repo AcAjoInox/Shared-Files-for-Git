@@ -63,6 +63,25 @@ sequenceDiagram
     Note over A: git shared status: versione nuova da applicare<br/>git shared update<br/>git commit
 ```
 
+**Senza cambiare cartella.** L'ultimo passo si può fare restando in B:
+
+```bash
+# Da B: aggiorno A senza entrarci
+git shared update ../A                    # tutti i file shared di A
+git shared update ../A include/common.h   # solo common.h (path relativo ad A)
+```
+
+Il primo argomento è una cartella, quindi è la repo da aggiornare: è come `git -C ../A shared update`. Senza `-c` resta da fare il commit in A.
+
+**Tutte le repo insieme.** Con `--peers` aggiorni questa repo e tutti i peer dei suoi file, e in ognuna fai il commit:
+
+```bash
+# Da B, dopo il publish: A e ogni altro peer passano alla versione nuova
+git shared update --peers
+```
+
+I peer lavorano in parallelo. In ognuno si applica solo una versione nuova su un file senza modifiche locali. I casi da guardare a mano vengono saltati, ognuno con il motivo: modifiche locali, divergenza, merge o rebase in corso. Una repo che non vuole essere aggiornata da fuori si esclude con `git config shared.peerUpdate false`.
+
 ## Come funziona
 
 - **Nessuna repo principale.** Tutte le repo che usano il file (i *peer*) sono alla pari, e tutte possono modificarlo. Non c'è un server: le repo si parlano direttamente.
@@ -73,7 +92,7 @@ sequenceDiagram
 ## Le regole
 
 1. **Conta solo ciò che è committato.** Una modifica non committata non si pubblica mai. `set`, `link`, `unlink` e `mv` diventano effettivi al commit: prima puoi annullarli con `git restore`.
-2. **Decidi tu quando.** Si pubblica solo con `git shared publish`, e i comandi non fanno commit da soli. Con `-c` o `-m "messaggio"` committano subito, ma solo il file shared e `.gitshared`: il resto dello staging non entra nel commit.
+2. **Decidi tu quando.** Si pubblica solo con `git shared publish`, e i comandi non fanno commit da soli. Con `-c` o `-m "messaggio"` committano subito, e così `update --peers` in ogni repo, ma solo il file shared e `.gitshared`: il resto dello staging non entra nel commit.
 3. **Il tuo lavoro non si perde.** `update` non sovrascrive modifiche non committate, nemmeno quelle in staging. Per forzare serve `-f`.
 4. **Nessuna modifica viene scartata.** Se due repo modificano il file ognuna per conto suo, `update` unisce le versioni come `git merge`. In caso di conflitto risolvi i marker, fai `git add` e rilanci `git shared update`, oppure tieni una delle due versioni, intera, con `git shared update --ours` o `--theirs`. Un file binario non si unisce mai: il file resta la tua versione e scegli con `--ours` o `--theirs`. Per rinunciare c'è `git shared update --abort`.
 5. **Nessun blocco.** Puoi modificare il file anche se la tua copia è indietro: il file risulta *divergente* e `update` unisce.
@@ -88,7 +107,7 @@ sequenceDiagram
 | `git shared mv <file> <dest>` | Rinomina un file shared, solo in questa repo |
 | `git shared status [--peers] [--remote]` | Stato di ogni file shared; con `--peers`, anche quello dei peer; con `--remote`, prima chiede ai creatori |
 | `git shared publish [<file>]` | Crea una versione nuova e avvisa i peer |
-| `git shared update [--all] [<file>]` | Riceve e applica l'ultima versione; `--ours` / `--theirs` tiene una versione, `--abort` rinuncia a un'unione |
+| `git shared update [<repo>] [<file>]` | Riceve e applica l'ultima versione, anche in un'altra repo (`<repo>`); `--peers` aggiorna e committa anche tutti i peer; `--ours` / `--theirs` tiene una versione, `--abort` rinuncia a un'unione |
 | `git shared push [<remote>] [<file>]` | Remoto (beta): invia al creatore le versioni pubblicate; la prima volta `<remote>` diventa il creatore |
 | `git shared pull [<file>]` | Remoto (beta): riceve le versioni del creatore, poi `update` |
 | `git shared crown [<remote>] <file>` | Remoto (beta): sposta l'autorità del file su un altro remoto (di default il tuo `origin`), il creatore resta; `--restore` torna al creatore, `--accept` / `--reject` decidono un cambio ricevuto |

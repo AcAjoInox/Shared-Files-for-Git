@@ -3,6 +3,7 @@
  */
 #include "shared.h"
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -107,6 +108,7 @@ void repo_close(Repo_t *r)
     str_free(&r->objfmt);
     str_free(&r->self_path);
     str_free(&r->hooks);
+    str_free(&r->git_dir);
 }
 
 SharedEntry_t *repo_add(Repo_t *r)
@@ -516,37 +518,61 @@ exit:
 }
 
 /* Divide l'output di rev-parse (una riga per valore; il prefisso puo'
- * essere una riga vuota). Con hooks != NULL c'e' una quarta riga, la
- * cartella degli hook. */
+ * essere una riga vuota). Con hooks != NULL ci sono altre due righe, la
+ * cartella degli hook e la cartella .git (git_dir). */
 static eGsErr_t parse_locate(const Str_t *out, int code, Str_t *top,
-                             Str_t *prefix, Str_t *objfmt, Str_t *hooks)
+                             Str_t *prefix, Str_t *objfmt, Str_t *hooks,
+                             Str_t *git_dir)
 {
     const char *l1 = str_cstr(out);
     const char *l2;
     const char *l3;
     const char *l4 = NULL;
+    const char *l5 = NULL;
     eGsErr_t err = GS_ERR_NOT_REPO; /* anche dentro .git: nessun worktree */
 
     l2 = strchr(l1, '\n');
     l3 = (l2 != NULL) ? strchr(l2 + 1, '\n') : NULL;
     if ((hooks != NULL) && (l3 != NULL)) {
         l4 = strchr(l3 + 1, '\n');
+        l5 = (l4 != NULL) ? strchr(l4 + 1, '\n') : NULL;
     }
     if ((code == 0) && (l2 != NULL) && (l2 != l1) && (l3 != NULL) &&
-        ((hooks == NULL) || (l4 != NULL))) {
+        ((hooks == NULL) || (l5 != NULL))) {
         str_addn(top, l1, (size_t)(l2 - l1));
         str_addn(prefix, l2 + 1, (size_t)(l3 - (l2 + 1)));
         if (hooks == NULL) {
             str_add(objfmt, l3 + 1);
         } else {
             str_addn(objfmt, l3 + 1, (size_t)(l4 - (l3 + 1)));
-            str_add(hooks, l4 + 1);
+            str_addn(hooks, l4 + 1, (size_t)(l5 - (l4 + 1)));
+            str_add(git_dir, l5 + 1);
             str_trim_eol(hooks);
+            str_trim_eol(git_dir);
         }
         str_trim_eol(objfmt);
         err = GS_OK;
     }
     return err;
+}
+
+/* Valore booleano falso per git: false, no, off, 0 (maiuscole comprese).
+ * Una chiave senza valore e' vera. */
+static int cfg_is_false(const char *v)
+{
+    static const char *const no[] = { "false", "no", "off", "0" };
+    size_t i;
+    size_t j;
+    int is_false = 0;
+
+    for (i = 0U; (i < (sizeof no / sizeof no[0])) && (is_false == 0); i++) {
+        j = 0U;
+        while ((no[i][j] != '\0') && (tolower((unsigned char)v[j]) == no[i][j])) {
+            j++;
+        }
+        is_false = (no[i][j] == '\0') && (v[j] == '\0');
+    }
+    return is_false;
 }
 
 eGsErr_t repo_locate(const char *dir, Str_t *top, Str_t *prefix,
@@ -559,7 +585,7 @@ eGsErr_t repo_locate(const char *dir, Str_t *top, Str_t *prefix,
     eGsErr_t err = git_capture(args, PROC_STDERR_NULL, &out, &code);
 
     if (err == GS_OK) {
-        err = parse_locate(&out, code, top, prefix, objfmt, NULL);
+        err = parse_locate(&out, code, top, prefix, objfmt, NULL, NULL);
     }
     str_free(&out);
     return err;
@@ -573,7 +599,8 @@ eGsErr_t repo_open(Repo_t *r)
                                          "--show-prefix",
                                          "--show-object-format",
                                          "--path-format=absolute",
-                                         "--git-path", "hooks", NULL };
+                                         "--git-path", "hooks",
+                                         "--git-dir", NULL };
     static const char *const a_head[] = { "symbolic-ref", "-q", "HEAD", NULL };
     static const char *const a_cfg[] = { "config", "-z", "--show-scope",
                                          "--get-regexp", "^shared\\.", NULL };
@@ -612,7 +639,7 @@ eGsErr_t repo_open(Repo_t *r)
     err = proc_collect(&p_top, &out, &code);
     if (err == GS_OK) {
         err = parse_locate(&out, code, &r->top, &r->prefix, &r->objfmt,
-                           &r->hooks);
+                           &r->hooks, &r->git_dir);
     }
     if (err != GS_OK) {
         goto exit;
@@ -656,6 +683,12 @@ eGsErr_t repo_open(Repo_t *r)
                 (strncmp(rec, "shared.selfpath\n", 16U) == 0)) {
                 str_reset(&r->self_path);
                 str_add(&r->self_path, rec + 16U);
+            } else if ((strcmp(scope, "local") == 0) &&
+                       (strncmp(rec, "shared.peerupdate", 17U) == 0) &&
+                       ((rec[17] == '\n') || (rec[17] == '\0'))) {
+                /* D-115: senza valore e' vera */
+                r->no_peer_update =
+                    ((rec[17] == '\n') && cfg_is_false(rec + 18U)) ? 1U : 0U;
             } else if (strcmp(scope, "local") == 0) {
                 parse_local_rec(r, rec);
             } else {

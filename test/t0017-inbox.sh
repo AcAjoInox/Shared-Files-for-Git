@@ -88,20 +88,20 @@ expect_out "update riceve: ricevuta" "p.h: new version received"
 expect_out "update riceve: applicata" "p.h: new version applied and committed."
 expect_eq "update riceve: avviso cancellato" "$(notices C)" 0
 
-# --- update senza avvisi: nessun fetch; --all: da tutti --------------------------------
+# --- update senza avvisi: nessun fetch; --scan: da tutti --------------------------------
 mv "$TRASH/A" "$TRASH/A.off"
 run git shared update
 expect_rc "senza avvisi: codice 0" 0
 expect_out "senza avvisi: aggiornato" "p.h: up to date"
 expect_eq "senza avvisi: nessun fetch, nessun avviso di peer" "$ERR" ""
-run git shared update --all
-expect_rc "--all: codice 0" 0
-expect_err "--all: fetch da tutti i peer" "peer $TOP_A not reachable"
+run git shared update --scan
+expect_rc "--scan: codice 0" 0
+expect_err "--scan: fetch da tutti i peer" "peer $TOP_A not reachable"
 mv "$TRASH/A.off" "$TRASH/A"
-run git shared update --abort --all
-expect_rc "--abort con --all: codice 129" 129
+run git shared update --abort --scan
+expect_rc "--abort con --scan: codice 129" 129
 run git shared update -h
-expect_out "uso: --all" "--all             fetch from every peer"
+expect_out "uso: --scan" "--scan            fetch from every peer"
 
 # --- ricezione da publish: la versione nuova cambia lo stato -------------------------
 cd "$TRASH/A" || exit 1
@@ -120,7 +120,7 @@ git shared publish >/dev/null 2>&1
 cd "$TRASH/A" && git shared update -c >/dev/null 2>&1
 cd "$TRASH/B" && git shared update -c >/dev/null 2>&1
 
-# --- avviso perso: lo riscrive il publish successivo, o update --all ----------------
+# --- avviso perso: lo riscrive il publish successivo, o update --scan ----------------
 cd "$TRASH/A" || exit 1
 mv "$TRASH/B" "$TRASH/B.off"
 edit a3 c3
@@ -152,10 +152,10 @@ T4=$(tip A)
 mv "$TRASH/B.off" "$TRASH/B"
 cd "$TRASH/B" || exit 1
 run git shared update -c
-expect_out "avviso perso, update senza --all: nulla" "p.h: up to date"
-run git shared update --all -c
-expect_out "avviso perso, update --all: ricevuta" "p.h: new version received"
-expect_eq "avviso perso, update --all: T di A" "$(tip B)" "$T4"
+expect_out "avviso perso, update senza --scan: nulla" "p.h: up to date"
+run git shared update --scan -c
+expect_out "avviso perso, update --scan: ricevuta" "p.h: new version received"
+expect_eq "avviso perso, update --scan: T di A" "$(tip B)" "$T4"
 cd "$TRASH/C" && git shared update -c >/dev/null 2>&1
 
 # --- fetch fallito: l'avviso resta e status lo dice -----------------------------------

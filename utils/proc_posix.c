@@ -58,6 +58,9 @@ static _Noreturn void child_exec(const char *const argv[], unsigned flags,
         (void)close(null_fd);
     }
     (void)dup2(fd_out, STDOUT_FILENO);
+    if ((flags & PROC_STDERR_OUT) != 0U) {
+        (void)dup2(fd_out, STDERR_FILENO);
+    }
     (void)close(fd_out);
 
     /* execv/execvp non modificano argv: il cast toglie solo il const. */
@@ -79,6 +82,8 @@ eGsErr_t proc_start(Proc_t *p, const char *const argv[], unsigned flags)
     p->in = NULL;
     p->out = NULL;
     p->handle = 0;
+    p->reaped = 0;
+    p->status = 0;
     if (pipe(out_fd) != 0) {
         goto exit;
     }
@@ -131,6 +136,17 @@ exit:
     return err;
 }
 
+int proc_exited(Proc_t *p)
+{
+    int status = 0;
+
+    if ((p->reaped == 0) && (waitpid((pid_t)p->handle, &status, WNOHANG) > 0)) {
+        p->reaped = 1;
+        p->status = status;
+    }
+    return p->reaped;
+}
+
 eGsErr_t proc_finish(Proc_t *p, int *exit_code)
 {
     int status = 0;
@@ -139,7 +155,9 @@ eGsErr_t proc_finish(Proc_t *p, int *exit_code)
     proc_close_in(p);
     (void)fclose(p->out);
     p->out = NULL;
-    if (waitpid((pid_t)p->handle, &status, 0) < 0) {
+    if (p->reaped != 0) {
+        status = p->status; /* gia' raccolto da proc_exited */
+    } else if (waitpid((pid_t)p->handle, &status, 0) < 0) {
         goto exit;
     }
     if (WIFEXITED(status)) {

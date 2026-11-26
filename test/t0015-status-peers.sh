@@ -74,8 +74,8 @@ git shared publish >/dev/null 2>&1
 mv "$TRASH/A.off" "$TRASH/A"
 cd "$TRASH/A" || exit 1
 run git shared status --peers
-expect_out "avanti: update" "$TOP_B: newer or different version: run 'git shared update --all'"
-git shared update --all -c >/dev/null 2>&1 # A era spostata: nessun avviso
+expect_out "avanti: update" "$TOP_B: newer or different version: run 'git shared update --scan'"
+git shared update --scan -c >/dev/null 2>&1 # A era spostata: nessun avviso
 run git shared status --peers
 expect_out "dopo update: B allineato" "$TOP_B: same version"
 expect_out "dopo update: C annunciata da B" "$TOP_C: announced, not received yet: nothing to do"
@@ -94,7 +94,7 @@ git shared publish >/dev/null 2>&1
 git -C ../C fetch -q "$TOP_A" "+refs/shared/$(shared_id p.h):refs/tmp-a" 2>/dev/null
 git fetch -q "$TOP_C" "+refs/shared/$(shared_id p.h):refs/tmp-c" 2>/dev/null
 run git shared status --peers
-expect_out "divergente (oggetto presente): update" "$TOP_C: newer or different version: run 'git shared update --all'"
+expect_out "divergente (oggetto presente): update" "$TOP_C: newer or different version: run 'git shared update --scan'"
 
 # --- peer uscito, nessuna versione, illeggibile -----------------------------------------------
 group D E F G

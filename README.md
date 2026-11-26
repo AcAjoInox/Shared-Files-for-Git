@@ -66,6 +66,25 @@ sequenceDiagram
     Note over A: git shared status: new version to apply<br/>git shared update<br/>git commit
 ```
 
+**Without changing folder.** The last step can be done from B:
+
+```bash
+# From B: update A without going there
+git shared update ../A                    # every shared file of A
+git shared update ../A include/common.h   # only common.h (path relative to A)
+```
+
+The first argument is a folder, so it is the repository to update: it is the same as `git -C ../A shared update`. Without `-c` the commit in A is still to do.
+
+**Every repository at once.** With `--peers` you update this repository and every peer of its files, with a commit in each one:
+
+```bash
+# From B, after publish: A and every other peer get the new version
+git shared update --peers
+```
+
+The peers work in parallel. In each one, only a new version on a file with no local changes is applied. The cases that need a look by hand are skipped, each with its reason: local changes, divergence, a merge or rebase in progress. A repository that does not want to be updated from outside opts out with `git config shared.peerUpdate false`.
+
 ## How it works
 
 - **No main repository.** All the repositories that use the file (the *peers*) are equal, and all of them can change it. There is no server: the repositories talk to each other directly.
@@ -76,7 +95,7 @@ sequenceDiagram
 ## The rules
 
 1. **Only committed work counts.** An uncommitted change is never published. `set`, `link`, `unlink` and `mv` take effect at the commit: until then you can cancel them with `git restore`.
-2. **You decide when.** Nothing is published except by `git shared publish`, and the commands never commit by themselves. With `-c` or `-m "message"` they commit right away, but only the shared file and `.gitshared`: the rest of the staging area stays out of the commit.
+2. **You decide when.** Nothing is published except by `git shared publish`, and the commands never commit by themselves. With `-c` or `-m "message"` they commit right away, and so does `update --peers`, in every repository, but only the shared file and `.gitshared`: the rest of the staging area stays out of the commit.
 3. **Your work is never lost.** `update` does not overwrite uncommitted changes, staged ones included. Forcing it takes `-f`.
 4. **No change is thrown away.** If two repositories change the file independently, `update` merges the versions like `git merge`. On a conflict, resolve the markers, `git add` and run `git shared update` again, or keep one of the two versions, whole, with `git shared update --ours` or `--theirs`. A binary file is never merged: the file keeps your version and you choose with `--ours` or `--theirs`. To give up, use `git shared update --abort`.
 5. **Nothing is locked.** You can change the file even if your copy is behind: the file is *diverged* and `update` merges.
@@ -91,7 +110,7 @@ sequenceDiagram
 | `git shared mv <file> <dest>` | Renames a shared file, only in this repository |
 | `git shared status [--peers] [--remote]` | State of each shared file; with `--peers`, also that of the peers; with `--remote`, first asks the creators |
 | `git shared publish [<file>]` | Creates a new version and notifies the peers |
-| `git shared update [--all] [<file>]` | Receives and applies the latest version; `--ours` / `--theirs` keeps one version, `--abort` gives up a merge |
+| `git shared update [<repo>] [<file>]` | Receives and applies the latest version, also in another repository (`<repo>`); `--peers` also updates and commits every peer; `--ours` / `--theirs` keeps one version, `--abort` gives up a merge |
 | `git shared push [<remote>] [<file>]` | Remote (beta): sends the published versions to the creator; the first time, `<remote>` becomes the creator |
 | `git shared pull [<file>]` | Remote (beta): receives the versions of the creator, then `update` |
 | `git shared crown [<remote>] <file>` | Remote (beta): moves the authority of the file to another remote (default: your own `origin`), the creator stays; `--restore` goes back to the creator, `--accept` / `--reject` decide a change received |

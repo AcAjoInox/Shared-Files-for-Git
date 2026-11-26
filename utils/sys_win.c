@@ -5,6 +5,8 @@
 #include <windows.h>
 #include <bcrypt.h>
 #include <shellapi.h>
+#include <fcntl.h>
+#include <io.h>
 
 #include <limits.h>
 #include <stdlib.h>
@@ -96,6 +98,19 @@ int sys_setenv(const char *name, const char *value)
     return rc;
 }
 
+void sys_unsetenv(const char *name)
+{
+    wchar_t *wname = win_utf8_to_wide(name);
+
+    (void)SetEnvironmentVariableW(wname, NULL);
+    free(wname);
+}
+
+void sys_sleep_ms(unsigned ms)
+{
+    Sleep((DWORD)ms);
+}
+
 int sys_stdin_is_tty(void)
 {
     HANDLE h = GetStdHandle(STD_INPUT_HANDLE);
@@ -133,6 +148,29 @@ FILE *sys_fopen(const char *path, const char *mode)
 
     free(wpath);
     free(wmode);
+    return f;
+}
+
+FILE *sys_fopen_excl(const char *path)
+{
+    wchar_t *wpath = win_utf8_to_wide(path);
+    HANDLE h = CreateFileW(wpath, GENERIC_WRITE, 0U, NULL, CREATE_NEW,
+                           FILE_ATTRIBUTE_NORMAL, NULL);
+    FILE *f = NULL;
+    int fd;
+
+    free(wpath);
+    if (h != INVALID_HANDLE_VALUE) {
+        fd = _open_osfhandle((intptr_t)h, _O_WRONLY | _O_BINARY);
+        if (fd < 0) {
+            (void)CloseHandle(h);
+        } else {
+            f = _fdopen(fd, "wb");
+            if (f == NULL) {
+                (void)_close(fd);
+            }
+        }
+    }
     return f;
 }
 
@@ -258,6 +296,44 @@ int sys_is_dir(const char *path)
     free(wpath);
     return (attr != INVALID_FILE_ATTRIBUTES) &&
            ((attr & FILE_ATTRIBUTE_DIRECTORY) != 0U);
+}
+
+int sys_chdir(const char *path)
+{
+    wchar_t *wpath = win_utf8_to_wide(path);
+    BOOL done = SetCurrentDirectoryW(wpath);
+
+    free(wpath);
+    return done ? 0 : -1;
+}
+
+eGsErr_t sys_self_exe(Str_t *out)
+{
+    wchar_t *buf = NULL;
+    char *u8;
+    DWORD cap = 260U;
+    DWORD n = 0U;
+    eGsErr_t err = GS_ERR_SYS;
+
+    /* GetModuleFileNameW tronca senza errore: si ritenta piu' grande. */
+    while (cap <= 32768U) {
+        free(buf);
+        buf = xmalloc((size_t)cap * sizeof *buf);
+        n = GetModuleFileNameW(NULL, buf, cap);
+        if ((n == 0U) || (n < cap)) {
+            break;
+        }
+        cap *= 2U;
+    }
+    if ((n > 0U) && (n < cap)) {
+        u8 = win_wide_to_utf8(buf);
+        str_reset(out);
+        str_add(out, u8);
+        free(u8);
+        err = GS_OK;
+    }
+    free(buf);
+    return err;
 }
 
 int sys_mkdir(const char *path)

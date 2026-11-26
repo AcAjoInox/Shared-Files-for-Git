@@ -136,7 +136,7 @@ static void from_authority(const SharedEntry_t *e, GitBatch_t *b, const Oid_t *t
 }
 
 /*
- * Una versione da unire arrivata senza avviso (update --all, o la punta di
+ * Una versione da unire arrivata senza avviso (update --scan, o la punta di
  * una repo annunciante piu' nuova della versione annunciata) diventa un
  * avviso della repo stessa: la ricordano i comandi successivi, che non
  * fanno il fetch da tutti.

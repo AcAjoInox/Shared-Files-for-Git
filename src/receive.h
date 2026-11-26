@@ -12,7 +12,7 @@
  *   - T avanza sulla versione ricevuta che la contiene (D-092);
  *   - l'avviso si cancella quando T contiene la versione; resta se la
  *     versione non e' arrivata o non discende da T (da unire).
- * Senza avvisi nessun processo. update --all fa il fetch da tutti i peer.
+ * Senza avvisi nessun processo. update --scan fa il fetch da tutti i peer.
  *
  * In remoto (D-110): se T ha un creatore, l'ultima versione vista
  * (refs/shared-authority/<id>) entra tra le versioni ricevute come quella
@@ -85,7 +85,7 @@ void received_free(Received_t *rv);
 
 /*
  * Riceve per una voce collegata. all = 1: fetch anche da tutti i peer
- * (update --all). GS_ERR_GIT se la catena non c'e' o git fallisce; un peer
+ * (update --scan). GS_ERR_GIT se la catena non c'e' o git fallisce; un peer
  * irraggiungibile e' solo un avviso.
  */
 eGsErr_t receive_entry(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,

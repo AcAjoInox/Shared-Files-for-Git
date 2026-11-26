@@ -139,7 +139,7 @@ cd "$TRASH/R" || exit 1
 change r1
 git shared publish >/dev/null 2>&1 # notifica Q
 T_R=$(tip)
-run git shared update --all # l'avviso di Q e' andato perso
+run git shared update --scan # l'avviso di Q e' andato perso
 expect_rc "tra versioni: conflitto" 1
 expect_err "tra versioni: binario" "binary file changed on both sides"
 expect_ok "tra versioni: file nostro" same f.bin r1
@@ -220,13 +220,13 @@ expect_err "senza unione <file>: messaggio" "f.h: no merge in progress"
 run git shared update --ours --theirs
 expect_rc "--ours e --theirs: uso" 129
 expect_err "--ours e --theirs: messaggio" \
-	"use only one of --ours and --theirs, without --abort, -f or --all"
+	"use only one of --ours and --theirs, without --abort, -f, --scan or --peers"
 run git shared update --ours --abort
 expect_rc "--ours con --abort: uso" 129
 run git shared update -f --theirs
 expect_rc "--theirs con -f: uso" 129
-run git shared update --theirs --all
-expect_rc "--theirs con --all: uso" 129
+run git shared update --theirs --scan
+expect_rc "--theirs con --scan: uso" 129
 run git shared update -h
 expect_out "-h: --ours" "--ours"
 expect_out "-h: --theirs" "--theirs"

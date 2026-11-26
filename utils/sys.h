@@ -38,6 +38,12 @@ char *sys_getenv(const char *name);
  */
 int sys_setenv(const char *name, const char *value);
 
+/* Toglie la variabile dall'ambiente del processo (e dei figli). */
+void sys_unsetenv(const char *name);
+
+/* Attende ms millisecondi. */
+void sys_sleep_ms(unsigned ms);
+
 /*
  * 1 se lo standard input e' un terminale, a cui si puo' fare una domanda
  * (crown, D-111). Windows: la console, oppure il terminale di Git Bash
@@ -47,10 +53,24 @@ int sys_setenv(const char *name, const char *value);
 int sys_stdin_is_tty(void);
 
 FILE *sys_fopen(const char *path, const char *mode);
+
+/* Crea il file per scriverlo, solo se non esiste (lock, oggetti: D-116).
+ * NULL se esiste gia' o non si crea. Modo binario. */
+FILE *sys_fopen_excl(const char *path);
 int sys_remove(const char *path);
 
 /* 1 se il path esiste ed e' una cartella. */
 int sys_is_dir(const char *path);
+
+/* Cambia la cartella corrente (update <repo>, D-115). 0 = riuscito. */
+int sys_chdir(const char *path);
+
+/*
+ * Path assoluto dell'eseguibile in esecuzione (update --peers, D-115).
+ * GS_ERR_SYS se la piattaforma non lo dice: il chiamante ripiega sul
+ * nome cercato nel PATH.
+ */
+eGsErr_t sys_self_exe(Str_t *out);
 
 /* Crea una cartella (un solo livello). 0 se creata o se c'era gia'. */
 int sys_mkdir(const char *path);

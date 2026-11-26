@@ -4,7 +4,7 @@ NOME
     git shared pull - riceve le versioni del creatore e le applica
 
 SINTASSI
-    git shared pull [-f] [--all] [-c | -m <messaggio>] [<path>]
+    git shared pull [-f] [--scan] [-c | -m <messaggio>] [<path>]
 
 DESCRIZIONE
     Come 'git pull' = fetch + merge: per ogni file condiviso attraverso
@@ -37,8 +37,8 @@ OPZIONI
     -f, --force
         Sovrascrive le modifiche locali del file.
 
-    --all
-        Scarica anche da tutti i peer locali, come 'update --all'.
+    --scan
+        Scarica anche da tutti i peer locali, come 'update --scan'.
 
     -c, --commit
         Committa subito i file applicati.

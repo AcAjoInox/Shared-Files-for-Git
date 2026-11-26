@@ -200,8 +200,8 @@ run git shared publish
 expect_rc "avviso perso: B pubblica" 0
 expect_out "avviso perso: A e C notificati" "2 of 2 peers notified"
 run git shared update
-expect_out "avviso perso: senza --all B non sa di A" "up to date"
-run git shared update --all
+expect_out "avviso perso: senza --scan B non sa di A" "up to date"
+run git shared update --scan
 expect_rc "versioni divergenti tra peer: codice 1" 1
 expect_err "versioni divergenti tra peer: conflitto da risolvere" "merge conflict"
 

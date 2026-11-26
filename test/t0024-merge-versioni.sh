@@ -20,7 +20,7 @@ change a b c d F5
 run git shared publish
 expect_rc "peer: publish accettato, E notificato" 0
 T_F=$(tip)
-run git shared update --all # l'avviso di E e' andato perso
+run git shared update --scan # l'avviso di E e' andato perso
 expect_rc "peer: codice 0" 0
 expect_out "peer: unite" "f.h: merged. Commit it to confirm"
 expect_eq "peer: contenuto" "$(tr '\n' ' ' <f.h)" "E1 b c d F5 "
@@ -105,7 +105,7 @@ cd "$TRASH/L" || exit 1
 expect_eq "B-47: peer di L nell'ordine M, N" \
 	"$(git config --get-all "shared.$(shared_id f.h).peer" | sed 's|.*/||' | tr '\n' ' ')" \
 	"M N "
-run git shared update --all # vN senza avviso: L era spostata
+run git shared update --scan # vN senza avviso: L era spostata
 expect_rc "B-47: codice 0" 0
 expect_out "B-47: versione ricevuta" "new version received"
 expect_ok "B-47: la T di prima e' antenata della nuova" \
@@ -128,7 +128,7 @@ cd "$TRASH/R" || exit 1
 change R1 b c d e
 git shared publish >/dev/null 2>&1 # notifica Q
 T_R=$(tip)
-run git shared update --all # l'avviso di Q e' andato perso
+run git shared update --scan # l'avviso di Q e' andato perso
 expect_rc "B-49: conflitto" 1
 lines f.h QR1 b c d e
 git add f.h

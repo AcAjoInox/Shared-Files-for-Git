@@ -1,5 +1,5 @@
 /*
- * cmd_pull.c - "git shared pull [-f] [--all] [-c | -m <msg>] [<path>]"
+ * cmd_pull.c - "git shared pull [-f] [--scan] [-c | -m <msg>] [<path>]"
  * (REQ-F-028, D-110).
  *
  * Come "git pull" = fetch + merge: per i file scelti con un creatore, la
@@ -42,7 +42,7 @@ int cmd_pull(int argc, char **argv)
     int batch_ok = 0;
     int rc = GS_EXIT_USAGE;
 
-    first = cmd_parse(argc, argv, CMD_OPT_COMMIT | CMD_OPT_FORCE | CMD_OPT_ALL,
+    first = cmd_parse(argc, argv, CMD_OPT_COMMIT | CMD_OPT_FORCE | CMD_OPT_SCAN,
                       MSG_USAGE_PULL, &o);
     if (first < 0) {
         goto exit;

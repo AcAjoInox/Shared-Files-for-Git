@@ -84,7 +84,7 @@ expect_eq "relocate: C conosce il nuovo path" "$(peers_of C "$ID")" "$(sorted "$
 expect_eq "relocate: selfPath aggiornato" "$(git config shared.selfPath)" "$TOP_B2"
 run git shared status
 expect_eq "relocate: nessun avviso dopo" "$ERR" ""
-run git shared update --all -c # avviso perso: B era spostata (D-099)
+run git shared update --scan -c # avviso perso: B era spostata (D-099)
 expect_out "relocate: update funziona" "new version applied and committed"
 cd "$TRASH/A" || exit 1
 put p.h v3

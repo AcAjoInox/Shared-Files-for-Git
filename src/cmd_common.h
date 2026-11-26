@@ -18,18 +18,23 @@
 #define CMD_OPT_FORCE  0x2U /* -f, --force */
 #define CMD_OPT_DRY_RUN 0x4U /* -n, --dry-run */
 #define CMD_OPT_ABORT  0x8U /* --abort (update, D-093) */
-#define CMD_OPT_ALL    0x10U /* --all (update, D-099) */
+#define CMD_OPT_SCAN   0x10U /* --scan (update, pull; D-099, D-115) */
 #define CMD_OPT_MERGE  0x20U /* --merge (link, D-029, D-102) */
 #define CMD_OPT_ADOPT  0x40U /* --adopt (link, D-064) */
 #define CMD_OPT_CHOOSE 0x100U /* --ours, --theirs (update, D-108) */
+/* --peers e l'interna --as-peer <id>[,<id>...] (update, D-115) */
+#define CMD_OPT_PEERS  0x200U
 
 typedef struct {
     const char *message; /* -m; NULL = messaggio standard */
+    const char *peer_ids; /* --as-peer: ID separati da virgole (D-115) */
     unsigned commit : 1U;
     unsigned force : 1U;
     unsigned dry_run : 1U;
     unsigned abort : 1U;
-    unsigned all : 1U;
+    unsigned scan : 1U;
+    unsigned peers : 1U;
+    unsigned as_peer : 1U;
     unsigned merge : 1U;
     unsigned adopt : 1U;
     unsigned ours : 1U;

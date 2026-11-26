@@ -14,6 +14,7 @@
 #include <signal.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "mem.h"
@@ -75,6 +76,34 @@ exit:
 FILE *sys_fopen(const char *path, const char *mode)
 {
     return fopen(path, mode);
+}
+
+FILE *sys_fopen_excl(const char *path)
+{
+    int fd = open(path, O_WRONLY | O_CREAT | O_EXCL, 0666);
+    FILE *f = NULL;
+
+    if (fd >= 0) {
+        f = fdopen(fd, "wb");
+        if (f == NULL) {
+            (void)close(fd);
+        }
+    }
+    return f;
+}
+
+void sys_unsetenv(const char *name)
+{
+    (void)unsetenv(name);
+}
+
+void sys_sleep_ms(unsigned ms)
+{
+    struct timespec ts;
+
+    ts.tv_sec = (time_t)(ms / 1000U);
+    ts.tv_nsec = (long)(ms % 1000U) * 1000000L;
+    (void)nanosleep(&ts, NULL);
 }
 
 int sys_remove(const char *path)
@@ -150,6 +179,27 @@ int sys_is_dir(const char *path)
     struct stat st;
 
     return (stat(path, &st) == 0) && S_ISDIR(st.st_mode);
+}
+
+int sys_chdir(const char *path)
+{
+    return chdir(path);
+}
+
+eGsErr_t sys_self_exe(Str_t *out)
+{
+    char buf[PATH_MAX];
+    ssize_t n = readlink("/proc/self/exe", buf, sizeof buf - 1U);
+    eGsErr_t err = GS_ERR_SYS;
+
+    /* Solo Linux; altrove il chiamante cerca l'eseguibile nel PATH. */
+    if (n > 0) {
+        buf[n] = '\0';
+        str_reset(out);
+        str_add(out, buf);
+        err = GS_OK;
+    }
+    return err;
 }
 
 int sys_mkdir(const char *path)

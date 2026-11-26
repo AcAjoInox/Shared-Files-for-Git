@@ -60,13 +60,15 @@ typedef struct {
     Str_t self_path; /* shared.selfPath: dove la repo ricorda di essere */
     Str_t hooks;  /* cartella degli hook, assoluta (rev-parse --git-path
                    * hooks: rispetta core.hooksPath); solo da repo_open */
+    Str_t git_dir; /* cartella .git del worktree, assoluta; solo da repo_open */
     SharedEntry_t *v;
     size_t n;
     size_t cap;
+    unsigned char no_peer_update; /* shared.peerUpdate = false (D-115) */
 } Repo_t;
 
 #define REPO_INIT { STR_INIT, STR_INIT, STR_INIT, STR_INIT, STR_INIT, STR_INIT, \
-                    NULL, 0U, 0U }
+                    STR_INIT, NULL, 0U, 0U, 0U }
 
 /*
  * Apre la repo della cartella corrente e carica i file shared.
