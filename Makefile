@@ -4,6 +4,8 @@
 #   make test       compila ed esegue i test in test/ (serve sh: Git Bash),
 #                   JOBS alla volta: di default meta' dei processori,
 #                   make test JOBS=1 per uno alla volta
+#   make test-uso   test d'uso in test/uso/: l'utente che usa i comandi e
+#                   legge status (GS_GITHUB_BASE=... anche su GitHub)
 #   make doc        pagina HTML e man page di "git shared --help"
 #   make install    copia l'eseguibile in $(PREFIX) e installa la pagina di
 #                   "git shared --help" (HTML in git --html-path su Windows,
@@ -130,6 +132,14 @@ else
 	sh test/run.sh
 endif
 
+test-uso: $(BIN)
+ifdef CMD_SHELL
+	@echo make test-uso richiede sh: lanciarlo da Git Bash
+	@exit 1
+else
+	sh test/uso/run.sh
+endif
+
 install: $(BIN) doc
 	$(call MKDIR,$(PREFIX))
 	$(call CP,$(BIN),$(PREFIX)/git-shared$(EXE))
@@ -144,4 +154,4 @@ endif
 clean:
 	$(call RMDIR,$(BUILD))
 
-.PHONY: all test doc install clean
+.PHONY: all test test-uso doc install clean
