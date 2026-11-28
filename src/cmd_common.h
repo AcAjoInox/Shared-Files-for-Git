@@ -212,7 +212,10 @@ void cmd_auth_how(const SharedEntry_t *e, const Received_t *rv, size_t k, Str_t 
  *     l'autorita' era un sovrano): crown --restore;
  *   - HEIR_VISIT_NONE: nessuno.
  * where: l'indirizzo che l'ha detto; to: l'autorita' nuova; pos: la sua
- * posizione nell'ordine. Il cat-file viene riaperto: ritorna 0 se non ci
+ * posizione nell'ordine. line: quanti indirizzi ha la linea di
+ * successione, answered: quanti hanno risposto con il file (AB-07: nessun
+ * erede, eredi muti ed eredi che rispondono senza essersi incoronati sono
+ * tre casi diversi). Il cat-file viene riaperto: ritorna 0 se non ci
  * riesce (errore fatale stampato).
  */
 typedef enum {
@@ -229,9 +232,11 @@ typedef struct {
     Str_t where;
     Str_t to;
     unsigned pos;
+    unsigned line;
+    unsigned answered;
 } HeirVisit_t;
 
-#define HEIRVISIT_INIT { HEIR_VISIT_NONE, STR_INIT, STR_INIT, 0U }
+#define HEIRVISIT_INIT { HEIR_VISIT_NONE, STR_INIT, STR_INIT, 0U, 0U, 0U }
 
 void heirvisit_free(HeirVisit_t *v);
 int cmd_heirs_visit(Repo_t *r, SharedEntry_t *e, GitBatch_t *b, int apply,

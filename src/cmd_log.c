@@ -321,6 +321,7 @@ static int run_log(const LogCtx_t *c, GitBatch_t *b, const char *ref,
     size_t na = 0U;
     Proc_t p;
     Str_t line = STR_INIT;
+    Str_t author = STR_INIT;
     Changes_t ch = { STR_INIT, STR_INIT, 0, 0 };
     LogLine_t l;
     Oid_t parent;
@@ -354,6 +355,10 @@ static int run_log(const LogCtx_t *c, GitBatch_t *b, const char *ref,
             }
             continue;
         }
+        /* l'autore lo scrive chi crea la versione (S-07) */
+        str_reset(&author);
+        str_add_printable(&author, l.author);
+        l.author = str_cstr(&author);
         root = !first_parent(&l, &parent);
         changes_of(b, &l.commit, (root != 0) ? NULL : &parent, &ch);
         if (c->porcelain != 0) {
@@ -368,6 +373,7 @@ static int run_log(const LogCtx_t *c, GitBatch_t *b, const char *ref,
     }
     str_free(&ch.creator);
     str_free(&ch.authority);
+    str_free(&author);
     str_free(&line);
     return rc;
 }
@@ -497,11 +503,9 @@ int cmd_log(int argc, char **argv)
         rc = GS_EXIT_ERROR;
         goto exit;
     }
-    str_reset(&ref);
-    str_addf(&ref, "refs/shared-authority/%s", c.e->id);
-    if (git_batch_query(&batch, str_cstr(&ref), &c.auth_tip) != GIT_OBJ_COMMIT) {
-        c.auth_tip.len = 0U;
-    }
+    /* AB-08: il segno "authority" solo sulla versione vista sull'autorita'
+     * di T, con la regola di status (D-112): la ricezione l'ha calcolata. */
+    c.auth_tip = rv.auth_tip;
     if (find_base(&repo, &batch, &c) != GS_OK) {
         c.base.len = 0U; /* solo un segno in meno */
     }

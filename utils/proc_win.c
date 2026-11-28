@@ -63,27 +63,83 @@ exit:
  * CreateProcess, che guarda prima la cartella corrente: un git.exe dentro
  * una repo verrebbe eseguito al posto di quello vero.
  */
+/* 1 se la voce di PATH lunga n e' un path assoluto: "C:\..." o "\\server". */
+static int path_entry_absolute(const wchar_t *d, size_t n)
+{
+    return ((n >= 3U) && iswalpha(d[0]) && (d[1] == L':') &&
+            ((d[2] == L'\\') || (d[2] == L'/'))) ||
+           ((n >= 2U) && (d[0] == L'\\') && (d[1] == L'\\'));
+}
+
+/*
+ * Le cartelle assolute del PATH, separate da ';'; NULL se non ce n'e'
+ * nessuna (C-10, S-13). SearchPathW con NULL userebbe l'ordine di sistema,
+ * che comprende la cartella corrente; una voce relativa (".", vuota) la
+ * rimetterebbe.
+ */
+static wchar_t *path_dirs(void)
+{
+    const wchar_t *path = _wgetenv(L"PATH");
+    const wchar_t *p;
+    const wchar_t *end;
+    wchar_t *out;
+    size_t n;
+    size_t len = 0U;
+
+    if (path == NULL) {
+        return NULL;
+    }
+    out = xmalloc((wcslen(path) + 1U) * sizeof *out);
+    for (p = path; *p != L'\0'; p = (*end == L';') ? (end + 1) : end) {
+        end = wcschr(p, L';');
+        end = (end != NULL) ? end : (p + wcslen(p));
+        n = (size_t)(end - p);
+        if ((n > 0U) && (p[0] == L'"') && (p[n - 1U] == L'"') && (n >= 2U)) {
+            p++; /* voce tra virgolette */
+            n -= 2U;
+        }
+        if (path_entry_absolute(p, n)) {
+            if (len > 0U) {
+                out[len++] = L';';
+            }
+            memcpy(out + len, p, n * sizeof *out);
+            len += n;
+        }
+    }
+    out[len] = L'\0';
+    if (len == 0U) {
+        free(out);
+        out = NULL;
+    }
+    return out;
+}
+
 static wchar_t *find_in_path(const char *name)
 {
     Str_t file = STR_INIT;
     wchar_t *wfile;
+    wchar_t *dirs = path_dirs();
     wchar_t *found = NULL;
     DWORD n;
 
+    if (dirs == NULL) {
+        return NULL; /* nessun PATH: git non si cerca altrove */
+    }
     str_add(&file, name);
     if (strchr(name, '.') == NULL) {
         str_add(&file, ".exe");
     }
     wfile = win_utf8_to_wide(str_cstr(&file));
-    n = SearchPathW(_wgetenv(L"PATH"), wfile, NULL, 0, NULL, NULL);
+    n = SearchPathW(dirs, wfile, NULL, 0, NULL, NULL);
     if (n > 0U) {
         found = xmalloc((size_t)n * sizeof *found);
-        if (SearchPathW(_wgetenv(L"PATH"), wfile, NULL, n, found, NULL) == 0U) {
+        if (SearchPathW(dirs, wfile, NULL, n, found, NULL) == 0U) {
             free(found);
             found = NULL;
         }
     }
     free(wfile);
+    free(dirs);
     str_free(&file);
     return found;
 }

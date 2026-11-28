@@ -15,7 +15,9 @@
  * quell'URL e' l'autorita' di T (oggi il creatore).
  *
  * Nei comandi di rete GIT_TERMINAL_PROMPT=0 (D-112, P-07): un push senza
- * permessi e' un rifiuto, non una richiesta di password.
+ * permessi e' un rifiuto, non una richiesta di password. Nemmeno GCM o ssh
+ * chiedono qualcosa (S-10), e i fetch controllano gli oggetti
+ * (transfer.fsckObjects) con un limite di velocita' http (S-09).
  *
  * Il trasporto e' quello di git (push, fetch, credenziali, permessi):
  * nessun server nostro. Nessun dato locale va in remoto: solo la catena.
@@ -53,7 +55,10 @@ typedef enum {
 /*
  * 1 se un URL scritto da altri (nella catena) si puo' usare (D-107): non
  * vuoto, al piu' GS_PATH_MAX caratteri, senza '-' in testa (diventerebbe
- * un'opzione di git) ne' caratteri di controllo.
+ * un'opzione di git) ne' caratteri di controllo. Solo caratteri
+ * stampabili, e fuori dall'ASCII solo in un path locale (S-07,
+ * str_char_printable): un URL di rete si mostra all'utente, che non deve
+ * poterlo scambiare con un altro (bidi, omoglifi).
  */
 int remote_url_ok(const char *url);
 
@@ -95,6 +100,18 @@ eGsErr_t remote_arg_url(const char *top, const char *cwd, const char *arg,
  * Windows senza distinzione di maiuscole.
  */
 int remote_same(const char *a, const char *b);
+
+/*
+ * Come remote_same, ma per le decisioni di sicurezza (S-06): quale
+ * autorita' vale senza accettazione (auth.h), chi e' un erede (heirs.h).
+ * Per gli hosting noti (github.com, gitlab.com, bitbucket.org,
+ * codeberg.org) e' la stessa forma; per gli altri contano anche il
+ * trasporto, l'utente di ssh, una porta diversa da quella di default,
+ * maiuscole e ".git" del path: ssh://host:2222/x e https://host/x, o
+ * alice@host:repo e bob@host:repo, possono essere repo diverse. Un IPv6 si
+ * legge fino alla ']' (B-SA1). Path locali come remote_same.
+ */
+int remote_same_strict(const char *a, const char *b);
 
 /*
  * 1 se a e b sono della stessa casata (D-114): la forma normale senza

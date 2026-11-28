@@ -12,6 +12,9 @@
 #define GS_SOVEREIGN_MAX 16U /* sovrani nella voce "sovereigns" (D-111) */
 #define GS_ID_HEX_LEN 32U   /* cifre esadecimali dell'ID (128 bit, D-006) */
 #define GS_ID_RAW_LEN 16U   /* byte dell'ID */
+/* Versioni lette al piu' quando si risale una catena ricevuta senza una
+ * versione comune con T (B-SA5): la storia la sceglie chi l'ha scritta. */
+#define GS_SCAN_MAX   10000U
 
 /* Oid: 20 byte con SHA-1, 32 con SHA-256 (D-033). Tenuti in binario. */
 #define GS_OID_RAW_SHA1 20U

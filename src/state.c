@@ -331,7 +331,9 @@ eGsErr_t state_derive(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b,
         goto exit;
     }
 
-    err = chain_blobs(b, e->id, &chain);
+    /* C-26: la catena da T letta sopra (hex), non di nuovo dal nome della
+     * ref: un peer che invia nel frattempo la sposterebbe. */
+    err = chain_blobs_ref(b, hex, &chain);
     if ((err != GS_OK) || (chain.n == 0U)) {
         goto exit;
     }

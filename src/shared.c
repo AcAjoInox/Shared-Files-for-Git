@@ -243,10 +243,26 @@ int shared_id_is_valid(const char *s)
 /* Path relativo (D-003): non vuoto, senza '/' o '\' iniziale ne' "C:". */
 static int path_is_valid(const Str_t *p)
 {
+    const unsigned char *c = (const unsigned char *)str_cstr(p);
     const char *s = str_cstr(p);
 
-    return (s[0] != '\0') && (s[0] != '/') && (s[0] != '\\') &&
-           (s[1] != ':') && (p->len <= GS_PATH_MAX);
+    if ((s[0] == '\0') || (s[0] == '/') || (s[0] == '\\') || (s[1] == ':') ||
+        (p->len > GS_PATH_MAX) || shared_path_reserved(s)) {
+        return 0;
+    }
+    /* C-08: un carattere di controllo (un a capo) sfaserebbe domande e
+     * risposte di cat-file --batch */
+    for (; *c != 0U; c++) {
+        if ((*c < 0x20U) || (*c == 0x7FU)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+int shared_path_reserved(const char *path)
+{
+    return strcmp(path, ".gitshared") == 0;
 }
 
 eGsErr_t shared_new_id(char id[GS_ID_HEX_LEN + 1U])
@@ -771,7 +787,9 @@ static eGsErr_t copy_branches(const Repo_t *r, SharedEntry_t *e,
  * (codice 5) non e' un errore, cosi' il completamento si puo' ripetere. */
 static eGsErr_t config_unset(const char *id, const char *field)
 {
-    const char *args[] = { "config", "--unset", NULL, NULL };
+    /* --unset-all (C-09): con --unset il codice 5 vuol dire sia "chiave
+     * assente" sia "piu' righe", e due righe non si toglierebbero mai. */
+    const char *args[] = { "config", "--unset-all", NULL, NULL };
     Str_t key = STR_INIT;
     Str_t out = STR_INIT;
     int code = 0;
@@ -902,6 +920,7 @@ static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
     size_t n;
     size_t k;
     int sovereign = 0;
+    unsigned left = 0U; /* peer rimasti fuori per il limite (B-38) */
     eGsErr_t err = copy_branches(r, e, committed);
 
     if (err != GS_OK) {
@@ -958,14 +977,25 @@ static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
         msg_warning(MSG_WARN_PEER_UNREACHABLE, str_cstr(&committed->path),
                     str_cstr(&e->pending_src));
     }
-    str_addz(&found, str_cstr(&e->pending_src));
+    /* B-38: la sorgente per prima, poi i suoi peer finche' c'e' posto. Il
+     * gruppo cresciuto tra il comando (che l'ha controllato) e il commit
+     * non lascia un'attesa che non si chiude piu': i peer in piu' restano
+     * fuori, e lo si dice. */
+    str_reset(&del);
+    str_addz(&del, str_cstr(&e->pending_src));
+    for (p = str_znext(&found, NULL); p != NULL; p = str_znext(&found, p)) {
+        if (!str_zhas(&del, p)) {
+            str_addz(&del, p);
+        }
+    }
+    str_reset(&found);
+    str_addn(&found, del.buf, del.len);
+    str_reset(&del);
     for (p = str_znext(&found, NULL); (p != NULL) && (err == GS_OK);
          p = str_znext(&found, p)) {
         if (!str_eq(&r->top, p) && !str_zhas(&e->peers, p)) {
             if (str_zcount(&e->peers) >= GS_PEER_MAX) {
-                msg_error(MSG_ERR_TOO_MANY_PEERS, str_cstr(&committed->path),
-                          GS_PEER_MAX);
-                err = GS_ERR_USAGE;
+                left++;
             } else {
                 /* aggiunge senza duplicare, anche se ripetuto */
                 const char *add[] = { "config", "--replace-all", "--fixed-value",
@@ -983,10 +1013,14 @@ static eGsErr_t complete_link(const Repo_t *r, SharedEntry_t *e,
     if (err != GS_OK) {
         goto exit;
     }
+    if (left > 0U) {
+        msg_warning(MSG_WARN_PEERS_LEFT_OUT, str_cstr(&committed->path), left,
+                    GS_PEER_MAX);
+    }
 
     /* 3. Annuncio: ogni peer aggiunge questa repo ai propri (REQ-F-002).
      * Un peer irraggiungibile non blocca (REQ-F-008, B-07). */
-    peers_announce(e->id, &e->peers, str_cstr(&r->top), &tally);
+    peers_announce(str_cstr(&e->path), e->id, &e->peers, str_cstr(&r->top), &tally);
 
     /* 4. Versioni pubblicate tra il comando e il commit (D-100): chi le ha
      * pubblicate non conosceva ancora questa repo e non l'ha avvisata. Per

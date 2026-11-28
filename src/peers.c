@@ -59,10 +59,40 @@ eGsErr_t peers_of(const char *repo, const char *id, Str_t *out)
     return err;
 }
 
+/*
+ * Un fetch o un push verso il peer e' fallito (C-14): se la repo c'e', il
+ * motivo e' un altro (non ha il file, la ref e' bloccata): `exists` lo
+ * dice; altrimenti "not reachable".
+ */
+static void peer_failed(const char *label, const char *peer, eMsgId_t exists)
+{
+    msg_warning(peers_repo_exists(peer) ? exists : MSG_WARN_PEER_UNREACHABLE, label,
+                peer);
+}
+
 void peers_incoming_ref(Str_t *ref, const char *id, unsigned k)
 {
     str_reset(ref);
     str_addf(ref, "refs/shared-incoming/%s/%u", id, k);
+}
+
+void peers_tmp_ref(Str_t *ref, const char *id)
+{
+    static char tag[9] = "";
+    static const char digits[] = "0123456789abcdef";
+    uint8_t raw[4] = { 0U, 0U, 0U, 0U };
+    size_t k;
+
+    if (tag[0] == '\0') {
+        (void)sys_random(raw, sizeof raw); /* se fallisce: tutti zero */
+        for (k = 0U; k < sizeof raw; k++) {
+            tag[2U * k] = digits[raw[k] >> 4U];
+            tag[(2U * k) + 1U] = digits[raw[k] & 0x0FU];
+        }
+        tag[8] = '\0';
+    }
+    str_reset(ref);
+    str_addf(ref, "refs/shared-incoming/%s/t%s", id, tag);
 }
 
 void peers_push(const char *label, const char *id, const Str_t *peers,
@@ -107,7 +137,7 @@ void peers_push(const char *label, const char *id, const Str_t *peers,
             msg_error(MSG_ERR_PEER_REJECTED, label, peer);
         } else {
             t->unreachable++;
-            msg_warning(MSG_WARN_PEER_UNREACHABLE, label, peer);
+            peer_failed(label, peer, MSG_WARN_PEER_NOT_UPDATED);
         }
         str_reset(&out);
     }
@@ -152,7 +182,7 @@ void peers_fetch(const char *label, const char *id, const Str_t *peers,
             t->ok++;
         } else {
             t->unreachable++;
-            msg_warning(MSG_WARN_PEER_UNREACHABLE, label, peer);
+            peer_failed(label, peer, MSG_WARN_PEER_NO_CHAIN);
         }
     }
     str_free(&out);
@@ -380,8 +410,8 @@ void peers_forget(const char *label, const char *id, const Str_t *peers,
     free(jobs);
 }
 
-void peers_announce(const char *id, const Str_t *peers, const char *self,
-                    PeerTally_t *t)
+void peers_announce(const char *label, const char *id, const Str_t *peers,
+                    const char *self, PeerTally_t *t)
 {
     /* --replace-all --fixed-value: sostituisce la riga uguale a self o la
      * aggiunge se manca. Un processo per peer, nessun duplicato. */
@@ -415,7 +445,7 @@ void peers_announce(const char *id, const Str_t *peers, const char *self,
             t->ok++;
         } else {
             t->unreachable++;
-            msg_warning(MSG_WARN_PEER_UNREACHABLE, id, peer);
+            msg_warning(MSG_WARN_PEER_UNREACHABLE, label, peer);
         }
     }
     str_free(&out);

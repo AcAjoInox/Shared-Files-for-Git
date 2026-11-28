@@ -46,10 +46,13 @@ DESCRIPTION
 REMOTE (BETA)
     With <url> <id> you link a file shared through a remote (see
     'git shared push --help'): <url> is its creator, or a repository
-    that has a copy; <id> is the ID of the file, which 'git shared status'
-    shows in every repository that uses it. Only the version chain is
-    fetched, not the project. The default destination is the name of
-    the file.
+    that has a copy, also as the name of a remote of this repository or
+    as a path relative to the current folder; <id> is the ID of the file,
+    which 'git shared status' shows in every repository that uses it.
+    Only the version chain is fetched, not the project. The default
+    destination is the name of the file, written in the chain by whoever
+    published it: it is used only if it is a plain file name (no folders,
+    not starting with '.'); otherwise give the destination.
 
     This repository becomes nobody's peer and the creator records
     nothing: new versions come from the creator with 'git shared pull',

@@ -107,13 +107,24 @@ int cmd_pull(int argc, char **argv)
                           ? MSG_ERR_CREATOR_MISSING
                           : MSG_ERR_CREATOR_UNREACHABLE,
                       label, auth_role(sov[i]), str_cstr(&urls[i]));
+            if ((res[i] == (unsigned char)REMOTE_MISSING) &&
+                (visit.kind != HEIR_VISIT_OTHER)) {
+                /* AB-07: risponde, ma il file non c'e' piu': un incidente
+                 * o un dirottamento, non per forza un'autorita' morta */
+                msg_error(MSG_ERR_AUTH_NO_FILE, label, auth_role(sov[i]));
+            }
             if (visit.kind == HEIR_VISIT_OTHER) {
                 msg_error(MSG_ERR_HEIR_OTHER, label, str_cstr(&visit.where),
                           str_cstr(&visit.to), str_cstr(&visit.to), label);
             } else if (visit.kind == HEIR_VISIT_CREATOR) {
                 msg_error(MSG_ERR_CREATOR_BACK, label, str_cstr(&visit.where), label);
+            } else if ((visit.kind == HEIR_VISIT_NONE) && (visit.line == 0U)) {
+                msg_error(MSG_ERR_HEIRS_EMPTY, label, label, label);
+            } else if ((visit.kind == HEIR_VISIT_NONE) && (visit.answered == 0U)) {
+                msg_error(MSG_ERR_HEIRS_SILENT, label, visit.line, label, label);
             } else if (visit.kind == HEIR_VISIT_NONE) {
-                msg_error(MSG_ERR_HEIRS_NONE, label, label, label);
+                msg_error(MSG_ERR_HEIRS_STILL, label, visit.answered, visit.line,
+                          label, label);
             } else {
                 /* errore gia' detto */
             }

@@ -152,13 +152,14 @@ cd "$TRASH/R" || exit 1
 TR=$(tip R)
 run git shared pull
 expect_rc "nessun erede incoronato: codice 1" 1
-expect_err "nessun erede incoronato: lo dice" "the authority and its heirs are unreachable"
+expect_err "nessun erede incoronato: lo dice (AB-07)" "2 of 2 addresses of the line of succession answer, none has taken over"
 expect_err "nessun erede incoronato: crown <url>" "git shared crown <url> p.h"
 expect_err "nessun erede incoronato: crown della propria repo" "or your own remote:  'git shared crown p.h'"
 expect_eq "nessun erede incoronato: T non cambia" "$(tip R)" "$TR"
 run git shared status --remote --porcelain
 expect_out "creatore morto, porcelain: unreachable" "unreachable $ID $A"
 expect_out "creatore morto, porcelain: nessuno al suo posto" "succession $ID none 0 "
+expect_out "creatore morto, porcelain: due eredi rispondono (AB-07)" "succession-answer $ID 2 2"
 expect_out "creatore morto, porcelain: heir 1" "heir $ID 1 $B"
 run git shared crown --yes p.h
 expect_rc "crown senza URL e senza origin: codice 1" 1

@@ -3,6 +3,7 @@
  */
 #include "str.h"
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -104,6 +105,64 @@ const char *str_cstr(const Str_t *s)
 int str_eq(const Str_t *s, const char *p)
 {
     return strcmp(str_cstr(s), p) == 0;
+}
+
+/* 1 se il punto di codice non si stampa: C1, bidi, invisibili, surrogati. */
+static int cp_hidden(uint32_t cp)
+{
+    return (cp <= 0x9FUL) || (cp == 0x61CUL) ||
+           ((cp >= 0x200BUL) && (cp <= 0x200FUL)) ||
+           ((cp >= 0x2028UL) && (cp <= 0x202EUL)) ||
+           ((cp >= 0x2066UL) && (cp <= 0x2069UL)) || (cp == 0xFEFFUL) ||
+           ((cp >= 0xD800UL) && (cp <= 0xDFFFUL)) || (cp > 0x10FFFFUL);
+}
+
+size_t str_char_printable(const char *p)
+{
+    static const uint32_t min_cp[5] = { 0UL, 0UL, 0x80UL, 0x800UL, 0x10000UL };
+    const unsigned char *u = (const unsigned char *)p;
+    uint32_t cp;
+    size_t n;
+    size_t k;
+
+    if (u[0] < 0x80U) {
+        return ((u[0] >= 0x20U) && (u[0] != 0x7FU)) ? 1U : 0U;
+    }
+    if ((u[0] & 0xE0U) == 0xC0U) {
+        n = 2U;
+        cp = (uint32_t)(u[0] & 0x1FU);
+    } else if ((u[0] & 0xF0U) == 0xE0U) {
+        n = 3U;
+        cp = (uint32_t)(u[0] & 0x0FU);
+    } else if ((u[0] & 0xF8U) == 0xF0U) {
+        n = 4U;
+        cp = (uint32_t)(u[0] & 0x07U);
+    } else {
+        return 0U;
+    }
+    for (k = 1U; k < n; k++) {
+        if ((u[k] & 0xC0U) != 0x80U) { /* anche il byte nullo */
+            return 0U;
+        }
+        cp = (cp << 6U) | (uint32_t)(u[k] & 0x3FU);
+    }
+    return ((cp < min_cp[n]) || cp_hidden(cp)) ? 0U : n;
+}
+
+void str_add_printable(Str_t *s, const char *p)
+{
+    size_t n;
+
+    while (*p != '\0') {
+        n = str_char_printable(p);
+        if (n == 0U) {
+            str_addch(s, '?');
+            p++;
+        } else {
+            str_addn(s, p, n);
+            p += n;
+        }
+    }
 }
 
 void str_setlen(Str_t *s, size_t len)

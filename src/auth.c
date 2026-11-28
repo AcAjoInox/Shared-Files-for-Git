@@ -23,6 +23,7 @@
 #define AUTH_CACHE 8U
 static Oid_t cache_blob[AUTH_CACHE];
 static Str_t cache_text[AUTH_CACHE];
+static unsigned long cache_size[AUTH_CACHE]; /* dimensione del blob */
 static size_t cache_n = 0U;
 static size_t cache_next = 0U;
 
@@ -92,12 +93,18 @@ eGsErr_t auth_blob_text(GitBatch_t *b, const Oid_t *blob, unsigned long max,
     const char *args[] = { "cat-file", "blob", NULL, NULL };
     char hex[OID_HEX_SIZE];
     Oid_t got;
+    unsigned long size;
     size_t k;
     eGsErr_t err;
 
     str_reset(out);
     for (k = 0U; k < cache_n; k++) {
         if (oid_eq(&cache_blob[k], blob)) {
+            /* B-SA2: il limite vale anche per un blob gia' letto con un
+             * limite piu' largo (heirs, poi creator) */
+            if (cache_size[k] > max) {
+                return GS_ERR_FORMAT;
+            }
             str_addn(out, str_cstr(&cache_text[k]), cache_text[k].len);
             return GS_OK;
         }
@@ -107,10 +114,17 @@ eGsErr_t auth_blob_text(GitBatch_t *b, const Oid_t *blob, unsigned long max,
     if ((git_batch_query(b, hex, &got) != GIT_OBJ_BLOB) || (b->size > max)) {
         return GS_ERR_FORMAT;
     }
+    size = (unsigned long)b->size;
     args[2] = hex;
     err = git_run(args, 0U, out);
     /* un byte nullo accorcerebbe il testo */
     if ((err == GS_OK) && (strlen(str_cstr(out)) != out->len)) {
+        err = GS_ERR_FORMAT;
+    }
+    /* B-SA6: git_run toglie tutti i fine riga finali; la forma scritta da
+     * git shared ne ha uno solo, "\n". Un blob "url\n\n\r\n" e' un'altra
+     * forma della stessa voce: non vale. */
+    if ((err == GS_OK) && (((unsigned long)out->len + 1UL) != size)) {
         err = GS_ERR_FORMAT;
     }
     if (err != GS_OK) {
@@ -120,6 +134,7 @@ eGsErr_t auth_blob_text(GitBatch_t *b, const Oid_t *blob, unsigned long max,
     k = (cache_n < AUTH_CACHE) ? cache_n++ : cache_next;
     cache_next = (k + 1U) % AUTH_CACHE;
     cache_blob[k] = *blob;
+    cache_size[k] = size;
     str_reset(&cache_text[k]);
     str_addn(&cache_text[k], str_cstr(out), out->len);
     return GS_OK;
@@ -198,13 +213,14 @@ const char *auth_authority(const Auth_t *a)
     return (last != NULL) ? last : str_cstr(&a->creator);
 }
 
-/* Due URL, anche vuoti: "" e' uguale solo a "". */
+/* Due URL, anche vuoti: "" e' uguale solo a "". Confronto stretto (S-06):
+ * decide se un cambio di autorita' si accetta. */
 static int url_same(const char *x, const char *y)
 {
     if ((*x == '\0') || (*y == '\0')) {
         return (*x == '\0') && (*y == '\0');
     }
-    return remote_same(x, y);
+    return remote_same_strict(x, y);
 }
 
 eGsErr_t auth_target(GitBatch_t *b, const Oid_t *v, Str_t *url, int *sovereign)

@@ -153,7 +153,7 @@ static int relocate_self(Repo_t *r, const char *old, int copy)
                 str_addz(&e->peers, old);
             }
             n = (unsigned)str_zcount(&e->peers);
-            peers_announce(e->id, &e->peers, top, &tally);
+            peers_announce(label_of(e), e->id, &e->peers, top, &tally);
             printf(msg(MSG_RELOCATE_COPY), label_of(e), tally.ok, n);
         }
         putchar('\n');

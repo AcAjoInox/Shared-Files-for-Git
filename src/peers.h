@@ -53,9 +53,19 @@ void peers_fetch(const char *label, const char *id, const Str_t *peers,
 /* Ref temporanea del peer k: refs/shared-incoming/<id>/<k>. */
 void peers_incoming_ref(Str_t *ref, const char *id, unsigned k);
 
-/* Scrive `self` tra i peer di ogni peer (senza duplicati). */
-void peers_announce(const char *id, const Str_t *peers, const char *self,
-                    PeerTally_t *t);
+/*
+ * Ref temporanea di questo processo: refs/shared-incoming/<id>/t<8 cifre
+ * esadecimali casuali, le stesse per tutto il processo>. Per crown e push
+ * (B-SA3): con l'indice 0, due comandi sullo stesso ID in parallelo si
+ * cancellerebbero la ref a vicenda, e quella di un link in attesa. prune
+ * la toglie se resta.
+ */
+void peers_tmp_ref(Str_t *ref, const char *id);
+
+/* Scrive `self` tra i peer di ogni peer (senza duplicati). label: il
+ * file, nei messaggi (C-14). */
+void peers_announce(const char *label, const char *id, const Str_t *peers,
+                    const char *self, PeerTally_t *t);
 
 /* Toglie `self` dai peer di ogni peer (unlink, REQ-F-003). Un peer che
  * non lo conosceva gia' piu' non e' un errore. */

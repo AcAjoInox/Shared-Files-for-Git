@@ -135,6 +135,10 @@ void branchnames_free(BranchNames_t *bn);
 /* 1 se s e' un ID valido: 32 cifre esadecimali minuscole (D-006). */
 int shared_id_is_valid(const char *s);
 
+/* 1 se path (relativo alla radice) non puo' essere un file shared:
+ * .gitshared stesso (B-36). */
+int shared_path_reserved(const char *path);
+
 /* Nuovo ID casuale: UUID v4 in 32 cifre esadecimali minuscole (D-006). */
 eGsErr_t shared_new_id(char id[GS_ID_HEX_LEN + 1U]);
 

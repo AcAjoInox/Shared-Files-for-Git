@@ -58,6 +58,10 @@ int cmd_set(int argc, char **argv)
     if (cmd_resolve_tracked(NULL, argv[first], &full) != GS_OK) {
         goto exit;
     }
+    if (shared_path_reserved(str_cstr(&full))) {
+        msg_error(MSG_ERR_PATH_RESERVED, str_cstr(&full)); /* B-36 */
+        goto exit;
+    }
     e = repo_find_path(&repo, str_cstr(&full));
     if ((e != NULL) && e->valid && !e->in_config) {
         /* dichiarato ma scollegato: si riprende con il suo ID (D-079) */

@@ -3,6 +3,7 @@
  */
 #include "cmd_common.h"
 
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -194,6 +195,7 @@ eGsErr_t cmd_write_gitshared(const Repo_t *r, const char *name,
     const char *args[] = { "config", "-f", NULL, NULL, NULL, NULL, NULL };
     Str_t file = STR_INIT;
     Str_t key = STR_INIT;
+    Str_t tmp = STR_INIT;
     FILE *f;
     int created = 0;
     int put_rc;
@@ -205,16 +207,22 @@ eGsErr_t cmd_write_gitshared(const Repo_t *r, const char *name,
     if (f != NULL) {
         (void)fclose(f);
     } else {
-        f = sys_fopen(str_cstr(&file), "wb");
+        /* C-18: l'intestazione in un file nuovo, poi rinominato: un
+         * .gitshared con il solo commento non esiste mai. (".lock" e' il
+         * lock di git config.) */
+        str_addf(&tmp, "%s/.gitshared.new", str_cstr(&r->top));
+        f = sys_fopen(str_cstr(&tmp), "wb");
         if (f == NULL) {
             goto exit;
         }
-        created = 1;
         put_rc = fputs(gitshared_header, f);
         close_rc = fclose(f);
-        if ((put_rc < 0) || (close_rc != 0)) {
+        if ((put_rc < 0) || (close_rc != 0) ||
+            (sys_rename(str_cstr(&tmp), str_cstr(&file)) != 0)) {
+            (void)sys_remove(str_cstr(&tmp));
             goto exit;
         }
+        created = 1;
     }
 
     args[2] = str_cstr(&file);
@@ -250,6 +258,7 @@ exit:
     if ((err != GS_OK) && (created != 0)) {
         (void)sys_remove(str_cstr(&file));
     }
+    str_free(&tmp);
     str_free(&key);
     str_free(&file);
     return err;
@@ -299,6 +308,7 @@ eGsErr_t cmd_resolve_tracked(const char *dir, const char *path, Str_t *full)
     const char *line;
     const char *tab;
     size_t rec_len;
+    int code = 0;
     eGsErr_t err = GS_ERR_USAGE;
 
     if (strchr(path, '\n') != NULL) {
@@ -316,9 +326,15 @@ eGsErr_t cmd_resolve_tracked(const char *dir, const char *path, Str_t *full)
         goto exit;
     }
     args[8] = path;
-    if (git_run(args, 0U, &out) != GS_OK) {
+    if (git_capture(args, 0U, &out, &code) != GS_OK) {
         msg_fatal(MSG_ERR_PROC, "git ls-files");
         err = GS_ERR_GIT;
+        goto exit;
+    }
+    str_trim_eol(&out); /* come faceva git_run */
+    if (code != 0) {
+        /* C-14: git e' partito e ha rifiutato il path (fuori dalla repo) */
+        msg_error(MSG_ERR_PATH_OUTSIDE, path);
         goto exit;
     }
     /* Record: "<modo> <oid> <stage>\t<path>\0"; piu' record = stage di
@@ -428,6 +444,9 @@ int cmd_has_local_changes(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b
     Oid_t h;
     Oid_t i;
     int local = 1; /* nel dubbio, il lavoro dell'utente si protegge */
+    size_t base = 0U;
+    size_t k;
+    int found = 0;
 
     /* 1. Working tree diverso dall'index: modifica non in staging. */
     if (cmd_worktree_differs(r, path)) {
@@ -445,10 +464,22 @@ int cmd_has_local_changes(const Repo_t *r, const SharedEntry_t *e, GitBatch_t *b
         local = 0;
         goto exit;
     }
-    /* 4. Index uguale a una versione della catena: e' un update applicato
-     * e non committato, non lavoro dell'utente (D-076). */
+    /* 4. Index uguale a una versione della catena piu' recente della base:
+     * e' un update applicato e non committato, non lavoro dell'utente
+     * (D-076). Uguale alla base o a una versione piu' vecchia e' un revert
+     * voluto, e si protegge (B-43). Senza base, come prima: basta che sia
+     * una versione. */
     if ((chain_blobs(b, e->id, &chain) == GS_OK) && oidlist_has(&chain, &i)) {
-        local = 0;
+        if ((state_find_base(r, path, &e->old_paths, &chain, &base, &found) == GS_OK) &&
+            (found != 0)) {
+            for (k = 0U; (k < base) && (local != 0); k++) {
+                if (oid_eq(&chain.v[k], &i)) {
+                    local = 0;
+                }
+            }
+        } else {
+            local = 0;
+        }
     }
 
 exit:
@@ -636,14 +667,17 @@ static void version_info(const Oid_t *v, Str_t *out)
 {
     const char *args[] = { "log", "-1", "--format=%h, %an, %as", NULL, NULL };
     char hex[OID_HEX_SIZE];
+    Str_t raw = STR_INIT;
 
     oid_to_hex(v, hex);
     args[3] = hex;
     str_reset(out);
-    if ((git_run(args, 0U, out) != GS_OK) || (out->len == 0U)) {
-        str_reset(out);
+    if ((git_run(args, 0U, &raw) != GS_OK) || (raw.len == 0U)) {
         str_add(out, hex);
+    } else {
+        str_add_printable(out, str_cstr(&raw)); /* l'autore (S-07) */
     }
+    str_free(&raw);
 }
 
 void cmd_auth_describe(const AuthChange_t *c, Str_t *from, Str_t *info)
@@ -711,10 +745,58 @@ void cmd_warn_suspended(const SharedEntry_t *e, BranchNames_t *bn)
     str_free(&list);
 }
 
+/* 1 se i due caratteri sono uguali per il file system: separatori uguali,
+ * e su Windows senza distinzione di maiuscole. */
+static int path_char_eq(char a, char b)
+{
+    if (((a == '/') || (a == '\\')) && ((b == '/') || (b == '\\'))) {
+        return 1;
+    }
+#ifdef _WIN32
+    return tolower((unsigned char)a) == tolower((unsigned char)b);
+#else
+    return a == b;
+#endif
+}
+
+/*
+ * C-13: un path assoluto dentro la repo vale come il path relativo alla
+ * radice, come per git (set lo passa a git). Fuori dalla repo: 0. *rest
+ * punta al resto dopo la radice.
+ */
+static int abs_in_repo(const Repo_t *r, const char *user_path, const char **rest)
+{
+    const char *top = str_cstr(&r->top);
+    size_t n = r->top.len;
+    size_t k;
+
+    while ((n > 1U) && ((top[n - 1U] == '/') || (top[n - 1U] == '\\'))) {
+        n--;
+    }
+    for (k = 0U; k < n; k++) {
+        if ((user_path[k] == '\0') || !path_char_eq(top[k], user_path[k])) {
+            return 0;
+        }
+    }
+    if ((user_path[n] != '\0') && (user_path[n] != '/') && (user_path[n] != '\\')) {
+        return 0; /* /repo2 non e' dentro /repo */
+    }
+    *rest = user_path + n;
+    return 1;
+}
+
 int cmd_repo_path(const Repo_t *r, const char *user_path, Str_t *out)
 {
-    return !path_is_absolute(user_path) &&
-           path_join_norm(str_cstr(&r->prefix), user_path, out);
+    const char *rest = NULL;
+    int ok;
+
+    if (path_is_absolute(user_path)) {
+        ok = abs_in_repo(r, user_path, &rest) && path_join_norm("", rest, out);
+    } else {
+        ok = path_join_norm(str_cstr(&r->prefix), user_path, out);
+    }
+    /* REQ-NF-011: anche un path scritto dall'utente al piu' GS_PATH_MAX */
+    return ok && (out->len <= GS_PATH_MAX);
 }
 
 int cmd_select(Repo_t *r, const char *user_path, unsigned char *sel)

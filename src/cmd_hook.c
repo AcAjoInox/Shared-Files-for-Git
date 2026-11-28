@@ -125,7 +125,8 @@ static void hook_warn(void)
                 if (st == STATE_TO_COMMIT) {
                     msg_warning(MSG_UPD_TO_COMMIT, str_cstr(&e->path));
                 } else {
-                    command = (st == STATE_TO_PUBLISH) ? "publish" : "update";
+                    command = msg((st == STATE_TO_PUBLISH) ? MSG_WORD_PUBLISH
+                                                           : MSG_WORD_UPDATE);
                     msg_warning(MSG_HOOK_NOT_ALIGNED, str_cstr(&e->path),
                                 state_name(st), command);
                 }

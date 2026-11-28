@@ -1625,7 +1625,7 @@ void fp_apply(FpReader_t *rd, FpPeer_t *peers, size_t n, FpChain_t *chains,
             str_add(&text, message);
         } else {
             str_addf(&text, msg(MSG_UPD_COMMIT_MSG),
-                     (napply == 1U) ? str_cstr(&pp->f[a].path) : "shared files");
+                     (napply == 1U) ? str_cstr(&pp->f[a].path) : msg(MSG_WORD_SHARED_FILES));
         }
         commit_cmd[3] = str_cstr(&text);
         phase_start(pp, commit_pre, 3U, commit_cmd, 5U, FP_APPLY, NULL);

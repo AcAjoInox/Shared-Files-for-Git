@@ -154,7 +154,7 @@ static void fetch_tip(Crown_t *c, const char *url, Oid_t *tip)
     Str_t out = STR_INIT;
 
     tip->len = 0U;
-    peers_incoming_ref(&ref, c->e->id, 0U);
+    peers_tmp_ref(&ref, c->e->id); /* B-SA3 */
     rp[3] = str_cstr(&ref);
     if ((remote_fetch(url, c->e->id, str_cstr(&ref)) == GS_OK) &&
         (git_run(rp, PROC_STDERR_NULL, &out) == GS_OK) &&
@@ -176,7 +176,7 @@ static void drop_tmp(const Crown_t *c)
     Str_t ref = STR_INIT;
     Str_t del = STR_INIT;
 
-    peers_incoming_ref(&ref, c->e->id, 0U);
+    peers_tmp_ref(&ref, c->e->id); /* B-SA3 */
     str_addz(&del, str_cstr(&ref));
     (void)git_delete_refs(&del);
     str_free(&del);
@@ -594,14 +594,14 @@ static int revive(Crown_t *c, const char *url)
             str_addz(&drop, k);
         }
     }
+    /* S-12, B-SA4: si accetta il valore rifiutato, che ha il creatore
+     * (autorita' TAB creatore) se cambiava anche lui: scritto con l'URL
+     * dell'utente varrebbe per qualunque creatore. record toglie il
+     * rifiuto. */
     for (k = str_znext(&drop, NULL); k != NULL; k = str_znext(&drop, k)) {
-        if (repo_auth_drop(c->e->id, 0, k) != GS_OK) {
+        if (record(c->e, 1, k) != GS_OK) {
             goto exit;
         }
-        zremove(&c->e->auth_rejected, k);
-    }
-    if (record(c->e, 1, url) != GS_OK) {
-        goto exit;
     }
     printf(msg(MSG_CROWN_ACCEPTED), str_cstr(&c->e->path), url);
     putchar('\n');
@@ -733,6 +733,9 @@ static int visit_one(Crown_t *c, const char *url, const Auth_t *ta,
     int found = 0;
 
     fetch_tip(c, url, &u);
+    if ((c->batch_ok != 0) && (u.len > 0U)) {
+        out->answered++;
+    }
     if ((c->batch_ok == 0) || (u.len == 0U) ||
         (auth_of(c->b, &u, &au, NULL) != GS_OK) || !auth_creator_same(ta, &au) ||
         merge_is_ancestor(&u, &c->t)) {
@@ -789,6 +792,8 @@ int cmd_heirs_visit(Repo_t *r, SharedEntry_t *e, GitBatch_t *b, int apply,
     str_reset(&out->to);
     out->kind = HEIR_VISIT_NONE;
     out->pos = 0U;
+    out->line = 0U;
+    out->answered = 0U;
     c.r = r;
     c.e = e;
     c.b = b;
@@ -804,6 +809,7 @@ int cmd_heirs_visit(Repo_t *r, SharedEntry_t *e, GitBatch_t *b, int apply,
         goto exit;
     }
     heirs_order(&ta, &h, &order);
+    out->line = (unsigned)str_zcount(&order);
     for (url = str_znext(&order, NULL); url != NULL; url = str_znext(&order, url)) {
         if (visit_one(&c, url, &ta, &h, &order, apply, out)) {
             goto exit;

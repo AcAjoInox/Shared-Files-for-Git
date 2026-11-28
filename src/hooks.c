@@ -298,6 +298,12 @@ static eGsErr_t sync_range(const Repo_t *r, size_t first, size_t last)
     if (err != GS_OK) {
         msg_warning(MSG_WARN_HOOK, "hooks");
     }
+    /* C-04: senza la cartella (una repo creata senza template, o un
+     * core.hooksPath nuovo) si crea, invece di fermarsi al primo hook.
+     * Un mkdir che fallisce lo dice il primo hook. */
+    if ((err == GS_OK) && !sys_is_dir(str_cstr(&dir))) {
+        (void)sys_mkdir(str_cstr(&dir));
+    }
     for (i = first; (err == GS_OK) && (i <= last); i++) {
         str_reset(&path);
         str_addf(&path, "%s/%s", str_cstr(&dir), hooks[i].event);

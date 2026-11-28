@@ -39,6 +39,7 @@
  * membership, il creatore non registra nulla. Vale anche come ri-aggancio
  * dopo un clone, con l'URL di origin (ideeRemote §4.4).
  */
+#include <ctype.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -76,6 +77,33 @@ static void source_free(Source_t *s)
     repo_close(&s->shared);
 }
 
+#ifdef _WIN32
+/* La voce con il path uguale senza distinzione di maiuscole (ASCII), se e'
+ * una sola; NULL altrimenti. */
+static const SharedEntry_t *find_path_nocase(const Repo_t *r, const char *path)
+{
+    const SharedEntry_t *hit = NULL;
+    const char *a;
+    const char *b;
+    size_t i;
+    unsigned n = 0U;
+
+    for (i = 0U; i < r->n; i++) {
+        a = str_cstr(&r->v[i].path);
+        b = path;
+        while ((*a != '\0') && (tolower((unsigned char)*a) == tolower((unsigned char)*b))) {
+            a++;
+            b++;
+        }
+        if ((*a == '\0') && (*b == '\0')) {
+            hit = &r->v[i];
+            n++;
+        }
+    }
+    return (n == 1U) ? hit : NULL;
+}
+#endif
+
 /* Risale dalla path del file alla repo sorgente e alla sua voce (D-005). */
 static const SharedEntry_t *find_source(const Repo_t *r, const char *user_path,
                                         Source_t *s)
@@ -106,6 +134,17 @@ static const SharedEntry_t *find_source(const Repo_t *r, const char *user_path,
     str_addf(&file, "%s/.gitshared", str_cstr(&s->top));
     if (repo_load_gitshared(&s->shared, str_cstr(&file), 0, 0) == GS_OK) {
         e = repo_find_path(&s->shared, str_cstr(&s->rel));
+#ifdef _WIN32
+        /* C-12: il file system di Windows non distingue le maiuscole:
+         * COMMON.H e' common.h, se e' l'unico con quel nome. */
+        if (e == NULL) {
+            e = find_path_nocase(&s->shared, str_cstr(&s->rel));
+        }
+        if (e != NULL) {
+            str_reset(&s->rel);
+            str_add(&s->rel, str_cstr(&e->path)); /* il path dichiarato */
+        }
+#endif
     }
     if ((e == NULL) || !e->valid) {
         msg_error(MSG_ERR_SRC_NOT_SHARED, user_path); /* D-019 */
@@ -130,6 +169,7 @@ static void version_name(const Oid_t *v, const char *id, Str_t *name)
     const char *args[] = { "cat-file", "commit", NULL, NULL };
     char hex[OID_HEX_SIZE];
     Str_t out = STR_INIT;
+    Str_t raw = STR_INIT;
     const char *subj;
     const char *end;
 
@@ -142,13 +182,39 @@ static void version_name(const Oid_t *v, const char *id, Str_t *name)
             (strncmp(subj + 2, prefix, sizeof prefix - 1U) == 0)) {
             subj += 2U + (sizeof prefix - 1U);
             end = strchr(subj, '\n');
-            str_addn(name, subj, (end != NULL) ? (size_t)(end - subj) : strlen(subj));
+            str_addn(&raw, subj, (end != NULL) ? (size_t)(end - subj) : strlen(subj));
+            /* scritto da altri: niente controlli per il terminale (S-07) */
+            str_add_printable(name, str_cstr(&raw));
         }
     }
     if (name->len == 0U) {
         str_add(name, id);
     }
+    str_free(&raw);
     str_free(&out);
+}
+
+/*
+ * S-08: senza <dest> il path lo sceglierebbe chi ha scritto la catena
+ * (.github/workflows/ci.yml, .gitattributes, Makefile in una cartella...).
+ * Vale solo un nome di file semplice: niente separatori, niente '.' in
+ * testa, solo ASCII stampabile, nessun carattere che Windows non ammette
+ * in un nome (anche il '?' messo da str_add_printable al posto di un
+ * carattere non stampabile).
+ */
+static int name_is_simple(const char *name)
+{
+    const unsigned char *c = (const unsigned char *)name;
+
+    if ((*c == '\0') || (*c == '.')) {
+        return 0;
+    }
+    for (; *c != '\0'; c++) {
+        if ((*c < 0x20U) || (*c >= 0x7FU) || (strchr("/\\:<>\"|?*", (int)*c) != NULL)) {
+            return 0;
+        }
+    }
+    return 1;
 }
 
 /*
@@ -157,15 +223,28 @@ static void version_name(const Oid_t *v, const char *id, Str_t *name)
  * riceve l'URL: e' la sorgente per i messaggi e per l'attesa. GS_EXIT_OK o
  * il codice di uscita (messaggio stampato).
  */
-static int remote_source(GitBatch_t *b, const char *url, const char *id,
-                         Source_t *s, Str_t *name)
+static int remote_source(const Repo_t *r, GitBatch_t *b, const char *arg,
+                         const char *id, Source_t *s, Str_t *name)
 {
     Str_t ref = STR_INIT;
     Str_t creator = STR_INIT;
+    Str_t cwd = STR_INIT;
+    Str_t resolved = STR_INIT;
+    const char *url;
     Oid_t tip;
     int sovereign = 0;
     int rc = GS_EXIT_ERROR;
 
+    /* AB-06: l'argomento si risolve come in crown: il nome di un remote
+     * (il suo URL), un path relativo alla cartella corrente. Da qui in poi
+     * vale l'URL risolto: fetch, confronto con l'autorita', messaggi e
+     * sorgente dell'attesa. */
+    str_addf(&cwd, "%s/%s", str_cstr(&r->top), str_cstr(&r->prefix));
+    if (remote_arg_url(str_cstr(&r->top), str_cstr(&cwd), arg, &resolved) != GS_OK) {
+        msg_error(MSG_ERR_CROWN_BAD_URL, arg);
+        goto exit;
+    }
+    url = str_cstr(&resolved);
     peers_incoming_ref(&ref, id, 0U);
     if ((remote_fetch(url, id, str_cstr(&ref)) != GS_OK) ||
         (git_batch_query(b, str_cstr(&ref), &tip) != GIT_OBJ_COMMIT)) {
@@ -191,9 +270,121 @@ static int remote_source(GitBatch_t *b, const char *url, const char *id,
     rc = GS_EXIT_OK;
 
 exit:
+    str_free(&resolved);
+    str_free(&cwd);
     str_free(&creator);
     str_free(&ref);
     return rc;
+}
+
+/* 1 se il file c'e' e si apre. */
+static int file_exists(const char *path)
+{
+    FILE *f = sys_fopen(path, "rb");
+
+    if (f != NULL) {
+        (void)fclose(f);
+    }
+    return f != NULL;
+}
+
+/*
+ * C-21: un antenato della destinazione che e' un file (nel working tree o
+ * nell'index): update-index fallirebbe dopo la scrittura dell'attesa e di
+ * .gitshared. 1 e l'antenato in which.
+ */
+static int parent_is_file(const Repo_t *r, GitBatch_t *b, const char *dest,
+                          Str_t *which)
+{
+    Str_t disk = STR_INIT;
+    Str_t name = STR_INIT;
+    const char *slash;
+    Oid_t oid;
+    FILE *f;
+    int found = 0;
+
+    for (slash = strchr(dest, '/'); (slash != NULL) && (found == 0);
+         slash = strchr(slash + 1, '/')) {
+        str_reset(which);
+        str_addn(which, dest, (size_t)(slash - dest));
+        str_reset(&disk);
+        str_addf(&disk, "%s/%s", str_cstr(&r->top), str_cstr(which));
+        str_reset(&name);
+        str_addf(&name, ":%s", str_cstr(which));
+        f = sys_is_dir(str_cstr(&disk)) ? NULL : sys_fopen(str_cstr(&disk), "rb");
+        found = (f != NULL) || (git_batch_query(b, str_cstr(&name), &oid) == GIT_OBJ_BLOB);
+        if (f != NULL) {
+            (void)fclose(f);
+        }
+    }
+    str_free(&name);
+    str_free(&disk);
+    return found;
+}
+
+/*
+ * C-21: la scrittura e' fallita dopo l'attesa e la sezione di .gitshared.
+ * Si toglie la sezione (e .gitshared, se non dichiara altro e non c'era) e
+ * l'attesa, come se il comando non fosse partito.
+ */
+static void undo_link(const Repo_t *r, const char *id, const char *name,
+                      int gitshared_new)
+{
+    const char *cfg[] = { "config", "-f", NULL, "--remove-section", NULL, NULL };
+    const char *pend[] = { "config", "--unset-all", NULL, NULL };
+    Str_t file = STR_INIT;
+    Str_t key = STR_INIT;
+
+    str_addf(&file, "%s/.gitshared", str_cstr(&r->top));
+    str_addf(&key, "shared.%s", name);
+    cfg[2] = str_cstr(&file);
+    cfg[4] = str_cstr(&key);
+    (void)git_run(cfg, PROC_STDERR_NULL, NULL);
+    if (gitshared_new != 0) {
+        (void)sys_remove(str_cstr(&file));
+    }
+    str_reset(&key);
+    str_addf(&key, "shared.%s.pending", id);
+    pend[2] = str_cstr(&key);
+    (void)git_run(pend, PROC_STDERR_NULL, NULL);
+    str_free(&key);
+    str_free(&file);
+}
+
+/*
+ * B-44: link scrive l'ultima versione della catena, non il file che si
+ * vede nella sorgente. 1 se sono diversi: il file committato nella
+ * sorgente non e' la versione, o ha modifiche non committate.
+ */
+static int source_differs(const Source_t *s, const Oid_t *blob)
+{
+    const char *rp[] = { "-C", NULL, "rev-parse", "-q", "--verify", NULL, NULL };
+    const char *df[] = { "-C", NULL, "--literal-pathspecs", "diff", "--quiet",
+                         "HEAD", "--", NULL, NULL };
+    Str_t spec = STR_INIT;
+    Str_t out = STR_INIT;
+    Oid_t head;
+    int code = 0;
+    int differs = 0;
+
+    str_addf(&spec, "HEAD:%s", str_cstr(&s->rel));
+    rp[1] = str_cstr(&s->top);
+    rp[5] = str_cstr(&spec);
+    if (git_capture(rp, PROC_STDERR_NULL | PROC_CLEAN_ENV, &out, &code) != GS_OK) {
+        code = -1;
+    }
+    str_trim_eol(&out);
+    if ((code != 0) || !oid_from_hex(&head, out.buf, out.len) || !oid_eq(&head, blob)) {
+        differs = 1;
+    } else {
+        df[1] = str_cstr(&s->top);
+        df[7] = str_cstr(&s->rel);
+        differs = (git_capture(df, PROC_STDERR_NULL | PROC_CLEAN_ENV, &out, &code) == GS_OK) &&
+                  (code == 1);
+    }
+    str_free(&out);
+    str_free(&spec);
+    return differs;
 }
 
 /* 1 se la sorgente ha un'operazione in attesa per l'ID (set o link). */
@@ -355,6 +546,8 @@ int cmd_link(int argc, char **argv)
     int dest_new = 1; /* il file non e' in HEAD: entra nel commit */
     int opened = 0;
     int hooks = 0;
+    int undo = 0;     /* C-21: sezione e attesa da togliere se fallisce */
+    int gs_new = 0;   /* .gitshared non c'era */
     int rc = GS_EXIT_USAGE;
 
     first = cmd_parse(argc, argv,
@@ -393,7 +586,7 @@ int cmd_link(int argc, char **argv)
                       argv[first + 1]);
             goto exit;
         }
-        if (remote_source(&batch, argv[first], argv[first + 1], &src, &name) !=
+        if (remote_source(&repo, &batch, argv[first], argv[first + 1], &src, &name) !=
             GS_EXIT_OK) {
             goto exit;
         }
@@ -416,14 +609,19 @@ int cmd_link(int argc, char **argv)
         }
     } else if (remote) {
         /* il path nel creatore non si conosce: il nome del file, dalla
-         * radice come in locale */
-        if (path_is_absolute(str_cstr(&name)) ||
+         * radice come in locale, se e' un nome semplice (S-08) */
+        if (!name_is_simple(str_cstr(&name)) ||
             !path_join_norm("", str_cstr(&name), &dest)) {
-            msg_error(MSG_ERR_DEST_PATH, str_cstr(&name));
+            msg_error(MSG_ERR_LINK_NAME_UNSAFE, str_cstr(&name), argv[first],
+                      argv[first + 1]);
             goto exit;
         }
     } else {
         str_add(&dest, str_cstr(&src.rel));
+    }
+    if (shared_path_reserved(str_cstr(&dest))) {
+        msg_error(MSG_ERR_PATH_RESERVED, str_cstr(&dest)); /* B-36 */
+        goto exit;
     }
     e = repo_find_id(&repo, str_cstr(&id));
     relink = (e != NULL) && e->in_gitshared && e->valid && !e->in_config;
@@ -479,6 +677,10 @@ int cmd_link(int argc, char **argv)
             msg_error(MSG_ERR_IS_DIR, str_cstr(&dest));
             goto exit;
         }
+        if (parent_is_file(&repo, &batch, str_cstr(&dest), &text)) {
+            msg_error(MSG_ERR_DEST_PARENT_FILE, str_cstr(&dest), str_cstr(&text));
+            goto exit;
+        }
         write = !existing || (o.force != 0U);
     }
 
@@ -487,6 +689,15 @@ int cmd_link(int argc, char **argv)
         msg_error(MSG_ERR_SRC_PENDING, argv[first], str_cstr(&src.top));
         goto exit;
     }
+    /* B-38: il gruppo (la sorgente e i suoi peer) diventa l'elenco dei peer
+     * di questa repo, e questa repo entra in quello di ognuno: al piu'
+     * GS_PEER_MAX. Si controlla qui, prima di scrivere qualcosa. */
+    if (!remote && (peers_of(str_cstr(&src.top), str_cstr(&id), &peers) == GS_OK) &&
+        ((str_zcount(&peers) + 1U) > GS_PEER_MAX)) {
+        msg_error(MSG_ERR_TOO_MANY_PEERS, str_cstr(&dest), GS_PEER_MAX);
+        goto exit;
+    }
+    str_reset(&peers);
 
     /* --- catena: fetch in refs/shared-incoming/<id>/0 (D-040); in
      * remoto e' gia' arrivata (remote_source) ---------------------------- */
@@ -501,6 +712,9 @@ int cmd_link(int argc, char **argv)
     if ((fetched == 0U) || (git_batch_blob(&batch, str_cstr(&text), &blob) == 0)) {
         msg_error(MSG_ERR_SRC_NO_VERSIONS, argv[first], str_cstr(&src.top));
         goto exit;
+    }
+    if (!remote && write && source_differs(&src, &blob)) {
+        msg_warning(MSG_WARN_LINK_SOURCE_DIFFERS, argv[first]); /* B-44 */
     }
 
     /* --- destinazione che esiste: serve una base (D-062, D-029) -------- */
@@ -535,11 +749,15 @@ int cmd_link(int argc, char **argv)
             goto exit;
         }
     }
+    str_reset(&text);
+    str_addf(&text, "%s/.gitshared", str_cstr(&repo.top));
+    gs_new = !file_exists(str_cstr(&text));
     if (!relink && (cmd_write_gitshared(&repo, str_cstr(&name), str_cstr(&id),
                                         str_cstr(&dest)) != GS_OK)) {
         msg_error(MSG_ERR_WRITE_GITSHARED);
         goto exit;
     }
+    undo = !relink && !adopt; /* C-21: da qui un errore toglie sezione e attesa */
     if (write && (cmd_write_file(&repo, str_cstr(&dest), &blob) != GS_OK)) {
         msg_error(MSG_ERR_WRITE_FILE, str_cstr(&dest));
         goto exit;
@@ -557,6 +775,7 @@ int cmd_link(int argc, char **argv)
         msg_error(MSG_ERR_STAGE_GITSHARED);
         goto exit;
     }
+    undo = 0;
     hooks = 1; /* REQ-F-016: installati alla fine, vedi exit */
 
     /* --- la repo in memoria, per gli hook ------------------------------ */
@@ -649,6 +868,9 @@ int cmd_link(int argc, char **argv)
     rc = GS_EXIT_OK;
 
 exit:
+    if ((rc != GS_EXIT_OK) && (undo != 0)) {
+        undo_link(&repo, str_cstr(&id), str_cstr(&name), gs_new);
+    }
     /* Che cosa succede al file, dopo il messaggio del collegamento. */
     if ((rc == GS_EXIT_OK) && adopt) {
         printf(msg(MSG_LINK_ADOPTED), str_cstr(&dest), old.id);

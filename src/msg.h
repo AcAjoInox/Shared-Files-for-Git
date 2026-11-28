@@ -275,7 +275,10 @@ typedef enum {
     MSG_STATUS_HEIR_FOUND,   /* url, posizione, autorita', path (D-114) */
     MSG_STATUS_HEIR_OTHER,   /* url, autorita', autorita', path */
     MSG_STATUS_CREATOR_BACK, /* url del creatore, path */
-    MSG_STATUS_HEIRS_NONE,   /* path, path */
+    MSG_STATUS_HEIRS_EMPTY,  /* path, path (AB-07) */
+    MSG_STATUS_HEIRS_SILENT, /* quanti, path, path */
+    MSG_STATUS_HEIRS_STILL,  /* risposte, quanti, path, path */
+    MSG_STATUS_AUTH_NO_FILE, /* ruolo */
     MSG_LINK_COPY,           /* url, autorita' (D-111) */
     MSG_STATUS_CHAIN_MISSING, /* path (D-112, B-51) */
     MSG_CREATOR_SEEN,        /* data (D-112, B-53) */
@@ -294,7 +297,10 @@ typedef enum {
 
     /* crown (D-111) */
     MSG_ERR_CROWN_ARGS,
-    MSG_ERR_HEIRS_NONE,      /* file, path, path (D-114) */
+    MSG_ERR_HEIRS_EMPTY,     /* file, path, path (D-114, AB-07) */
+    MSG_ERR_HEIRS_SILENT,    /* file, quanti, path, path */
+    MSG_ERR_HEIRS_STILL,     /* file, risposte, quanti, path, path */
+    MSG_ERR_AUTH_NO_FILE,    /* file, ruolo */
     MSG_ERR_HEIR_OTHER,      /* file, url, autorita', autorita', path */
     MSG_ERR_CREATOR_BACK,    /* file, url del creatore, path */
     MSG_ERR_CROWN_NO_CREATOR,     /* file */
@@ -356,6 +362,19 @@ typedef enum {
     MSG_LOG_CREATOR,         /* url */
     MSG_LOG_AUTH,            /* url */
     MSG_LOG_HEIRS,
+
+    MSG_WARN_CREATOR_NEWER,  /* file, ruolo, url (AB-09) */
+    MSG_ERR_LINK_NAME_UNSAFE, /* nome, url, id (S-08) */
+    MSG_ERR_PATH_RESERVED,   /* path (B-36) */
+    MSG_ERR_DEST_PARENT_FILE, /* path, antenato (C-21) */
+    MSG_WARN_PEER_NO_CHAIN,  /* file, peer (C-14) */
+    MSG_WARN_PEER_NOT_UPDATED, /* file, peer */
+    MSG_ERR_PATH_OUTSIDE,    /* path */
+    MSG_WARN_PEERS_LEFT_OUT, /* file, quanti, massimo (B-38) */
+    MSG_WARN_LINK_SOURCE_DIFFERS, /* sorgente (B-44) */
+    MSG_WORD_PUBLISH,        /* parole dentro altri testi (C-15) */
+    MSG_WORD_UPDATE,
+    MSG_WORD_SHARED_FILES,
 
     MSG_COUNT
 } eMsgId_t;

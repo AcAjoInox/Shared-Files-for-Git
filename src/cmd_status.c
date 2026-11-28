@@ -207,6 +207,9 @@ static void porc_creator(const SharedEntry_t *e, const Received_t *rv, eMsgId_t 
         if ((visit->kind == HEIR_VISIT_FOUND) || (visit->kind == HEIR_VISIT_OTHER)) {
             cmd_porc(s_eol, "succession-via", e->id, "%s", str_cstr(&visit->where));
         }
+        /* AB-07: quanti indirizzi della linea hanno risposto, su quanti */
+        cmd_porc(s_eol, "succession-answer", e->id, "%u %u", visit->answered,
+                 visit->line);
     }
     if (back != 0) {
         cmd_porc(s_eol, "creator-back", e->id, "%s", str_cstr(&rv->creator));
@@ -286,10 +289,22 @@ static void print_creator(const SharedEntry_t *e, GitBatch_t *b,
                    str_cstr(&visit->to), str_cstr(&visit->to), path);
         } else if (visit->kind == HEIR_VISIT_CREATOR) {
             printf(msg(MSG_STATUS_CREATOR_BACK), str_cstr(&visit->where), path);
+        } else if (visit->line == 0U) {
+            printf(msg(MSG_STATUS_HEIRS_EMPTY), path, path);
+        } else if (visit->answered == 0U) {
+            printf(msg(MSG_STATUS_HEIRS_SILENT), visit->line, path, path);
         } else {
-            printf(msg(MSG_STATUS_HEIRS_NONE), path, path);
+            printf(msg(MSG_STATUS_HEIRS_STILL), visit->answered, visit->line, path,
+                   path);
         }
         putchar('\n');
+        if ((fetched == (unsigned char)REMOTE_MISSING) &&
+            (visit->kind != HEIR_VISIT_OTHER)) {
+            /* AB-07: l'autorita' risponde, ma il file non c'e' piu' */
+            printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
+            printf(msg(MSG_STATUS_AUTH_NO_FILE), auth_role(rv->sovereign));
+            putchar('\n');
+        }
     }
     if (back != 0) {
         printf("    %-6s ", msg(MSG_STATUS_FIELD_NOTE));
@@ -557,6 +572,8 @@ int cmd_status(int argc, char **argv)
         str_init(&visits[i].to);
         visits[i].kind = HEIR_VISIT_NONE;
         visits[i].pos = 0U;
+        visits[i].line = 0U;
+        visits[i].answered = 0U;
         back[i] = 0;
         fetched[i] = CMD_NO_CREATOR;
         sel[i] = (with_remote && e->in_config && e->valid &&

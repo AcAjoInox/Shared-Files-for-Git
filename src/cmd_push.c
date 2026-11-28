@@ -360,6 +360,13 @@ static int push_creators(const Repo_t *r, GitBatch_t *b, const unsigned char *se
             }
             if ((en->on[x] != 0U) && (res[k] != (uint8_t)REMOTE_PUSH_OK)) {
                 tips[x] = en->orig[x]; /* l'iscrizione non e' passata */
+                if (oid_eq(&seen[x], &en->orig[x]) &&
+                    (res[k] == (uint8_t)REMOTE_PUSH_NEWER)) {
+                    /* AB-09: niente da mandare, ma l'autorita' ha versioni
+                     * che qui mancano: lo si dice, senza errore */
+                    msg_warning(MSG_WARN_CREATOR_NEWER, label, auth_role(sov[x]), url);
+                    continue;
+                }
                 if (oid_eq(&seen[x], &en->orig[x])) {
                     /* non c'era altro da mandare: come prima */
                     printf(msg(MSG_PUSH_ON_CREATOR), label, auth_role(sov[x]), url);

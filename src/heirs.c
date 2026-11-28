@@ -84,8 +84,10 @@ int heirs_find(const Heirs_t *h, const char *url, const char **parent)
     const char *p = NULL;
     const char *x = NULL;
 
+    /* Stretto (S-06): un erede si segue senza domande, un'altra repo che
+     * gli somiglia no. */
     while (next_pair(h, &p, &x)) {
-        if (remote_same(x, url)) {
+        if (remote_same_strict(x, url)) {
             if (parent != NULL) {
                 *parent = p;
             }

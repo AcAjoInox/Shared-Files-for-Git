@@ -126,6 +126,9 @@ PORCELAIN
     succession <id> <kind> <n> <url>    --remote: found, other, creator,
                                         none
     succession-via <id> <url>           who said so (found, other)
+    succession-answer <id> <n> <of>     --remote: <n> addresses of the
+                                        line of succession, out of <of>,
+                                        answered with the file
     creator-back <id> <url>
     auth-change <id> <version> <from> <url>
                                         from: authority, peer, unknown

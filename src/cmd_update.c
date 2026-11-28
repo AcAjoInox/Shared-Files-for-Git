@@ -698,7 +698,7 @@ int cmd_update_run(Repo_t *r, GitBatch_t *b, const unsigned char *sel,
         if (o->message == NULL) {
             str_addf(&text, msg(MSG_UPD_COMMIT_MSG),
                      (str_zcount(&touched.applied) == 1U) ? touched.applied.buf
-                                                         : "shared files");
+                                                         : msg(MSG_WORD_SHARED_FILES));
             o->message = str_cstr(&text);
         }
         if (cmd_commit(r, o->message, &touched.applied) == GS_OK) {

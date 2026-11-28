@@ -47,10 +47,14 @@ DESCRIZIONE
 REMOTO (BETA)
     Con <url> <id> si collega un file condiviso attraverso un remoto
     (vedi 'git shared push --help'): <url> e' il suo creatore, o un
-    repository che ne ha una copia; <id> e' l'ID del file, che
-    'git shared status' mostra in ogni repository che lo usa. Si scarica
-    solo la catena delle versioni, non il progetto. La destinazione di
-    default e' il nome del file.
+    repository che ne ha una copia, anche come nome di un remote di
+    questo repository o come path relativo alla cartella corrente; <id>
+    e' l'ID del file, che 'git shared status' mostra in ogni repository
+    che lo usa. Si scarica solo la catena delle versioni, non il
+    progetto. La destinazione di default e' il nome del file, scritto
+    nella catena da chi l'ha pubblicato: vale solo se e' un nome di file
+    semplice (senza cartelle, senza '.' in testa); altrimenti si indica
+    la destinazione.
 
     Il repository non diventa peer di nessuno e il creatore non registra
     nulla: le versioni nuove arrivano dal creatore con 'git shared pull',

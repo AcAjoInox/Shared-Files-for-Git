@@ -15,24 +15,40 @@
 #include "mem.h"
 #include "msg.h"
 #include "path.h"
+#include "peers.h"
 #include "sys.h"
+
+static int url_is_path(const char *u);
 
 /*
  * Un URL che arriva dalla catena e' scritto da altri: non deve poter
  * diventare un'opzione di git ("--upload-pack=<comando>") ne' spezzare le
  * righe. Si rifiutano un trattino in testa, i caratteri di controllo e gli
- * URL troppo lunghi (REQ-NF-011).
+ * URL troppo lunghi (REQ-NF-011). Si mostra all'utente, che decide
+ * guardandolo (crown --accept): solo caratteri stampabili, e fuori
+ * dall'ASCII solo in un path locale (S-07). Un URL di rete con una lettera
+ * cirillica al posto di una latina, o un controllo bidi, sembrerebbe
+ * quello vero; un nome di host non ASCII si scrive in punycode.
  */
 int remote_url_ok(const char *url)
 {
-    const unsigned char *c;
     size_t n = strlen(url);
+    size_t k;
+    size_t len;
+    int path = -1;
 
     if ((n == 0U) || (n > GS_PATH_MAX) || (url[0] == '-')) {
         return 0;
     }
-    for (c = (const unsigned char *)url; *c != 0U; c++) {
-        if ((*c < 0x20U) || (*c == 0x7FU)) {
+    for (k = 0U; k < n; k += len) {
+        len = str_char_printable(url + k);
+        if (len == 0U) {
+            return 0;
+        }
+        if ((len > 1U) && (path < 0)) {
+            path = url_is_path(url);
+        }
+        if ((len > 1U) && (path == 0)) {
             return 0;
         }
     }
@@ -45,15 +61,66 @@ int remote_url_ok(const char *url)
  * una domanda invisibile bloccherebbe il comando. Senza permessi il push
  * e' un rifiuto. Le credenziali salvate (credential helper) valgono come
  * sempre. Una volta per processo.
+ * S-10: nemmeno Git Credential Manager apre la sua finestra
+ * (GCM_INTERACTIVE=never), e ssh non chiede nulla (BatchMode: nessuna
+ * domanda sulla chiave dell'host, nessuna passphrase) e non aspetta piu' di
+ * 15 secondi la connessione; ssh solo se l'utente non ha scelto un suo
+ * comando (GIT_SSH_COMMAND, GIT_SSH, core.sshCommand).
  */
 static void no_prompt(void)
 {
+    static const char *const args[] = { "config", "core.sshCommand", NULL };
     static int done = 0;
+    Str_t out = STR_INIT;
+    char *v;
+    int own = 0;
 
-    if (done == 0) {
-        (void)sys_setenv("GIT_TERMINAL_PROMPT", "0");
-        done = 1;
+    if (done != 0) {
+        return;
     }
+    done = 1;
+    (void)sys_setenv("GIT_TERMINAL_PROMPT", "0");
+    (void)sys_setenv("GCM_INTERACTIVE", "never");
+    v = sys_getenv("GIT_SSH_COMMAND");
+    own = (v != NULL) && (v[0] != '\0');
+    free(v);
+    v = sys_getenv("GIT_SSH");
+    own = own || ((v != NULL) && (v[0] != '\0'));
+    free(v);
+    if ((own == 0) && (git_run(args, PROC_STDERR_NULL, &out) == GS_OK) &&
+        (out.len > 0U)) {
+        own = 1;
+    }
+    if (own == 0) {
+        (void)sys_setenv("GIT_SSH_COMMAND",
+                         "ssh -o BatchMode=yes -o ConnectTimeout=15");
+    }
+    str_free(&out);
+}
+
+/*
+ * Opzioni -c di ogni comando di rete verso un URL (S-09), prima del nome
+ * del comando: oggetti controllati da git prima di entrare nella repo
+ * (transfer.fsckObjects), e un server che manda meno di 1000 byte al
+ * secondo per 30 secondi interrompe il trasferimento http invece di
+ * bloccare il comando per sempre.
+ */
+#define NET_OPTS_N 6U
+static const char *const net_opts[NET_OPTS_N] = {
+    "-c", "transfer.fsckObjects=true",
+    "-c", "http.lowSpeedLimit=1000",
+    "-c", "http.lowSpeedTime=30"
+};
+
+/* Copia le opzioni di rete in testa ad args; ritorna quante. */
+static size_t add_net_opts(const char **args)
+{
+    size_t k;
+
+    for (k = 0U; k < NET_OPTS_N; k++) {
+        args[k] = net_opts[k];
+    }
+    return NET_OPTS_N;
 }
 
 static int is_sep(char c)
@@ -309,13 +376,167 @@ static void add_path(Str_t *key, const char *p, int lower)
     }
 }
 
-/* Forma normale di un URL (remote_same). */
-static void url_key(const char *u, Str_t *key)
-{
+/* Le parti di un URL di rete: scheme://[utente@]host[:porta]/path oppure
+ * [utente@]host:path (forma scp, scheme_len = 0). host con le [] di un
+ * indirizzo IPv6. */
+typedef struct {
+    const char *scheme;
+    size_t scheme_len;
+    const char *user;
+    size_t user_len;
     const char *host;
-    const char *end;
-    const char *at;
-    const char *colon;
+    size_t host_len;
+    const char *port;
+    size_t port_len;
+    const char *path; /* URL: dal '/' dopo l'host; scp: dopo il ':' */
+} UrlParts_t;
+
+static void url_parts(const char *u, UrlParts_t *p)
+{
+    const char *sep = strstr(u, "://");
+    const char *auth = (sep != NULL) ? (sep + 3) : u;
+    const char *end = NULL;
+    const char *at = NULL;
+    const char *h;
+    const char *hend;
+    const char *c;
+    int bracket = 0;
+
+    memset(p, 0, sizeof *p);
+    p->scheme = u;
+    p->scheme_len = (sep != NULL) ? (size_t)(sep - u) : 0U;
+    if (sep != NULL) {
+        end = auth + strcspn(auth, "/");
+    } else {
+        /* scp: l'host finisce al primo ':' fuori dalle [] di IPv6 */
+        for (c = auth; (*c != '\0') && (end == NULL); c++) {
+            if (*c == '[') {
+                bracket = 1;
+            } else if (*c == ']') {
+                bracket = 0;
+            } else if ((*c == ':') && (bracket == 0)) {
+                end = c;
+            } else {
+                /* parte dell'host */
+            }
+        }
+        end = (end != NULL) ? end : (auth + strlen(auth));
+    }
+    for (c = auth; c < end; c++) {
+        if (*c == '@') {
+            at = c; /* l'ultima */
+        }
+    }
+    h = (at != NULL) ? (at + 1) : auth;
+    if (at != NULL) {
+        p->user = auth;
+        p->user_len = (size_t)(at - auth);
+    }
+    /* B-SA1: la porta si cerca dopo la ']' di un indirizzo IPv6 */
+    hend = NULL;
+    if (*h == '[') {
+        hend = memchr(h, ']', (size_t)(end - h));
+        hend = (hend != NULL) ? (hend + 1) : NULL;
+    }
+    if (hend == NULL) {
+        hend = (sep != NULL) ? memchr(h, ':', (size_t)(end - h)) : NULL;
+        hend = (hend != NULL) ? hend : end;
+    }
+    p->host = h;
+    p->host_len = (size_t)(hend - h);
+    if ((sep != NULL) && (hend < end) && (*hend == ':')) {
+        p->port = hend + 1;
+        p->port_len = (size_t)(end - (hend + 1));
+    }
+    p->path = (sep != NULL) ? end : ((*end == ':') ? (end + 1) : end);
+}
+
+/* 1 se n byte di s sono uguali a w, senza distinzione di maiuscole. */
+static int word_is(const char *s, size_t n, const char *w)
+{
+    size_t k;
+
+    if (strlen(w) != n) {
+        return 0;
+    }
+    for (k = 0U; k < n; k++) {
+        if (tolower((unsigned char)s[k]) != (unsigned char)w[k]) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+/*
+ * Hosting noti, dove path e nome della repo non distinguono le maiuscole,
+ * ".git" finale e utente non cambiano la repo, e https e ssh portano alla
+ * stessa repo (S-06).
+ */
+static int host_known(const UrlParts_t *p)
+{
+    static const char *const known[] = { "github.com", "ssh.github.com",
+                                         "gitlab.com", "bitbucket.org",
+                                         "codeberg.org" };
+    size_t k;
+
+    for (k = 0U; k < (sizeof known / sizeof known[0]); k++) {
+        if (word_is(p->host, p->host_len, known[k])) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Classe del trasporto per la forma stretta: scp e git+ssh sono ssh. */
+static void add_scheme(Str_t *key, const UrlParts_t *p)
+{
+    size_t k;
+
+    if ((p->scheme_len == 0U) || word_is(p->scheme, p->scheme_len, "git+ssh") ||
+        word_is(p->scheme, p->scheme_len, "ssh+git")) {
+        str_add(key, "ssh");
+        return;
+    }
+    for (k = 0U; k < p->scheme_len; k++) {
+        str_addch(key, (char)tolower((unsigned char)p->scheme[k]));
+    }
+}
+
+/* 1 se la porta e' quella di default del trasporto (o non c'e'). */
+static int port_default(const UrlParts_t *p)
+{
+    static const struct {
+        const char *scheme;
+        const char *port;
+    } def[] = { { "ssh", "22" }, { "git+ssh", "22" }, { "ssh+git", "22" },
+                { "https", "443" }, { "http", "80" }, { "git", "9418" } };
+    size_t k;
+
+    if (p->port_len == 0U) {
+        return 1;
+    }
+    for (k = 0U; k < (sizeof def / sizeof def[0]); k++) {
+        if (word_is(p->scheme, p->scheme_len, def[k].scheme) &&
+            (strlen(def[k].port) == p->port_len) &&
+            (strncmp(p->port, def[k].port, p->port_len) == 0)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/*
+ * Forma normale di un URL. Larga (strict = 0, remote_same): host senza
+ * utente ne' porta, path in minuscolo e senza ".git". Stretta (strict = 1,
+ * remote_same_strict): per gli hosting noti come la larga; per gli altri
+ * restano il trasporto, l'utente di ssh, una porta che non e' quella di
+ * default, maiuscole e ".git" del path, e un path scp relativo resta
+ * relativo alla home ("/~/"). I path locali sono uguali nelle due forme.
+ */
+static void url_key(const char *u, Str_t *key, int strict)
+{
+    UrlParts_t p;
+    size_t k;
     int lower_path = 0;
 
     str_reset(key);
@@ -334,38 +555,60 @@ static void url_key(const char *u, Str_t *key)
         trim_tail(key, 0);
         return;
     }
-    /* scheme://[utente@]host[:porta]/path oppure [utente@]host:path */
-    host = strstr(u, "://");
-    host = (host != NULL) ? (host + 3) : u;
-    end = host + strcspn(host, (host != u) ? "/" : ":");
-    at = memchr(host, '@', (size_t)(end - host));
-    if (at != NULL) {
-        host = at + 1;
-    }
-    colon = (host != u) ? memchr(host, ':', (size_t)(end - host)) : NULL;
+    url_parts(u, &p);
     str_add(key, "net:");
-    for (; host < ((colon != NULL) ? colon : end); host++) {
-        str_addch(key, (char)tolower((unsigned char)*host));
+    if ((strict == 0) || host_known(&p)) {
+        for (k = 0U; k < p.host_len; k++) {
+            str_addch(key, (char)tolower((unsigned char)p.host[k]));
+        }
+        str_addch(key, '/');
+        add_path(key, p.path, 1);
+        trim_tail(key, 1);
+        return;
+    }
+    add_scheme(key, &p);
+    str_add(key, "://");
+    if ((p.user_len > 0U) && (strncmp(str_cstr(key) + 4, "ssh:", 4U) == 0)) {
+        str_addn(key, p.user, p.user_len);
+        str_addch(key, '@');
+    }
+    for (k = 0U; k < p.host_len; k++) {
+        str_addch(key, (char)tolower((unsigned char)p.host[k]));
+    }
+    if (!port_default(&p)) {
+        str_addch(key, ':');
+        str_addn(key, p.port, p.port_len);
     }
     str_addch(key, '/');
-    if (*end != '\0') {
-        add_path(key, end + 1, 1);
+    if ((p.scheme_len == 0U) && (p.path[0] != '/') && (p.path[0] != '\0')) {
+        str_add(key, "~/"); /* scp: relativo alla home */
     }
-    trim_tail(key, 1);
+    add_path(key, p.path, 0);
+    trim_tail(key, 0);
 }
 
-int remote_same(const char *a, const char *b)
+static int same_key(const char *a, const char *b, int strict)
 {
     Str_t ka = STR_INIT;
     Str_t kb = STR_INIT;
     int same;
 
-    url_key(a, &ka);
-    url_key(b, &kb);
+    url_key(a, &ka, strict);
+    url_key(b, &kb, strict);
     same = str_eq(&ka, str_cstr(&kb));
     str_free(&kb);
     str_free(&ka);
     return same;
+}
+
+int remote_same(const char *a, const char *b)
+{
+    return same_key(a, b, 0);
+}
+
+int remote_same_strict(const char *a, const char *b)
+{
+    return same_key(a, b, 1);
 }
 
 /* La casata: la forma normale senza l'ultimo componente del path. */
@@ -373,7 +616,7 @@ static void house_key(const char *u, Str_t *key)
 {
     const char *slash;
 
-    url_key(u, key);
+    url_key(u, key, 0);
     slash = strrchr(str_cstr(key), '/');
     if (slash != NULL) {
         str_setlen(key, (size_t)(slash - key->buf));
@@ -562,15 +805,24 @@ exit:
  */
 static int fetch_specs(const char *url, const Str_t *ids, const uint8_t *sel)
 {
-    const char *args[] = { "fetch", "-q", "--no-tags", "--no-write-fetch-head",
-                           "--no-auto-gc", "--stdin", transport(url), NULL };
+    const char *args[NET_OPTS_N + 10U];
     Str_t out = STR_INIT;
     Proc_t p;
     const char *id;
     size_t k;
+    size_t na = add_net_opts(args);
     int code = -1;
     int ok = 0;
 
+    args[na++] = "fetch";
+    args[na++] = "-q";
+    args[na++] = "--no-tags";
+    args[na++] = "--no-write-fetch-head";
+    args[na++] = "--no-auto-gc";
+    args[na++] = "--no-recurse-submodules";
+    args[na++] = "--stdin";
+    args[na++] = transport(url);
+    args[na] = NULL;
     no_prompt();
     if (git_start(&p, args, PROC_STDIN_PIPE | PROC_STDERR_NULL) != GS_OK) {
         goto exit;
@@ -597,7 +849,7 @@ exit:
 static int remote_has(const char *url, const Str_t *ids, uint8_t *has)
 {
     static const char prefix[] = "refs/shared/";
-    const char *args[] = { "ls-remote", transport(url), "refs/shared/*", NULL };
+    const char *args[NET_OPTS_N + 4U];
     Str_t out = STR_INIT;
     const char *line;
     const char *tab;
@@ -607,6 +859,11 @@ static int remote_has(const char *url, const Str_t *ids, uint8_t *has)
     size_t k;
     int ok;
 
+    k = add_net_opts(args);
+    args[k++] = "ls-remote";
+    args[k++] = transport(url);
+    args[k++] = "refs/shared/*";
+    args[k] = NULL;
     for (k = 0U, id = str_znext(ids, NULL); id != NULL;
          k++, id = str_znext(ids, id)) {
         has[k] = 0U;
@@ -697,7 +954,7 @@ static void push_chunk(const char *url, const char *const *idv, const Oid_t *v,
 {
     /* --no-verify: non e' un push dell'utente, il suo pre-push non gira
      * (D-080). Senza "+": un push che non e' fast-forward lo rifiuta git. */
-    const char **args = xmalloc((n + 5U) * sizeof *args);
+    const char **args = xmalloc((n + NET_OPTS_N + 5U) * sizeof *args);
     Str_t specs = STR_INIT;
     Str_t one = STR_INIT;
     Str_t out = STR_INIT;
@@ -715,6 +972,7 @@ static void push_chunk(const char *url, const char *const *idv, const Oid_t *v,
     if (!remote_url_ok(url)) {
         goto exit;
     }
+    na = add_net_opts(args);
     args[na++] = "push";
     args[na++] = "--porcelain";
     args[na++] = "--no-verify";
@@ -863,9 +1121,8 @@ int remote_find_own(GitBatch_t *b, const char *url, const char *id,
     Oid_t mine;
     int found = 0;
 
-    /* Ref temporanea, cancellata subito: il push non ha attese (cmd_select
-     * le esclude), quindi nessun link la usa. */
-    str_addf(&tmp, "refs/shared-incoming/%s/0", id);
+    /* Ref temporanea di questo processo, cancellata subito (B-SA3). */
+    peers_tmp_ref(&tmp, id);
     if (remote_fetch(url, id, str_cstr(&tmp)) != GS_OK) {
         goto exit;
     }
@@ -920,15 +1177,23 @@ exit:
 
 eGsErr_t remote_fetch(const char *url, const char *id, const char *ref)
 {
-    const char *args[] = { "fetch", "-q", "--no-tags", "--no-write-fetch-head",
-                           "--no-auto-gc", transport(url), NULL, NULL };
+    const char *args[NET_OPTS_N + 10U];
     Str_t spec = STR_INIT;
+    size_t na = add_net_opts(args);
     eGsErr_t err = GS_ERR_GIT;
 
     if (remote_url_ok(url)) {
         no_prompt();
         str_addf(&spec, "+refs/shared/%s:%s", id, ref);
-        args[6] = str_cstr(&spec);
+        args[na++] = "fetch";
+        args[na++] = "-q";
+        args[na++] = "--no-tags";
+        args[na++] = "--no-write-fetch-head";
+        args[na++] = "--no-auto-gc";
+        args[na++] = "--no-recurse-submodules";
+        args[na++] = transport(url);
+        args[na++] = str_cstr(&spec);
+        args[na] = NULL;
         err = git_run(args, PROC_STDERR_NULL, NULL);
     }
     str_free(&spec);

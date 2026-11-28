@@ -4,10 +4,12 @@
 #include "receive.h"
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "auth.h"
+#include "bounds.h"
 #include "chain.h"
 #include "inbox.h"
 #include "mem.h"
@@ -354,6 +356,7 @@ static eGsErr_t find_stop(Decide_t *d, const Oid_t *base, const Oid_t *c,
                            NULL };
     char hc[OID_HEX_SIZE];
     char hb[OID_HEX_SIZE];
+    char max[32];
     Str_t range = STR_INIT;
     Str_t out = STR_INIT;
     const char *line;
@@ -367,7 +370,11 @@ static eGsErr_t find_stop(Decide_t *d, const Oid_t *base, const Oid_t *c,
         oid_to_hex(base, hb);
         str_addf(&range, "%s..%s", hb, hc);
     } else {
-        args[2] = hc; /* nessuna versione comune: tutta la storia di c */
+        /* nessuna versione comune: la storia di c, al piu' GS_SCAN_MAX
+         * versioni (B-SA5); oltre, nessuna versione al suo posto */
+        (void)snprintf(max, sizeof max, "--max-count=%u", GS_SCAN_MAX);
+        args[2] = max;
+        args[3] = hc;
     }
     if (base->len > 0U) {
         args[3] = str_cstr(&range);
@@ -614,6 +621,70 @@ static void set_authority(const SharedEntry_t *e, GitBatch_t *b, const Oid_t *t,
     auth_free(&a);
 }
 
+/* 1 se la catena si puo' ricostruire dalla versione v (S-11): la sua
+ * autorita' e' quella su cui la ref e' stata vista (senza seen_url, il
+ * creatore), oppure un'autorita' accettata. */
+static int restore_ok(const SharedEntry_t *e, GitBatch_t *b, const Oid_t *v)
+{
+    Auth_t a = AUTH_INIT;
+    int ok = 0;
+
+    if ((auth_of(b, v, &a, NULL) == GS_OK) && (a.creator.len > 0U)) {
+        ok = remote_same_strict(auth_authority(&a), (e->seen_url.len > 0U)
+                                                        ? str_cstr(&e->seen_url)
+                                                        : str_cstr(&a.creator)) ||
+             receive_auth_listed(&e->auth_accepted, &a);
+    }
+    auth_free(&a);
+    return ok;
+}
+
+/*
+ * S-11: refs/shared-authority/<id> si aggiorna a ogni fetch
+ * dall'autorita', quindi puo' essere una versione che cambia l'autorita' e
+ * aspetta una decisione (un passaggio di consegne, o un dirottamento).
+ * Ricostruita cosi', T la prenderebbe senza accettazione. Si prende la
+ * prima versione della sua storia, in ordine topologico, che va bene
+ * (restore_ok): la stessa regola di judge, "T fino all'ultima versione con
+ * l'autorita' di prima". 1 e la versione in *pick se c'e'.
+ */
+static int restore_pick(const SharedEntry_t *e, GitBatch_t *b, const Oid_t *tip,
+                        Oid_t *pick)
+{
+    const char *args[] = { "rev-list", "--topo-order", NULL, NULL, NULL };
+    char hex[OID_HEX_SIZE];
+    char max[32];
+    Str_t out = STR_INIT;
+    const char *line;
+    const char *nl;
+    Oid_t v;
+    int found = 0;
+
+    if (restore_ok(e, b, tip)) {
+        *pick = *tip;
+        return 1;
+    }
+    oid_to_hex(tip, hex);
+    (void)snprintf(max, sizeof max, "--max-count=%u", GS_SCAN_MAX);
+    args[2] = max;
+    args[3] = hex;
+    if (git_run(args, 0U, &out) != GS_OK) {
+        str_reset(&out);
+    }
+    for (line = str_cstr(&out); (*line != '\0') && (found == 0);
+         line = (*nl == '\n') ? (nl + 1) : nl) {
+        nl = strchr(line, '\n');
+        nl = (nl != NULL) ? nl : (line + strlen(line));
+        if (oid_from_hex(&v, line, (size_t)(nl - line)) && !oid_eq(&v, tip) &&
+            restore_ok(e, b, &v)) {
+            *pick = v;
+            found = 1;
+        }
+    }
+    str_free(&out);
+    return found;
+}
+
 eGsErr_t receive_restore_chain(const SharedEntry_t *e, GitBatch_t *b, Oid_t *t)
 {
     PeerTally_t tally = { 0U, 0U, 0U };
@@ -626,6 +697,7 @@ eGsErr_t receive_restore_chain(const SharedEntry_t *e, GitBatch_t *b, Oid_t *t)
     Str_t del = STR_INIT;
     Str_t out = STR_INIT;
     Oid_t tip;
+    Oid_t seen;
     size_t k;
     int found = 0;
     eGsErr_t err = GS_ERR_GIT;
@@ -633,7 +705,8 @@ eGsErr_t receive_restore_chain(const SharedEntry_t *e, GitBatch_t *b, Oid_t *t)
     /* 1. L'ultima versione vista in remoto: nessuna rete. Il suo tree dice
      * anche il creatore, quindi il prossimo pull sa dove andare. */
     remote_seen_ref(&ref, e->id);
-    if (git_batch_query(b, str_cstr(&ref), &tip) == GIT_OBJ_COMMIT) {
+    if ((git_batch_query(b, str_cstr(&ref), &seen) == GIT_OBJ_COMMIT) &&
+        restore_pick(e, b, &seen, &tip)) {
         found = 1;
         if (e->seen_url.len > 0U) {
             str_add(&src, str_cstr(&e->seen_url));

@@ -130,6 +130,9 @@ PORCELAIN
     succession <id> <esito> <n> <url>   --remote: found, other, creator,
                                         none
     succession-via <id> <url>           chi l'ha detto (found, other)
+    succession-answer <id> <n> <di>     --remote: quanti indirizzi della
+                                        linea di successione, su <di>,
+                                        hanno risposto con il file
     creator-back <id> <url>
     auth-change <id> <versione> <fonte> <url>
                                         fonte: authority, peer, unknown

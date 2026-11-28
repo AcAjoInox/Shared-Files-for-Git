@@ -603,9 +603,21 @@ static const char *const msg_en[] = {
         "it, 'git shared crown %s %s'",
     [MSG_STATUS_CREATOR_BACK] =
         "the creator %s is reachable again: 'git shared crown --restore %s'",
-    [MSG_STATUS_HEIRS_NONE] =
-        "no heir answers: choose a sovereign with 'git shared crown <url> %s', "
-        "or your own remote with 'git shared crown %s'",
+    [MSG_STATUS_HEIRS_EMPTY] =
+        "there are no heirs in the chain: choose a sovereign with "
+        "'git shared crown <url> %s', or your own remote with "
+        "'git shared crown %s'",
+    [MSG_STATUS_HEIRS_SILENT] =
+        "none of the %u addresses of the line of succession answers: choose "
+        "a sovereign with 'git shared crown <url> %s', or your own remote "
+        "with 'git shared crown %s'",
+    [MSG_STATUS_HEIRS_STILL] =
+        "%u of %u addresses of the line of succession answer, none has taken "
+        "over: choose a sovereign with 'git shared crown <url> %s', or your "
+        "own remote with 'git shared crown %s'",
+    [MSG_STATUS_AUTH_NO_FILE] =
+        "the %s answers but no longer has the file: if it was removed by "
+        "mistake, its maintainers can publish it again",
     [MSG_CREATOR_SAME] = "same version",
     [MSG_CREATOR_AHEAD] = "ahead: run 'git shared push'",
     [MSG_CREATOR_BEHIND] = "newer version on the %s: run 'git shared update'",
@@ -633,10 +645,23 @@ static const char *const msg_en[] = {
     [MSG_ERR_CROWN_ARGS] = "crown needs a path, with a remote or URL "
                            "(default: origin), or --restore, --accept or "
                            "--reject",
-    [MSG_ERR_HEIRS_NONE] =
-        "%s: the authority and its heirs are unreachable.\n"
+    [MSG_ERR_HEIRS_EMPTY] =
+        "%s: there are no heirs in the chain.\n"
         "  choose a sovereign: 'git shared crown <url> %s',\n"
         "  or your own remote:  'git shared crown %s'",
+    [MSG_ERR_HEIRS_SILENT] =
+        "%s: none of the %u addresses of the line of succession answers.\n"
+        "  choose a sovereign: 'git shared crown <url> %s',\n"
+        "  or your own remote:  'git shared crown %s'",
+    [MSG_ERR_HEIRS_STILL] =
+        "%s: %u of %u addresses of the line of succession answer, none has "
+        "taken over.\n"
+        "  choose a sovereign: 'git shared crown <url> %s',\n"
+        "  or your own remote:  'git shared crown %s'",
+    [MSG_ERR_AUTH_NO_FILE] =
+        "%s: the %s answers but no longer has the file: if it was removed by "
+        "mistake, ask its maintainers to publish it again before choosing "
+        "another authority",
     [MSG_ERR_HEIR_OTHER] =
         "%s: the authority is unreachable; %s says it is now %s, which is "
         "not an heir: to follow it, 'git shared crown %s %s'",
@@ -734,6 +759,30 @@ static const char *const msg_en[] = {
     [MSG_LOG_CREATOR] = "creator %s",
     [MSG_LOG_AUTH] = "authority -> %s",
     [MSG_LOG_HEIRS] = "heirs changed",
+
+    [MSG_WARN_CREATOR_NEWER] =
+        "%s: the %s %s has a newer version: run 'git shared pull'",
+    [MSG_ERR_LINK_NAME_UNSAFE] =
+        "the chain proposes '%s' as the name of the file, which is not a "
+        "plain file name: say where to put it, "
+        "'git shared link %s %s <path>'",
+    [MSG_ERR_PATH_RESERVED] =
+        "%s declares the shared files of the repository: it cannot be "
+        "shared itself",
+    [MSG_ERR_DEST_PARENT_FILE] = "cannot write %s: %s is a file, not a folder",
+    [MSG_WARN_PEER_NO_CHAIN] =
+        "%s: peer %s does not have this file, or cannot be read",
+    [MSG_WARN_PEER_NOT_UPDATED] = "%s: peer %s could not be updated",
+    [MSG_ERR_PATH_OUTSIDE] = "'%s' is not a path of this repository",
+    [MSG_WARN_PEERS_LEFT_OUT] =
+        "%s: %u repositories of the group are not peers of this one: at most "
+        "%u peers per file",
+    [MSG_WARN_LINK_SOURCE_DIFFERS] =
+        "%s is not the latest published version (changes not published or "
+        "not committed there): linked the latest version",
+    [MSG_WORD_PUBLISH] = "publish",
+    [MSG_WORD_UPDATE] = "update",
+    [MSG_WORD_SHARED_FILES] = "shared files",
 };
 
 _Static_assert(sizeof msg_en / sizeof msg_en[0] == MSG_COUNT,
